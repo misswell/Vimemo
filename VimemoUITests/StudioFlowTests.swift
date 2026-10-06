@@ -16,6 +16,48 @@ final class StudioFlowTests: XCTestCase {
         start.press(forDuration: 0.05, thenDragTo: end)
     }
 
+    @MainActor func testDraftSavingToggleAndTemporaryExportLifecycle() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["--test-library", UUID().uuidString, "-unlimitedDuration", "NO"]
+        app.launch()
+        app.buttons["设置"].tap()
+        let toggle = app.switches["saveDrafts"]
+        for _ in 0..<4 where !toggle.isHittable { app.swipeUp() }
+        XCTAssertTrue(toggle.waitForExistence(timeout: 5))
+        XCTAssertEqual(toggle.value as? String, "1")
+        toggle.tap()
+        XCTAssertEqual(toggle.value as? String, "0")
+        screenshot(app, name: "17-draft-storage-setting")
+        app.buttons["工作台"].tap()
+        app.buttons["试试示例"].tap()
+        XCTAssertTrue(app.buttons["makeLivePhotos"].waitForExistence(timeout: 10))
+        app.buttons["makeLivePhotos"].tap()
+        app.buttons["静态照片"].tap()
+        app.swipeUp()
+        app.buttons["本机作品 / 分享文件"].tap()
+        app.buttons["制作文件 · 1 个作品"].tap()
+        XCTAssertTrue(app.staticTexts["已制作 1 个作品"].waitForExistence(timeout: 30))
+        app.buttons["完成"].tap()
+        app.buttons["返回工作台"].tap()
+        XCTAssertTrue(app.staticTexts["下一张实况，从这里开始"].waitForExistence(timeout: 5))
+        app.terminate(); app.launch()
+        app.buttons["作品"].tap()
+        XCTAssertTrue(app.staticTexts["海边的最后一束光"].waitForExistence(timeout: 5))
+        app.buttons["设置"].tap()
+        for _ in 0..<4 where !toggle.isHittable { app.swipeUp() }
+        XCTAssertEqual(toggle.value as? String, "0")
+        app.buttons["clearTemporaryCache"].tap()
+        XCTAssertTrue(app.alerts["临时缓存已检查"].waitForExistence(timeout: 5))
+        app.alerts.buttons["好"].tap()
+        toggle.tap()
+        app.buttons["工作台"].tap()
+        app.buttons["试试示例"].tap()
+        XCTAssertTrue(app.buttons["返回工作台"].waitForExistence(timeout: 10))
+        app.buttons["返回工作台"].tap()
+        app.terminate(); app.launch()
+        XCTAssertTrue(app.staticTexts["海边的最后一束光"].waitForExistence(timeout: 5))
+    }
+
     @MainActor func testGIFOptionsExportAndRestoreDraft() throws {
         let app = XCUIApplication()
         app.launchArguments = ["--test-library", UUID().uuidString, "--demo-editor", "-unlimitedDuration", "NO"]

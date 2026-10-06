@@ -9,6 +9,8 @@ struct SettingsView: View {
     @AppStorage("defaultMuted") private var muted = false
     @AppStorage("unlimitedDuration") private var unlimitedDuration = false
     @State private var usage = "计算中…"
+    @State private var storageDetail = ""
+    @State private var showCacheResult = false
     @State private var showPurchase = false
     @State private var showRestoreResult = false
     var body: some View {
@@ -47,7 +49,14 @@ struct SettingsView: View {
                 StudioCard {
                     VStack(alignment: .leading, spacing: 16) {
                         SectionLabel(title: "本机存储", detail: usage)
-                        Text("\(store.projects.count) 个草稿 · \(store.exports.count) 个作品").font(.subheadline)
+                        Toggle("保存草稿", isOn: Binding(get: { store.savesDrafts }, set: { store.setSavesDrafts($0); refreshStorage() }))
+                            .accessibilityIdentifier("saveDrafts")
+                        Text("默认开启，自动保存导入视频与编辑进度。关闭后，本次编辑文件在返回时清理；已有草稿保留，修改不自动保存。导出作品仍会保留。")
+                            .font(.caption).foregroundStyle(StudioTheme.secondary)
+                        Text("\(store.savedDraftCount) 个草稿 · \(store.exports.count) 个作品").font(.subheadline)
+                        Text(storageDetail).font(.caption).foregroundStyle(StudioTheme.secondary)
+                        Button("清理临时缓存") { store.clearTemporaryCache(); refreshStorage(); showCacheResult = true }
+                            .accessibilityIdentifier("clearTemporaryCache")
                         Text("长按工作台的草稿或收藏中的作品可删除本机文件。相册中的原视频和已保存作品不会随之删除。").font(.caption).foregroundStyle(StudioTheme.secondary)
                     }
                 }
@@ -66,7 +75,9 @@ struct SettingsView: View {
                     Text("Vimemo 实刻 · \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "")").font(.system(size: 11, design: .monospaced)).foregroundStyle(StudioTheme.secondary.opacity(0.6))
                 }.frame(maxWidth: .infinity).padding(.vertical, 15)
             }.padding(.horizontal, 24)
-        }.scrollIndicators(.hidden).task { usage = store.diskUsage }
+        }.scrollIndicators(.hidden).task { refreshStorage() }
+            .onChange(of: store.exports.count) { _, _ in refreshStorage() }
+            .alert("临时缓存已检查", isPresented: $showCacheResult) { Button("好", role: .cancel) {} } message: { Text("已清理可移除的临时文件。正在编辑或导出的文件、草稿及作品会保留。") }
             .onChange(of: unlimitedDuration) { _, enabled in store.setUnlimitedDuration(enabled) }
             .sheet(isPresented: $showPurchase) {
                 UnlimitedPurchaseView { unlimitedDuration = true }
@@ -74,6 +85,10 @@ struct SettingsView: View {
             .alert("恢复购买", isPresented: $showRestoreResult) {
                 Button("好", role: .cancel) {}
             } message: { Text(purchases.message ?? "已恢复不限制时长。") }
+    }
+    private func refreshStorage() {
+        usage = store.diskUsage
+        storageDetail = store.storageDetail
     }
     private func tip(_ title: String, _ content: String) -> some View {
         VStack(alignment: .leading, spacing: 7) { Text(title).font(.system(size: 13, weight: .medium)); Text(content).font(.system(size: 12)).foregroundStyle(StudioTheme.secondary).lineSpacing(3) }

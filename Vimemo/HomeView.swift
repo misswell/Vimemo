@@ -9,6 +9,7 @@ struct HomeView: View {
     @State private var selection: [PhotosPickerItem] = []
     @State private var fileImporter = false
     @State private var editing: VideoProject?
+    @State private var editingID: UUID?
     @State private var batchMode = false
     @State private var batchIDs: Set<UUID> = []
     @State private var exportProjects: [VideoProject] = []
@@ -54,8 +55,13 @@ struct HomeView: View {
                     if items.count == 1, store.projects.count > previous { editing = store.projects.first }
                 }
             }
-            .fullScreenCover(item: $editing) { project in EditorView(project: project) }
-            .sheet(isPresented: $showExport) { ExportSheet(projects: exportProjects) }
+            .fullScreenCover(item: $editing, onDismiss: {
+                if let editingID { store.endEditing(editingID) }
+                editingID = nil
+            }) { project in
+                EditorView(project: project).onAppear { editingID = project.id; store.beginEditing(project.id) }
+            }
+            .sheet(isPresented: $showExport, onDismiss: { store.endWorkspaceSession(); exportProjects = []; batchIDs = [] }) { ExportSheet(projects: exportProjects) }
             .alert("需要处理", isPresented: Binding(get: { store.errorMessage != nil }, set: { if !$0 { store.errorMessage = nil } })) {
                 Button("知道了") { store.errorMessage = nil }
             } message: { Text(store.errorMessage ?? "") }
@@ -96,7 +102,7 @@ struct HomeView: View {
                 }.foregroundStyle(.white)
                 VStack(alignment: .leading, spacing: 17) {
                     HStack {
-                        Text("我的草稿").font(.system(size: 19, weight: .semibold))
+                        Text(store.savesDrafts ? "我的草稿" : "草稿与本次编辑").font(.system(size: 19, weight: .semibold))
                         Text("\(store.projects.count)").font(.caption.monospacedDigit()).foregroundStyle(StudioTheme.secondary)
                         Spacer()
                         if !store.projects.isEmpty {
@@ -110,7 +116,7 @@ struct HomeView: View {
                             Image(systemName: "rectangle.stack").font(.system(size: 28, weight: .ultraLight)).foregroundStyle(StudioTheme.secondary)
                             VStack(alignment: .leading, spacing: 6) {
                                 Text("下一张实况，从这里开始").font(.system(size: 14, weight: .medium))
-                                Text("导入视频后，编辑进度自动保存。").font(.caption).foregroundStyle(StudioTheme.secondary)
+                                Text(store.savesDrafts ? "导入视频后，编辑进度自动保存。" : "未开启保存草稿，返回时清理本次编辑文件。").font(.caption).foregroundStyle(StudioTheme.secondary)
                             }
                         }.frame(maxWidth: .infinity, alignment: .leading).padding(22).background(StudioTheme.surface, in: RoundedRectangle(cornerRadius: 20))
                     } else {
@@ -194,7 +200,7 @@ struct HomeView: View {
             .overlay(alignment: .top) { Rectangle().fill(.white.opacity(0.07)).frame(height: 1) }
     }
     private func tabButton(_ title: String, symbol: String, index: Int) -> some View {
-        Button { tab = index } label: {
+        Button { if tab == 0 && index != 0 { store.endWorkspaceSession(); batchIDs = [] }; tab = index } label: {
             VStack(spacing: 6) {
                 Image(systemName: symbol).font(.system(size: 19, weight: tab == index ? .semibold : .regular))
                 Text(title).font(.system(size: 10, weight: .medium))

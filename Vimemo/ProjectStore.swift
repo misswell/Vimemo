@@ -13,7 +13,8 @@ struct ImportedMovie: Transferable {
             let directory = FileManager.default.temporaryDirectory.appendingPathComponent("VimemoImports", isDirectory: true)
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
             let target = directory.appendingPathComponent(UUID().uuidString).appendingPathExtension(received.file.pathExtension.isEmpty ? "mov" : received.file.pathExtension)
-            try FileManager.default.copyItem(at: received.file, to: target)
+            do { try FileManager.default.copyItem(at: received.file, to: target) }
+            catch { try? FileManager.default.removeItem(at: target); throw error }
             return ImportedMovie(url: target, name: received.file.deletingPathExtension().lastPathComponent)
         }
     }
@@ -26,34 +27,53 @@ struct ImportedMovie: Transferable {
     @Published var importMessage = ""
     @Published var errorMessage: String?
     let root: URL
+    @Published private(set) var savesDrafts: Bool
+    private let defaults: UserDefaults
+    private var savedProjects: [VideoProject] = []
+    private var editingIDs: Set<UUID> = []
+    private var exportInputs: [UUID: [VideoProject]] = [:]
+    private var exportFolders: Set<URL> = []
+    private var cleanupAllowed = true
+    private var activeImports = 0
     private var saveTask: Task<Void, Never>?
     private struct Library: Codable { var projects: [VideoProject]; var exports: [ExportRecord] }
 
-    init(root: URL? = nil) {
+    init(root: URL? = nil, defaults: UserDefaults = .standard) {
+        var draftDefaults = defaults
         var defaultRoot = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("Vimemo", isDirectory: true)
         #if DEBUG
         let arguments = ProcessInfo.processInfo.arguments
         if let index = arguments.firstIndex(of: "--test-library"), arguments.count > index + 1,
            let id = UUID(uuidString: arguments[index + 1]) {
+            if root == nil { draftDefaults = UserDefaults(suiteName: "VimemoUITests.\(id.uuidString)") ?? defaults }
             defaultRoot = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("VimemoUITests/\(id.uuidString)", isDirectory: true)
         }
         #endif
+        self.defaults = draftDefaults
+        savesDrafts = draftDefaults.object(forKey: "saveDrafts") as? Bool ?? true
         self.root = root ?? defaultRoot
         do {
             try FileManager.default.createDirectory(at: self.root, withIntermediateDirectories: true)
             let index = self.root.appendingPathComponent("library.json")
             if FileManager.default.fileExists(atPath: index.path) {
                 let saved = try JSONDecoder().decode(Library.self, from: Data(contentsOf: index))
+                savedProjects = saved.projects
                 projects = saved.projects
                 exports = saved.exports
             }
         } catch {
+            cleanupAllowed = false
             let index = self.root.appendingPathComponent("library.json")
             if FileManager.default.fileExists(atPath: index.path) {
                 try? FileManager.default.copyItem(at: index, to: self.root.appendingPathComponent("library-recovery-\(UUID().uuidString).json"))
             }
             errorMessage = "草稿库读取失败：\(error.localizedDescription)。原文件已保留为恢复副本。"
         }
+        // Recovery copies may still refer to media that is absent from the current index.
+        if let files = try? FileManager.default.contentsOfDirectory(atPath: self.root.path),
+           files.contains(where: { $0.hasPrefix("library-recovery-") }) { cleanupAllowed = false }
+        cleanTemporaryFiles()
+        if root == nil { cleanImportStaging() }
     }
 
     func url(for filename: String) -> URL { root.appendingPathComponent(filename) }
@@ -78,11 +98,78 @@ struct ImportedMovie: Transferable {
         try jpeg.write(to: url(for: filename), options: .atomic)
         return filename
     }
-    func persist() {
+    @discardableResult func persist() -> Bool {
         do {
-            let data = try JSONEncoder().encode(Library(projects: projects, exports: exports))
+            let drafts = savesDrafts ? projects : savedProjects
+            let data = try JSONEncoder().encode(Library(projects: drafts, exports: exports))
             try data.write(to: root.appendingPathComponent("library.json"), options: .atomic)
-        } catch { errorMessage = "草稿保存失败：\(error.localizedDescription)" }
+            savedProjects = drafts
+            return true
+        } catch {
+            cleanupAllowed = false
+            errorMessage = "草稿保存失败：\(error.localizedDescription)"
+            return false
+        }
+    }
+
+    func setSavesDrafts(_ enabled: Bool) {
+        guard enabled != savesDrafts else { return }
+        // Finish the saved snapshot before disabling automatic saving.
+        if savesDrafts, !persist() { return }
+        savesDrafts = enabled
+        defaults.set(enabled, forKey: "saveDrafts")
+        if enabled, persist() {
+            for project in projects { setTemporaryBackup(project, temporary: false) }
+        }
+    }
+    var savedDraftCount: Int { savedProjects.count }
+    var storageDetail: String { LibraryStorage.usage(root: root, savedProjects: savedProjects) }
+    func beginEditing(_ id: UUID) { editingIDs.insert(id) }
+    func endEditing(_ id: UUID) {
+        editingIDs.remove(id)
+        discardUnsavedChanges(ids: [id])
+        cleanTemporaryFiles()
+    }
+    func endWorkspaceSession() {
+        discardUnsavedChanges(ids: Set(projects.map(\.id)).subtracting(editingIDs))
+        cleanTemporaryFiles()
+    }
+    private func discardUnsavedChanges(ids: Set<UUID>) {
+        guard !savesDrafts else { persist(); return }
+        saveTask?.cancel()
+        projects = projects.compactMap { project in
+            guard ids.contains(project.id) else { return project }
+            return savedProjects.first { $0.id == project.id }
+        }
+        persist()
+    }
+    func retainExportInputs(_ projects: [VideoProject]) -> UUID {
+        let token = UUID(); exportInputs[token] = projects; return token
+    }
+    func releaseExportInputs(_ token: UUID) {
+        exportInputs.removeValue(forKey: token)
+        cleanTemporaryFiles()
+    }
+    func protectExportFolder(_ folder: URL) { exportFolders.insert(folder) }
+    func releaseExportFolder(_ folder: URL) { exportFolders.remove(folder) }
+    func cleanTemporaryFiles() {
+        guard cleanupAllowed, !importing, activeImports == 0 else { return }
+        LibraryStorage.clean(root: root, projects: savedProjects + projects + exportInputs.values.flatMap { $0 },
+                             exports: exports, editingIDs: editingIDs, exportFolders: exportFolders)
+    }
+    private func cleanImportStaging() {
+        guard !importing, activeImports == 0 else { return }
+        let staging = FileManager.default.temporaryDirectory.appendingPathComponent("VimemoImports", isDirectory: true)
+        try? FileManager.default.removeItem(at: staging)
+    }
+    func clearTemporaryCache() {
+        cleanTemporaryFiles()
+        if !importing { cleanImportStaging() }
+    }
+    private func setTemporaryBackup(_ project: VideoProject, temporary: Bool) {
+        var folder = url(for: project.filename).deletingLastPathComponent()
+        var values = URLResourceValues(); values.isExcludedFromBackup = temporary
+        try? folder.setResourceValues(values)
     }
     func update(_ project: VideoProject) {
         guard let index = projects.firstIndex(where: { $0.id == project.id }) else { return }
@@ -95,13 +182,15 @@ struct ImportedMovie: Transferable {
     }
     func delete(_ project: VideoProject) {
         projects.removeAll { $0.id == project.id }
-        persist()
-        try? FileManager.default.removeItem(at: url(for: project.filename).deletingLastPathComponent())
+        savedProjects.removeAll { $0.id == project.id }
+        if persist() { cleanTemporaryFiles() }
     }
     func delete(_ export: ExportRecord) {
         exports.removeAll { $0.id == export.id }
-        persist()
-        if let first = export.files.first { try? FileManager.default.removeItem(at: url(for: first).deletingLastPathComponent()) }
+        guard persist() else { return }
+        if let first = export.files.first {
+            LibraryStorage.removeOwnedFolder(url(for: first).deletingLastPathComponent(), parent: root.appendingPathComponent("Exports"))
+        }
     }
 
     func importSelections(_ items: [PhotosPickerItem]) async {
@@ -146,6 +235,8 @@ struct ImportedMovie: Transferable {
     }
 
     @discardableResult func importVideo(_ source: URL, title: String?) async throws -> VideoProject {
+        activeImports += 1
+        defer { activeImports -= 1 }
         let id = UUID()
         let folder = root.appendingPathComponent("Projects/\(id.uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
@@ -183,6 +274,7 @@ struct ImportedMovie: Transferable {
         project.settings.unlimitedDuration = unlimitedDuration
         project.hasAudio = !(try await asset.loadTracks(withMediaType: .audio)).isEmpty
         projects.insert(project, at: 0)
+        setTemporaryBackup(project, temporary: !savesDrafts)
         persist()
         completed = true
         return project
@@ -223,8 +315,10 @@ struct ImportedMovie: Transferable {
             errorMessage = "超过 3 秒的导出需要解锁不限制时长。"; return false
         }
         running = true; progress = 0; completed = []; errorMessage = nil; cancelled = false
+        let lease = store.retainExportInputs(projects)
         let entries = projects.flatMap { project in project.clips.map { (project, $0) } }
         job = Task { [weak self] in
+            defer { store.releaseExportInputs(lease) }
             guard let self else { return }
             let background = UIApplication.shared.beginBackgroundTask(withName: "VimemoExport") { [weak self] in
                 Task { @MainActor in self?.cancel() }
@@ -244,6 +338,8 @@ struct ImportedMovie: Transferable {
                     let (project, clip) = entry
                     self.status = "正在制作 \(index + 1) / \(entries.count) · \(project.title)"
                     let folder = store.root.appendingPathComponent("Exports/\(UUID().uuidString)", isDirectory: true)
+                    store.protectExportFolder(folder)
+                    defer { store.releaseExportFolder(folder) }
                     let media = try await exporter.export(source: store.url(for: project.filename), project: project, clip: clip, directory: folder) { [weak self] fraction in
                         Task { @MainActor in self?.progress = (Double(index) + fraction) / Double(entries.count) }
                     }
