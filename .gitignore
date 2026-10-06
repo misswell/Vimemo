@@ -1,0 +1,13 @@
+build/
+Reference/
+.asc/
+.env
+.env.*
+*.xcresult
+*.xcarchive
+.DS_Store
+*.mobileprovision
+*.p8
+*.p12
+xcuserdata/
+*.xcuserstate

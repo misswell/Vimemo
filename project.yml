@@ -1,0 +1,57 @@
+name: Vimemo
+options:
+  bundleIdPrefix: com.vimemo
+  deploymentTarget:
+    iOS: '18.0'
+  xcodeVersion: '26.0'
+settings:
+  base:
+    SWIFT_VERSION: '5.0'
+    DEVELOPMENT_TEAM: U8U443D7ZL
+    MARKETING_VERSION: '1.0.1'
+    CURRENT_PROJECT_VERSION: '2'
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+targets:
+  Vimemo:
+    type: application
+    platform: iOS
+    sources: [Vimemo]
+    info:
+      path: Vimemo/Info.plist
+      properties:
+        CFBundleDisplayName: 实刻
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        ITSAppUsesNonExemptEncryption: false
+        UILaunchScreen:
+          UIColorName: LaunchBackground
+        NSPhotoLibraryAddUsageDescription: 将你制作的实况照片、视频和图片保存到相册。
+        UISupportsDocumentBrowser: false
+        UIFileSharingEnabled: false
+        LSSupportsOpeningDocumentsInPlace: true
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        UISupportedInterfaceOrientations~ipad: [UIInterfaceOrientationPortrait, UIInterfaceOrientationPortraitUpsideDown, UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.vimemo.live
+        TARGETED_DEVICE_FAMILY: '1,2'
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+  VimemoTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources: [VimemoTests]
+    dependencies:
+      - target: Vimemo
+  VimemoUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: [VimemoUITests]
+    dependencies:
+      - target: Vimemo
+schemes:
+  Vimemo:
+    build:
+      targets:
+        Vimemo: all
+    test:
+      targets: [VimemoTests, VimemoUITests]

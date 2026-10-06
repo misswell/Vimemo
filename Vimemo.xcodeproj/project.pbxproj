@@ -1,0 +1,599 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		05F848268836991683CF3424 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3C1E5F2CD456963D32BD9D7 /* SettingsView.swift */; };
+		1412744612C019E08BA9051D /* FrameAnalysis.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD2BCE4ABE8C18F0B2B410D6 /* FrameAnalysis.swift */; };
+		18C6526278A41E4FB5142FE2 /* DemoPoster.jpg in Resources */ = {isa = PBXBuildFile; fileRef = 745A5B234A67FC388657143C /* DemoPoster.jpg */; };
+		1D8EB763F07CA06C7022B9BB /* MediaProcessor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F8C0E5F75CE0686900A20D5 /* MediaProcessor.swift */; };
+		2757C32D1517DEC963CA80D2 /* TimelineView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54A8AA74B56AE08436D70E5C /* TimelineView.swift */; };
+		2CD3B11E236A7DE64B548E37 /* ProjectStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 526AEC8B2AB81852BFBDA44D /* ProjectStore.swift */; };
+		2FE82C9757C0B46913AAF5D3 /* ConversionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9334053069559BEC925B94C9 /* ConversionTests.swift */; };
+		31816DE93B37777681CF58F1 /* ExportViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC2DB2334232B072557A74AA /* ExportViews.swift */; };
+		5B85764F979AA71017AC2C85 /* LivePhotoExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD671452152F7FFF1BE8F4F1 /* LivePhotoExporter.swift */; };
+		66869A973CAF56B3AA493D1F /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = D35BC4007A3663455B2FE7F8 /* Theme.swift */; };
+		68FEACE0724F5E238CDDF22D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = ACFAF2A2EAB11395E7003787 /* Assets.xcassets */; };
+		712A5CB7AE1D392CFE2C8B5E /* HistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A8D1F8B507869296D816F47 /* HistoryView.swift */; };
+		8D16920595805C26FB763A82 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F4201FCA686FCFF0F180D7A /* Models.swift */; };
+		9CAF0EDDABDE813ECCCEB0F1 /* StudioFlowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A78144CB0D2A6734E514D19B /* StudioFlowTests.swift */; };
+		ADCEBA15435CC5AB5FF81D0D /* EditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A74CF6506976EC76D178416 /* EditorView.swift */; };
+		B6C576193B7087C225C271DB /* Demo.mov in Resources */ = {isa = PBXBuildFile; fileRef = 7AABEFC4FF4D647E6D85BEEE /* Demo.mov */; };
+		BDEF5FC05902A5FBDA5E8272 /* PreviewCompositor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 164CF80884B18FDBB0790EA0 /* PreviewCompositor.swift */; };
+		D10F953DE4548DF7AABF8CC6 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2004620AB707B86C25E51F04 /* HomeView.swift */; };
+		D1B3DA361AFAF53C447D096F /* AudioFixture.mov in Resources */ = {isa = PBXBuildFile; fileRef = E61D0FE5A8B9D494C91643A7 /* AudioFixture.mov */; };
+		F53E4A804E86F9BCAE0FC326 /* VimemoApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C7EB6C4F034914E55CF7210 /* VimemoApp.swift */; };
+		FB332EBA71470FE13CBCA262 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 4550B527243C4938ED07CF04 /* PrivacyInfo.xcprivacy */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		2B0A3814BC3CF63A5B8B1918 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A91D52151668A5133EC2A5E1 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = F341F0DA490C6C2CB46F69AF;
+			remoteInfo = Vimemo;
+		};
+		6E14212A59E2968C96549A6C /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A91D52151668A5133EC2A5E1 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = F341F0DA490C6C2CB46F69AF;
+			remoteInfo = Vimemo;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		0F8C0E5F75CE0686900A20D5 /* MediaProcessor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaProcessor.swift; sourceTree = "<group>"; };
+		15AC16403C80A25C3B71B15A /* Vimemo.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Vimemo.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		164CF80884B18FDBB0790EA0 /* PreviewCompositor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewCompositor.swift; sourceTree = "<group>"; };
+		1CEB44D62EB5D262FF2E5974 /* VimemoTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = VimemoTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		2004620AB707B86C25E51F04 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
+		4550B527243C4938ED07CF04 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		4A74CF6506976EC76D178416 /* EditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorView.swift; sourceTree = "<group>"; };
+		526AEC8B2AB81852BFBDA44D /* ProjectStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectStore.swift; sourceTree = "<group>"; };
+		54A8AA74B56AE08436D70E5C /* TimelineView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimelineView.swift; sourceTree = "<group>"; };
+		5A8D1F8B507869296D816F47 /* HistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryView.swift; sourceTree = "<group>"; };
+		745A5B234A67FC388657143C /* DemoPoster.jpg */ = {isa = PBXFileReference; lastKnownFileType = image.jpeg; path = DemoPoster.jpg; sourceTree = "<group>"; };
+		75DE8ACD72CEFCFE332347E8 /* VimemoUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = VimemoUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		7AABEFC4FF4D647E6D85BEEE /* Demo.mov */ = {isa = PBXFileReference; lastKnownFileType = video.quicktime; path = Demo.mov; sourceTree = "<group>"; };
+		8C7EB6C4F034914E55CF7210 /* VimemoApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VimemoApp.swift; sourceTree = "<group>"; };
+		8F4201FCA686FCFF0F180D7A /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+		9334053069559BEC925B94C9 /* ConversionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversionTests.swift; sourceTree = "<group>"; };
+		A78144CB0D2A6734E514D19B /* StudioFlowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudioFlowTests.swift; sourceTree = "<group>"; };
+		ACFAF2A2EAB11395E7003787 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		C3C1E5F2CD456963D32BD9D7 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		CC2DB2334232B072557A74AA /* ExportViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportViews.swift; sourceTree = "<group>"; };
+		D35BC4007A3663455B2FE7F8 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
+		DD671452152F7FFF1BE8F4F1 /* LivePhotoExporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LivePhotoExporter.swift; sourceTree = "<group>"; };
+		E61D0FE5A8B9D494C91643A7 /* AudioFixture.mov */ = {isa = PBXFileReference; lastKnownFileType = video.quicktime; path = AudioFixture.mov; sourceTree = "<group>"; };
+		FBCA03C66EB23962C5B87906 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		FD2BCE4ABE8C18F0B2B410D6 /* FrameAnalysis.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrameAnalysis.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		0C9F22FA4E8D8BAC38383406 /* Vimemo */ = {
+			isa = PBXGroup;
+			children = (
+				ACFAF2A2EAB11395E7003787 /* Assets.xcassets */,
+				4A74CF6506976EC76D178416 /* EditorView.swift */,
+				CC2DB2334232B072557A74AA /* ExportViews.swift */,
+				FD2BCE4ABE8C18F0B2B410D6 /* FrameAnalysis.swift */,
+				5A8D1F8B507869296D816F47 /* HistoryView.swift */,
+				2004620AB707B86C25E51F04 /* HomeView.swift */,
+				FBCA03C66EB23962C5B87906 /* Info.plist */,
+				DD671452152F7FFF1BE8F4F1 /* LivePhotoExporter.swift */,
+				0F8C0E5F75CE0686900A20D5 /* MediaProcessor.swift */,
+				8F4201FCA686FCFF0F180D7A /* Models.swift */,
+				164CF80884B18FDBB0790EA0 /* PreviewCompositor.swift */,
+				4550B527243C4938ED07CF04 /* PrivacyInfo.xcprivacy */,
+				526AEC8B2AB81852BFBDA44D /* ProjectStore.swift */,
+				C3C1E5F2CD456963D32BD9D7 /* SettingsView.swift */,
+				D35BC4007A3663455B2FE7F8 /* Theme.swift */,
+				54A8AA74B56AE08436D70E5C /* TimelineView.swift */,
+				8C7EB6C4F034914E55CF7210 /* VimemoApp.swift */,
+				91046CB5A66C155C2903F7A7 /* Resources */,
+			);
+			path = Vimemo;
+			sourceTree = "<group>";
+		};
+		1D7170AD21A29EA37D33AE77 /* Fixtures */ = {
+			isa = PBXGroup;
+			children = (
+				E61D0FE5A8B9D494C91643A7 /* AudioFixture.mov */,
+			);
+			path = Fixtures;
+			sourceTree = "<group>";
+		};
+		39E53DFB7CEFA056969F4660 /* VimemoTests */ = {
+			isa = PBXGroup;
+			children = (
+				9334053069559BEC925B94C9 /* ConversionTests.swift */,
+				1D7170AD21A29EA37D33AE77 /* Fixtures */,
+			);
+			path = VimemoTests;
+			sourceTree = "<group>";
+		};
+		51DCCF19F07D90ADFECF7A8F /* VimemoUITests */ = {
+			isa = PBXGroup;
+			children = (
+				A78144CB0D2A6734E514D19B /* StudioFlowTests.swift */,
+			);
+			path = VimemoUITests;
+			sourceTree = "<group>";
+		};
+		8AA082569FE1112146C1B845 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				15AC16403C80A25C3B71B15A /* Vimemo.app */,
+				1CEB44D62EB5D262FF2E5974 /* VimemoTests.xctest */,
+				75DE8ACD72CEFCFE332347E8 /* VimemoUITests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		91046CB5A66C155C2903F7A7 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				7AABEFC4FF4D647E6D85BEEE /* Demo.mov */,
+				745A5B234A67FC388657143C /* DemoPoster.jpg */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		A1444737C6F0454019007F12 = {
+			isa = PBXGroup;
+			children = (
+				0C9F22FA4E8D8BAC38383406 /* Vimemo */,
+				39E53DFB7CEFA056969F4660 /* VimemoTests */,
+				51DCCF19F07D90ADFECF7A8F /* VimemoUITests */,
+				8AA082569FE1112146C1B845 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		A5DFB3465FA3B91B420123B4 /* VimemoUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F9B19E75EC1109F72E40A602 /* Build configuration list for PBXNativeTarget "VimemoUITests" */;
+			buildPhases = (
+				A0052135950C894240B67DC5 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				F8C8B28BA6760EEC59FAF65C /* PBXTargetDependency */,
+			);
+			name = VimemoUITests;
+			packageProductDependencies = (
+			);
+			productName = VimemoUITests;
+			productReference = 75DE8ACD72CEFCFE332347E8 /* VimemoUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+		B8E15CBD109A636E5AA09958 /* VimemoTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = E2A153AACA35A9F75A5DE5CB /* Build configuration list for PBXNativeTarget "VimemoTests" */;
+			buildPhases = (
+				11302CB4FF75FA93524DAE36 /* Sources */,
+				9B43B6953210535AF70AEB06 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				37BF26001102E9ACED143B4D /* PBXTargetDependency */,
+			);
+			name = VimemoTests;
+			packageProductDependencies = (
+			);
+			productName = VimemoTests;
+			productReference = 1CEB44D62EB5D262FF2E5974 /* VimemoTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		F341F0DA490C6C2CB46F69AF /* Vimemo */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = E73F55D735E706CAB8B9629C /* Build configuration list for PBXNativeTarget "Vimemo" */;
+			buildPhases = (
+				C1CC0980FE90D4DC9572CF8D /* Sources */,
+				C57D80E0F0E93C8DDF35FE80 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = Vimemo;
+			packageProductDependencies = (
+			);
+			productName = Vimemo;
+			productReference = 15AC16403C80A25C3B71B15A /* Vimemo.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		A91D52151668A5133EC2A5E1 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 2600;
+				TargetAttributes = {
+					A5DFB3465FA3B91B420123B4 = {
+						DevelopmentTeam = U8U443D7ZL;
+						TestTargetID = F341F0DA490C6C2CB46F69AF;
+					};
+					B8E15CBD109A636E5AA09958 = {
+						DevelopmentTeam = U8U443D7ZL;
+					};
+					F341F0DA490C6C2CB46F69AF = {
+						DevelopmentTeam = U8U443D7ZL;
+					};
+				};
+			};
+			buildConfigurationList = 7B28CC127A48950347AE3AE1 /* Build configuration list for PBXProject "Vimemo" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = A1444737C6F0454019007F12;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 8AA082569FE1112146C1B845 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				F341F0DA490C6C2CB46F69AF /* Vimemo */,
+				B8E15CBD109A636E5AA09958 /* VimemoTests */,
+				A5DFB3465FA3B91B420123B4 /* VimemoUITests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		9B43B6953210535AF70AEB06 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D1B3DA361AFAF53C447D096F /* AudioFixture.mov in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C57D80E0F0E93C8DDF35FE80 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				68FEACE0724F5E238CDDF22D /* Assets.xcassets in Resources */,
+				B6C576193B7087C225C271DB /* Demo.mov in Resources */,
+				18C6526278A41E4FB5142FE2 /* DemoPoster.jpg in Resources */,
+				FB332EBA71470FE13CBCA262 /* PrivacyInfo.xcprivacy in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		11302CB4FF75FA93524DAE36 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				2FE82C9757C0B46913AAF5D3 /* ConversionTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A0052135950C894240B67DC5 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				9CAF0EDDABDE813ECCCEB0F1 /* StudioFlowTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C1CC0980FE90D4DC9572CF8D /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				ADCEBA15435CC5AB5FF81D0D /* EditorView.swift in Sources */,
+				31816DE93B37777681CF58F1 /* ExportViews.swift in Sources */,
+				1412744612C019E08BA9051D /* FrameAnalysis.swift in Sources */,
+				712A5CB7AE1D392CFE2C8B5E /* HistoryView.swift in Sources */,
+				D10F953DE4548DF7AABF8CC6 /* HomeView.swift in Sources */,
+				5B85764F979AA71017AC2C85 /* LivePhotoExporter.swift in Sources */,
+				1D8EB763F07CA06C7022B9BB /* MediaProcessor.swift in Sources */,
+				8D16920595805C26FB763A82 /* Models.swift in Sources */,
+				BDEF5FC05902A5FBDA5E8272 /* PreviewCompositor.swift in Sources */,
+				2CD3B11E236A7DE64B548E37 /* ProjectStore.swift in Sources */,
+				05F848268836991683CF3424 /* SettingsView.swift in Sources */,
+				66869A973CAF56B3AA493D1F /* Theme.swift in Sources */,
+				2757C32D1517DEC963CA80D2 /* TimelineView.swift in Sources */,
+				F53E4A804E86F9BCAE0FC326 /* VimemoApp.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		37BF26001102E9ACED143B4D /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = F341F0DA490C6C2CB46F69AF /* Vimemo */;
+			targetProxy = 6E14212A59E2968C96549A6C /* PBXContainerItemProxy */;
+		};
+		F8C8B28BA6760EEC59FAF65C /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = F341F0DA490C6C2CB46F69AF /* Vimemo */;
+			targetProxy = 2B0A3814BC3CF63A5B8B1918 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		06EB5496FD49C7F68BFD8BF3 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				INFOPLIST_FILE = Vimemo/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.vimemo.live;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		1EC6FC4F60C22649955BC749 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 2;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = U8U443D7ZL;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				MARKETING_VERSION = 1.0.1;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		774670BE1A604E7029D6C04C /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 2;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = U8U443D7ZL;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				MARKETING_VERSION = 1.0.1;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		B133D7D378132B885C27EBF6 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.vimemo.VimemoTests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Vimemo.app/Vimemo";
+			};
+			name = Release;
+		};
+		CDF6EC82842309AE6377E6F5 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				INFOPLIST_FILE = Vimemo/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.vimemo.live;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		ED15DB294798D39539B20472 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.vimemo.VimemoUITests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = Vimemo;
+			};
+			name = Release;
+		};
+		EFABA162668E5680C4A61747 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.vimemo.VimemoUITests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = Vimemo;
+			};
+			name = Debug;
+		};
+		F16D29DDC809B0C9BA728216 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.vimemo.VimemoTests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Vimemo.app/Vimemo";
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		7B28CC127A48950347AE3AE1 /* Build configuration list for PBXProject "Vimemo" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				1EC6FC4F60C22649955BC749 /* Debug */,
+				774670BE1A604E7029D6C04C /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		E2A153AACA35A9F75A5DE5CB /* Build configuration list for PBXNativeTarget "VimemoTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				F16D29DDC809B0C9BA728216 /* Debug */,
+				B133D7D378132B885C27EBF6 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		E73F55D735E706CAB8B9629C /* Build configuration list for PBXNativeTarget "Vimemo" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				CDF6EC82842309AE6377E6F5 /* Debug */,
+				06EB5496FD49C7F68BFD8BF3 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		F9B19E75EC1109F72E40A602 /* Build configuration list for PBXNativeTarget "VimemoUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				EFABA162668E5680C4A61747 /* Debug */,
+				ED15DB294798D39539B20472 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = A91D52151668A5133EC2A5E1 /* Project object */;
+}
