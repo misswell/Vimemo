@@ -23,9 +23,11 @@ enum ExportAccess {
     @Published private(set) var loadingProduct = false
     @Published private(set) var busy = false
     @Published private(set) var message: String?
+    private let productLoader: () async throws -> [Product]
     private var updatesTask: Task<Void, Never>?
 
-    init(observeTransactions: Bool = true) {
+    init(observeTransactions: Bool = true, productLoader: (() async throws -> [Product])? = nil) {
+        self.productLoader = productLoader ?? { try await Product.products(for: [Self.productID]) }
         if observeTransactions {
             updatesTask = Task { [weak self] in
                 for await result in Transaction.updates {
@@ -60,9 +62,10 @@ enum ExportAccess {
     func loadProduct() async {
         guard !loadingProduct else { return }
         loadingProduct = true
+        message = nil
         defer { loadingProduct = false }
         do {
-            product = try await Product.products(for: [Self.productID]).first { $0.id == Self.productID && $0.type == .nonConsumable }
+            product = try await productLoader().first { $0.id == Self.productID && $0.type == .nonConsumable }
             message = product == nil ? "暂时无法获取商品，请稍后重试。其他功能可继续免费使用。" : nil
         } catch { message = "商品加载失败：\(error.localizedDescription)" }
     }

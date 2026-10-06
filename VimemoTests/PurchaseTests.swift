@@ -41,6 +41,25 @@ final class PurchaseTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: root.appendingPathComponent("Exports").path))
     }
 
+    @MainActor func testUnavailableProductsKeepRetryFeedbackAndNeverUnlock() async throws {
+        var requests = 0
+        let store = PurchaseStore(observeTransactions: false, productLoader: {
+            requests += 1
+            if requests == 1 { throw URLError(.notConnectedToInternet) }
+            return []
+        })
+        await store.prepare()
+        XCTAssertTrue(store.entitlementReady)
+        XCTAssertNil(store.product)
+        XCTAssertNotNil(store.message)
+        XCTAssertFalse(store.loadingProduct)
+        await store.loadProduct()
+        XCTAssertEqual(requests, 2)
+        XCTAssertEqual(store.message, "暂时无法获取商品，请稍后重试。其他功能可继续免费使用。")
+        XCTAssertFalse(store.hasUnlimited)
+        XCTAssertFalse(store.loadingProduct)
+    }
+
     @MainActor func testVerifiedPurchaseSurvivesRelaunchAndRefundRevokesAccess() async throws {
         if UIDevice.current.systemVersion.hasPrefix("26.5") {
             throw XCTSkip("iOS 26.5 StoreKitTest configuration sync is affected by Apple FB22237318; run on a supported runtime.")

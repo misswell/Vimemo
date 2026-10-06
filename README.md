@@ -24,6 +24,7 @@
 3 秒内的实况、MOV、GIF 导出，以及静态照片、视频帧/相册封面和全部编辑功能免费。GIF 的全部尺寸与帧率选项免费。
 超过 3 秒的动态导出使用一次性非消耗型应用内购买解锁，不订阅、不按次数收费。美国价格为 0.99 美元，中国大陆为 6 元；其他地区由 Apple 换算，购买界面读取 StoreKit 的实际本地价格。
 商品 ID：`com.vimemo.live.unlimited`。购买权益仅来自 StoreKit 验证通过的交易，支持恢复购买与退款后收回权限。旧版长草稿继续保留，未购买时长导出会显示解锁入口，也可免费导出静态照片。
+购买页采用深色海边画面、权益卡片、金色永久解锁选项和底部固定购买按钮；价格加载时显示进度，失败时显示持续的错误提示与重试入口。
 App Store Connect 商品与价格已配置；首次内购须随应用版本提交 Apple 审核，通过并上架后才能正式收费。GitHub IPA 和真机 Ad Hoc 安装不代表内购已上线。
 
 本机 iOS 26.5 的 StoreKitTest 配置同步受 Apple FB22237318 影响；iOS 27 模拟器当前将本地交易判为 `invalidDeviceVerification`。相应成功购买/恢复/退款集成测试明确跳过，保留签名验证，不用未验证交易解锁。正式启用收费前须在 TestFlight 沙盒完成成功购买、重装恢复与退款验证。
@@ -126,7 +127,7 @@ swiftc -target arm64-apple-macos14.0 -parse-as-library \
 
 ## GitHub 发布
 
-源码仓库：[misswell/Vimemo](https://github.com/misswell/Vimemo)。当前源码发布版本为 1.0.4（5），GitHub tag 为 `v1.0.4`；首次发布为 1.0.1（2）。
+源码仓库：[misswell/Vimemo](https://github.com/misswell/Vimemo)。当前源码发布版本为 1.0.5（6），GitHub tag 为 `v1.0.5`；首次发布为 1.0.1（2）。
 Release 附带 Apple Distribution 签名的 App Store IPA，仅供 App Store Connect 上传；日常安装请使用下方 TestFlight 邀请。
 `build/`、参考录屏截图、个人 Xcode 配置和签名凭据均不纳入 Git。
 
@@ -135,5 +136,6 @@ Release 附带 Apple Distribution 签名的 App Store IPA，仅供 App Store Con
 1.0.0（1）正式签名包已生成并验证：`build/TestFlight/Export/Vimemo.ipa`。
 归档：`build/TestFlight/Vimemo-1.0.0-1.xcarchive`。中文测试说明：`build/TestFlight/WhatToTest.zh-Hans.txt`。
 2026-10-06 已上传并处理通过，内部测试状态为 `IN_BETA_TESTING`。测试邀请已发送到 `misswell@foxmail.com`，可通过邀请邮件在 iPhone / iPad 的 TestFlight 安装。
+最新内部测试版本为 1.0.5（6），含新的永久解锁购买页、可选尺寸/帧率的 GIF 导出与两种封面选择。通过现有邀请在 TestFlight 中覆盖安装，不必先删除应用。TestFlight 内购使用 Apple 沙盒，不实际扣款；商品价格加载失败时可在固定按钮处查看错误并重试。
 App Store Connect：[Vimemo 实刻 TestFlight](https://appstoreconnect.apple.com/apps/6819492441/testflight/ios)。
 应用 ID：`6819492441`；构建 ID：`54e012e6-b4cc-4c50-a763-8058c9640432`；内部测试组：`58d7d5de-0316-4bf2-a7a5-5acf1387b9d5`。

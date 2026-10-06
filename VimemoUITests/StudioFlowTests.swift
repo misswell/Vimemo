@@ -1,4 +1,6 @@
 import XCTest
+import StoreKitTest
+import UIKit
 
 final class StudioFlowTests: XCTestCase {
     override func setUpWithError() throws { continueAfterFailure = false }
@@ -45,6 +47,74 @@ final class StudioFlowTests: XCTestCase {
         XCTAssertEqual(app.buttons["gifSize480"].value as? String, "已选择")
         app.swipeUp()
         XCTAssertEqual(app.buttons["gifFPS24"].value as? String, "已选择")
+    }
+
+    @MainActor func testPurchaseUnavailableKeepsVisibleRetryAndFreeExit() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["--test-library", UUID().uuidString, "--test-purchase-unavailable"]
+        app.launch()
+        app.buttons["设置"].tap()
+        app.buttons["unlockUnlimited"].tap()
+        let retry = app.buttons["reloadPurchase"]
+        XCTAssertTrue(retry.waitForExistence(timeout: 5))
+        XCTAssertTrue(retry.isHittable)
+        XCTAssertTrue(retry.isEnabled)
+        XCTAssertEqual(retry.label, "重新获取价格")
+        let error = app.staticTexts["purchaseMessage"]
+        XCTAssertTrue(error.waitForExistence(timeout: 5))
+        XCTAssertTrue(error.isHittable, "Price failures must remain above the pinned button")
+        screenshot(app, name: "17-purchase-unavailable")
+        retry.tap()
+        XCTAssertTrue(error.waitForExistence(timeout: 5))
+        XCTAssertTrue(retry.isHittable)
+        app.buttons["continueFree"].tap()
+        XCTAssertTrue(app.buttons["unlockUnlimited"].waitForExistence(timeout: 5))
+    }
+
+    @MainActor func testPurchaseLoadingKeepsDisabledButtonAndFreeExit() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["--test-library", UUID().uuidString, "--test-purchase-loading"]
+        app.launch()
+        app.buttons["设置"].tap()
+        app.buttons["unlockUnlimited"].tap()
+        let button = app.buttons["reloadPurchase"]
+        XCTAssertTrue(button.waitForExistence(timeout: 5))
+        XCTAssertTrue(button.isHittable)
+        XCTAssertFalse(button.isEnabled)
+        XCTAssertTrue(button.label.contains("正在获取价格"))
+        XCTAssertTrue(app.buttons["continueFree"].isHittable)
+        screenshot(app, name: "18-purchase-loading")
+        app.buttons["continueFree"].tap()
+        XCTAssertTrue(app.buttons["unlockUnlimited"].waitForExistence(timeout: 5))
+    }
+
+    @MainActor func testPurchasePriceAndButtonVisibleWithoutScrolling() throws {
+        if UIDevice.current.systemVersion.hasPrefix("26.5") {
+            throw XCTSkip("iOS 26.5 StoreKitTest sync is affected by Apple FB22237318; use a supported runtime for real test-product prices.")
+        }
+        let config = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "Unlimited", withExtension: "storekit"))
+        let session = try SKTestSession(contentsOf: config)
+        session.resetToDefaultState()
+        session.clearTransactions()
+        session.disableDialogs = true
+        defer { session.clearTransactions() }
+        let app = XCUIApplication()
+        app.launchArguments = ["--test-library", UUID().uuidString]
+        app.launch()
+        app.buttons["设置"].tap()
+        app.buttons["unlockUnlimited"].tap()
+        let button = app.buttons["buyUnlimited"]
+        XCTAssertTrue(button.waitForExistence(timeout: 10))
+        XCTAssertTrue(button.isHittable)
+        XCTAssertTrue(button.isEnabled)
+        let price = app.staticTexts["unlimitedPrice"]
+        XCTAssertTrue(price.exists)
+        XCTAssertTrue(price.isHittable)
+        XCTAssertTrue(button.label.contains(price.label))
+        XCTAssertTrue(app.buttons["restoreUnlimited"].isHittable)
+        screenshot(app, name: "19-purchase-ready")
+        app.buttons["continueFree"].tap()
+        XCTAssertTrue(app.buttons["unlockUnlimited"].exists)
     }
 
     @MainActor func testCreateTwoLivePhotosSaveToPhotosAndRestoreDraft() throws {
