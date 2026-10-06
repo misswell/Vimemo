@@ -33,8 +33,8 @@ struct CoverPickerView: View {
                     ZStack {
                         Color.black
                         if let preview { Image(uiImage: preview).resizable().scaledToFit() }
-                        else { ProgressView() }
-                    }.frame(height: 290).clipShape(RoundedRectangle(cornerRadius: 20))
+                        else { ProgressView().tint(.white) }
+                    }.foregroundStyle(.white).frame(height: 290).clipShape(RoundedRectangle(cornerRadius: 20))
                     HStack(spacing: 12) {
                         PillButton(title: "视频画面", selected: photoFilename == nil) {
                             photoTask?.cancel(); photoGeneration = UUID(); loadingPhoto = false
@@ -43,7 +43,7 @@ struct CoverPickerView: View {
                         PhotosPicker(selection: $photoItem, matching: .images) {
                             Label("相册照片", systemImage: "photo").font(.system(size: 13, weight: .medium))
                                 .padding(.horizontal, 16).padding(.vertical, 12)
-                                .foregroundStyle(photoFilename == nil ? .white : StudioTheme.background)
+                                .foregroundStyle(photoFilename == nil ? StudioTheme.ink : .white)
                                 .background(photoFilename == nil ? StudioTheme.raised : StudioTheme.accent, in: Capsule())
                         }.accessibilityIdentifier("pickCoverPhoto")
                     }
@@ -97,7 +97,7 @@ struct CoverPickerView: View {
                         try? FileManager.default.removeItem(at: store.url(for: importedFilename))
                     }
                 }
-        }.preferredColorScheme(.dark)
+        }.preferredColorScheme(.light)
     }
 
     private func loadPhoto(_ item: PhotosPickerItem?) {

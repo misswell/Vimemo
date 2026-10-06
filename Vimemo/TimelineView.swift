@@ -37,7 +37,7 @@ struct TimelineView: View {
                             clip.start = newStart; clip.end = original.end + shift; clip.cover = original.cover + shift
                             onSeek(clip.cover)
                         }.onEnded { _ in dragStart = nil })
-                    handle.offset(x: left - 10).simultaneousGesture(DragGesture(minimumDistance: 0).onChanged { value in
+                    handle.offset(x: left - 22).simultaneousGesture(DragGesture(minimumDistance: 0).onChanged { value in
                         guard abs(value.translation.width) >= abs(value.translation.height) else { return }
                         if dragStart == nil { dragStart = clip }
                         let start = (dragStart?.start ?? clip.start) + value.translation.width / width * total
@@ -46,7 +46,7 @@ struct TimelineView: View {
                         clip.normalize(sourceDuration: duration, speed: speed, maxOutputDuration: maxOutputDuration)
                         onSeek(clip.start)
                     }.onEnded { _ in dragStart = nil; onSeek(clip.cover) })
-                    handle.offset(x: right - 10).simultaneousGesture(DragGesture(minimumDistance: 0).onChanged { value in
+                    handle.offset(x: right - 22).simultaneousGesture(DragGesture(minimumDistance: 0).onChanged { value in
                         guard abs(value.translation.width) >= abs(value.translation.height) else { return }
                         if dragStart == nil { dragStart = clip }
                         let end = (dragStart?.end ?? clip.end) + value.translation.width / width * total
@@ -69,6 +69,7 @@ struct TimelineView: View {
     }
     private var handle: some View {
         RoundedRectangle(cornerRadius: 5).fill(StudioTheme.accent).frame(width: 20, height: 61)
-            .overlay { Capsule().fill(StudioTheme.background.opacity(0.5)).frame(width: 2, height: 19) }
+            .overlay { Capsule().fill(.white.opacity(0.8)).frame(width: 2, height: 19) }
+            .frame(width: 44, height: 70).contentShape(Rectangle())
     }
 }

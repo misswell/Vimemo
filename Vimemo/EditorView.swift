@@ -14,6 +14,7 @@ struct EditorView: View {
     @State private var tool = 0
     @State private var showExport = false
     @State private var showRename = false
+    @State private var showReset = false
     @State private var showCoverPicker = false
     @State private var titleDraft = ""
     @State private var previewTask: Task<Void, Never>?
@@ -41,15 +42,24 @@ struct EditorView: View {
         NavigationStack {
             ZStack {
                 StudioTheme.background.ignoresSafeArea()
-                ScrollView {
-                    VStack(spacing: 20) {
-                        preview
-                        clipSelector
-                        timelineCard
-                        toolSelector
-                        toolPanel
-                    }.padding(.horizontal, 20).padding(.top, 8).padding(.bottom, 20)
-                }.scrollIndicators(.hidden).accessibilityIdentifier("editorScroll")
+                GeometryReader { geometry in
+                    if geometry.size.width > 700 {
+                        HStack(alignment: .top, spacing: 24) {
+                            VStack(spacing: 12) {
+                                preview.frame(height: min(520, max(260, geometry.size.height - 92)))
+                                coverControls
+                            }.frame(width: geometry.size.width * 0.46)
+                            editorPanels
+                        }.padding(.horizontal, 24).padding(.vertical, 12)
+                    } else {
+                        VStack(spacing: 0) {
+                            preview.frame(height: min(280, max(136, geometry.size.height * 0.34)))
+                                .padding(.horizontal, 16).padding(.top, 6)
+                            coverControls.padding(.horizontal, 20).padding(.vertical, 8)
+                            editorPanels
+                        }
+                    }
+                }
             }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -59,25 +69,24 @@ struct EditorView: View {
                 ToolbarItem(placement: .principal) {
                     Button { titleDraft = project.title; showRename = true } label: {
                         VStack(spacing: 3) {
-                            Text(project.title).font(.system(size: 14, weight: .semibold)).lineLimit(1).foregroundStyle(.white)
+                            Text(project.title).font(.system(size: 14, weight: .semibold)).lineLimit(1).foregroundStyle(StudioTheme.ink)
                             Text("\(project.sizeLabel) · \(Int(project.frameRate.rounded())) FPS").font(.system(size: 9, design: .monospaced)).foregroundStyle(StudioTheme.secondary)
                         }
                     }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        project.settings.ratio = .original; project.settings.rotation = 0; project.settings.mirrored = false
-                        project.settings.look = .original; project.settings.exposure = 0; project.settings.contrast = 1; project.settings.saturation = 1
-                        project.settings.cropX = 0.5; project.settings.cropY = 0.5
-                    } label: { Image(systemName: "arrow.counterclockwise").font(.system(size: 15)) }.accessibilityLabel("重置画面编辑")
+                    Button { showReset = true } label: { Image(systemName: "arrow.counterclockwise").font(.system(size: 15)) }.accessibilityLabel("重置画面编辑")
                 }
             }
             .safeAreaInset(edge: .bottom) {
-                VStack(spacing: 0) {
-                    PrimaryButton(title: "制作与导出 · \(project.clips.count) 个片段", symbol: "square.and.arrow.up") {
+                VStack(spacing: 8) {
+                    toolSelector
+                    PrimaryButton(title: "导出 · \(project.clips.count) 个作品", symbol: "arrow.up.right") {
                         playing = false; player.pause(); store.update(project); store.persist(); showExport = true
                     }.disabled(exporter.running).accessibilityIdentifier("makeLivePhotos")
-                }.padding(.horizontal, 20).padding(.top, 12).padding(.bottom, 10).background(StudioTheme.background)
+                }.frame(maxWidth: 680).frame(maxWidth: .infinity).padding(.horizontal, 16).padding(.top, 8).padding(.bottom, 8)
+                    .background(StudioTheme.surface)
+                    .overlay(alignment: .top) { Rectangle().fill(StudioTheme.line).frame(height: 1) }
             }
             .sheet(isPresented: $showExport, onDismiss: {
                 if let saved = store.projects.first(where: { $0.id == project.id }) { project = saved }
@@ -89,6 +98,10 @@ struct EditorView: View {
                     store.update(project); store.persist()
                 }
             }
+            .alert("重置画面编辑", isPresented: $showReset) {
+                Button("重置画面编辑", role: .destructive) { resetPicture() }
+                Button("取消", role: .cancel) {}
+            } message: { Text("重置构图和调色？片段与封面选择会保留。") }
             .alert("重命名视频", isPresented: $showRename) {
                 TextField("视频名称", text: $titleDraft)
                 Button("取消", role: .cancel) {}
@@ -111,7 +124,21 @@ struct EditorView: View {
                 if let playerObserver { NotificationCenter.default.removeObserver(playerObserver) }
                 store.update(project); store.persist()
             }
-        }.preferredColorScheme(.dark)
+        }.preferredColorScheme(.light)
+    }
+
+    private var editorPanels: some View {
+        ScrollView {
+            VStack(spacing: 16) {
+                if tool == 0 {
+                    clipSelector
+                    timelineCard
+                    DisclosureGroup("发现更多片段") { momentsPanel.padding(.top, 12) }
+                        .font(.subheadline).padding(.horizontal, 4)
+                } else { toolPanel }
+            }.frame(maxWidth: 680).frame(maxWidth: .infinity)
+                .padding(.horizontal, 16).padding(.vertical, 12)
+        }.scrollIndicators(.hidden).accessibilityIdentifier("editorScroll")
     }
 
     private var preview: some View {
@@ -121,7 +148,7 @@ struct EditorView: View {
                 PlayerSurface(player: player)
             } else if let coverImage {
                 Image(uiImage: coverImage).resizable().scaledToFit().frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else { ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity) }
+            } else { ProgressView().tint(.white).frame(maxWidth: .infinity, maxHeight: .infinity) }
             HStack {
                 Label("LIVE", systemImage: "livephoto").font(.system(size: 10, weight: .semibold, design: .monospaced)).tracking(1)
                 Spacer()
@@ -131,8 +158,8 @@ struct EditorView: View {
                 Image(systemName: playing ? "pause.fill" : "play.fill").font(.system(size: 19)).foregroundStyle(.white)
                     .frame(width: 48, height: 48).background(.black.opacity(0.4), in: Circle())
             }.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing).padding(13).accessibilityLabel(playing ? "暂停预览" : "播放编辑后片段")
-        }.frame(height: 260).clipShape(RoundedRectangle(cornerRadius: 22))
-            .overlay(RoundedRectangle(cornerRadius: 22).stroke(.white.opacity(0.08), lineWidth: 1))
+        }.accessibilityIdentifier("editorPreview").clipShape(RoundedRectangle(cornerRadius: 6))
+            .overlay(RoundedRectangle(cornerRadius: 6).stroke(StudioTheme.line, lineWidth: 1))
     }
 
     private var clipSelector: some View {
@@ -140,7 +167,7 @@ struct EditorView: View {
             HStack(spacing: 8) {
                 ForEach(Array(project.clips.enumerated()), id: \.element.id) { index, item in
                     PillButton(title: "片段 \(index + 1)", selected: item.id == activeClipID) { activeClipID = item.id }
-                        .frame(width: 78, height: 40).fixedSize()
+                        .frame(width: 84, height: 44).fixedSize()
                 }
                 Button {
                     let start = min(clip.end, max(0, project.duration - maxSourceClipDuration))
@@ -148,7 +175,7 @@ struct EditorView: View {
                     newClip.normalize(sourceDuration: project.duration, speed: project.settings.speed, maxOutputDuration: project.settings.maxOutputDuration)
                     project.clips.append(newClip); activeClipID = newClip.id
                 } label: { Image(systemName: "plus").font(.system(size: 14, weight: .medium)).padding(12).background(StudioTheme.surface, in: Circle()) }
-                    .frame(width: 40, height: 40).fixedSize()
+                    .frame(width: 44, height: 44).fixedSize()
                     .disabled(project.clips.count >= 20).accessibilityLabel("添加片段")
                 if project.clips.count > 1 {
                     Button {
@@ -156,7 +183,7 @@ struct EditorView: View {
                         activeClipID = project.clips.first { $0.id != removedID }!.id
                         project.clips.removeAll { $0.id == removedID }
                     } label: { Image(systemName: "trash").font(.system(size: 13)).padding(12).foregroundStyle(StudioTheme.secondary) }
-                        .frame(width: 40, height: 40).fixedSize().accessibilityLabel("删除当前片段")
+                        .frame(width: 44, height: 44).fixedSize().accessibilityLabel("删除当前片段")
                 }
             }.buttonStyle(.plain)
         }.scrollIndicators(.hidden)
@@ -165,7 +192,7 @@ struct EditorView: View {
     private var timelineCard: some View {
         StudioCard {
             VStack(spacing: 16) {
-                SectionLabel(title: "选择这一刻", detail: "原视频 \(project.duration.timeLabel)")
+                SectionLabel(title: "裁剪片段", detail: "原视频 \(project.duration.timeLabel)")
                 TimelineView(clip: clipBinding, duration: project.duration, speed: project.settings.speed, maxOutputDuration: project.settings.maxOutputDuration, thumbnails: thumbnails) { time in seekFrame(time) }
                 if project.settings.maxOutputDuration == nil {
                     Button("使用整段视频") {
@@ -174,46 +201,20 @@ struct EditorView: View {
                         project.clips[clipIndex] = value
                     }.font(.system(size: 12, weight: .medium)).accessibilityIdentifier("useFullVideo")
                 }
-                Button {
-                    coverTask?.cancel(); findingCover = false; playing = false; player.pause()
-                    showCoverPicker = true
-                } label: {
-                    Label("选择封面", systemImage: "photo.on.rectangle").font(.system(size: 14, weight: .semibold))
-                        .frame(maxWidth: .infinity).padding(.vertical, 12).background(StudioTheme.raised, in: RoundedRectangle(cornerRadius: 12))
-                }.accessibilityIdentifier("chooseCover")
-                if clip.coverPhotoFilename != nil {
-                    Text("已使用相册照片作为封面").font(.caption).foregroundStyle(StudioTheme.peach)
-                } else { VStack(spacing: 8) {
-                    HStack {
-                        Text("封面帧").font(.system(size: 12)).foregroundStyle(StudioTheme.secondary)
-                        Spacer()
-                        Text("第 \(Int((clip.cover * max(1, project.frameRate)).rounded())) 帧").font(.system(size: 10, design: .monospaced)).foregroundStyle(StudioTheme.peach)
-                    }
-                    Slider(value: Binding(get: { clip.cover }, set: { coverTask?.cancel(); project.clips[clipIndex].cover = $0 }), in: clip.start...max(clip.start + 0.001, clip.end - 1.0 / 600)).tint(StudioTheme.peach).accessibilityLabel("选择封面时间")
-                    HStack(spacing: 12) {
-                        frameButton("上一帧", symbol: "backward.end.fill", delta: -1)
-                        Button { togglePlayback() } label: {
-                            Image(systemName: playing ? "pause.fill" : "play.fill").font(.system(size: 14)).frame(width: 40, height: 36).background(StudioTheme.raised, in: Capsule())
-                        }.accessibilityLabel("预览片段")
-                        frameButton("下一帧", symbol: "forward.end.fill", delta: 1)
-                    }.foregroundStyle(.white)
-                } }
-                HStack {
-                    Text("精确裁剪").font(.caption).foregroundStyle(StudioTheme.secondary)
-                    Spacer()
-                    Text("入点").font(.caption2)
-                    timeStepper(isStart: true)
-                    Text("出点").font(.caption2)
-                    timeStepper(isStart: false)
+                HStack(spacing: 8) {
+                    frameButton("上一帧", symbol: "backward.end.fill", delta: -1)
+                    Text(clip.coverPhotoFilename == nil ? "第 \(Int((clip.cover * max(1, project.frameRate)).rounded())) 帧" : "照片封面")
+                        .font(.system(size: 10, design: .monospaced)).foregroundStyle(StudioTheme.secondary)
+                    frameButton("下一帧", symbol: "forward.end.fill", delta: 1)
                 }
-                Button {
-                    findClearCover()
-                } label: {
-                    HStack(spacing: 7) {
-                        if findingCover { ProgressView().controlSize(.small) }
-                        Label(findingCover ? "正在比较片段中的画面…" : "自动选清晰封面", systemImage: "viewfinder")
-                    }.font(.system(size: 12, weight: .medium))
-                }.disabled(findingCover)
+                DisclosureGroup("精确裁剪") {
+                    HStack {
+                        VStack(spacing: 8) { Text("入点 \(clip.start.timeLabel)"); timeStepper(isStart: true) }
+                        Spacer()
+                        VStack(spacing: 8) { Text("出点 \(clip.end.timeLabel)"); timeStepper(isStart: false) }
+                    }.font(.caption).padding(.top, 12)
+                }.font(.caption)
+
             }
         }.buttonStyle(.plain)
     }
@@ -228,7 +229,7 @@ struct EditorView: View {
                     } else { value.end += Double(direction) / max(1, project.frameRate) }
                     value.normalize(sourceDuration: project.duration, speed: project.settings.speed, maxOutputDuration: project.settings.maxOutputDuration)
                     project.clips[clipIndex] = value
-                } label: { Image(systemName: direction == -1 ? "minus" : "plus").font(.system(size: 10)).frame(width: 23, height: 28).background(StudioTheme.raised, in: RoundedRectangle(cornerRadius: 6)) }
+                } label: { Image(systemName: direction == -1 ? "minus" : "plus").font(.system(size: 10)).frame(width: 44, height: 44).background(StudioTheme.raised, in: RoundedRectangle(cornerRadius: 6)) }
                     .accessibilityLabel("\(isStart ? "入点" : "出点")\(direction == -1 ? "前移" : "后移")一帧")
             }
         }.buttonStyle(.plain)
@@ -239,21 +240,45 @@ struct EditorView: View {
             coverTask?.cancel()
             project.clips[clipIndex].coverPhotoFilename = nil
             project.clips[clipIndex].cover = min(clip.end - 1.0 / 600, max(clip.start, clip.cover + delta / max(1, project.frameRate)))
-        } label: { Label(title, systemImage: symbol).font(.system(size: 11, weight: .medium)).frame(maxWidth: .infinity).padding(.vertical, 11).background(StudioTheme.raised, in: Capsule()) }
+        } label: { Label(title, systemImage: symbol).font(.system(size: 11, weight: .medium)).frame(maxWidth: .infinity).frame(minHeight: 44).background(StudioTheme.raised, in: RoundedRectangle(cornerRadius: 10)) }
     }
 
     private var toolSelector: some View {
-        HStack(spacing: 0) {
-            ForEach(Array([("片段", "square.stack"), ("画面", "crop.rotate"), ("调色", "camera.filters"), ("播放", "speedometer")].enumerated()), id: \.offset) { index, item in
+        HStack(spacing: 4) {
+            ForEach(Array([("片段", "scissors"), ("画面", "crop.rotate"), ("调色", "camera.filters"), ("播放", "speedometer")].enumerated()), id: \.offset) { index, item in
                 Button { tool = index } label: {
-                    VStack(spacing: 8) {
-                        Image(systemName: item.1).font(.system(size: 18))
-                        Text(item.0).font(.system(size: 11, weight: .medium))
-                    }.foregroundStyle(tool == index ? StudioTheme.accent : StudioTheme.secondary).frame(maxWidth: .infinity).padding(.vertical, 13)
-                        .background(tool == index ? StudioTheme.surface : .clear, in: RoundedRectangle(cornerRadius: 14))
-                }
+                    VStack(spacing: 6) {
+                        Label(item.0, systemImage: item.1).font(.system(size: 12, weight: .semibold))
+                        Capsule().fill(tool == index ? StudioTheme.accent : .clear).frame(height: 3)
+                    }.foregroundStyle(tool == index ? StudioTheme.accent : StudioTheme.secondary)
+                        .frame(maxWidth: .infinity).frame(minHeight: 44)
+                }.accessibilityIdentifier("editorTool\(index)")
+                    .accessibilityValue(tool == index ? "已选择" : "未选择")
             }
         }.buttonStyle(.plain)
+    }
+    private var coverControls: some View {
+        HStack(spacing: 12) {
+            Button {
+                coverTask?.cancel(); findingCover = false; playing = false; player.pause(); showCoverPicker = true
+            } label: {
+                Label("选择封面", systemImage: "photo.on.rectangle").font(.system(size: 13, weight: .semibold)).frame(minHeight: 44)
+            }.accessibilityIdentifier("chooseCover")
+            Spacer(minLength: 0)
+            if clip.coverPhotoFilename != nil {
+                Text("已使用相册照片作为封面").font(.system(size: 10)).foregroundStyle(StudioTheme.secondary).lineLimit(2)
+            } else {
+                Button { findClearCover() } label: {
+                    if findingCover { ProgressView().controlSize(.small).frame(minHeight: 44) }
+                    else { Label("自动选帧", systemImage: "sparkle").font(.system(size: 12)).frame(minHeight: 44) }
+                }.disabled(findingCover).accessibilityLabel("自动选清晰封面")
+            }
+        }.buttonStyle(.plain)
+    }
+    private func resetPicture() {
+        project.settings.ratio = .original; project.settings.rotation = 0; project.settings.mirrored = false
+        project.settings.look = .original; project.settings.exposure = 0; project.settings.contrast = 1; project.settings.saturation = 1
+        project.settings.cropX = 0.5; project.settings.cropY = 0.5
     }
     @ViewBuilder private var toolPanel: some View {
         switch tool {

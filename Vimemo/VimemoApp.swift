@@ -8,7 +8,7 @@ import SwiftUI
     var body: some Scene {
         WindowGroup {
             HomeView().environmentObject(store).environmentObject(exporter).environmentObject(purchases)
-                .preferredColorScheme(.dark).tint(StudioTheme.accent)
+                .foregroundStyle(StudioTheme.ink).preferredColorScheme(.light).tint(StudioTheme.accent)
                 .task { await purchases.prepare() }
                 .onChange(of: scenePhase) { _, phase in
                     if phase != .active { store.persist() }

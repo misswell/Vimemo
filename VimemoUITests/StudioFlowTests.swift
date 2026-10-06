@@ -16,6 +16,46 @@ final class StudioFlowTests: XCTestCase {
         start.press(forDuration: 0.05, thenDragTo: end)
     }
 
+    @MainActor func testPersistentToolsCoverResetAndQuickDraftExport() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["--test-library", UUID().uuidString]
+        app.launch()
+        app.buttons["试试示例"].tap()
+        XCTAssertTrue(app.buttons["makeLivePhotos"].waitForExistence(timeout: 10))
+        app.buttons["editorTool1"].tap()
+        XCTAssertTrue(app.buttons["1:1"].waitForExistence(timeout: 5))
+        app.buttons["1:1"].tap()
+        XCTAssertEqual(app.buttons["1:1"].value as? String, "已选择")
+        XCTAssertTrue(app.buttons["chooseCover"].isHittable)
+        XCTAssertTrue(app.buttons["makeLivePhotos"].isHittable)
+        app.buttons["重置画面编辑"].tap()
+        app.buttons["取消"].tap()
+        XCTAssertEqual(app.buttons["1:1"].value as? String, "已选择", "Cancelling reset must keep edits")
+        app.buttons["editorTool2"].tap()
+        app.buttons["胶片"].tap()
+        XCTAssertTrue(app.buttons["chooseCover"].isHittable)
+        screenshot(app, name: "18-persistent-editor-tools")
+        app.buttons["返回工作台"].tap()
+        let draft = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "海边的最后一束光")).firstMatch
+        XCTAssertTrue(draft.waitForExistence(timeout: 5))
+        draft.press(forDuration: 1)
+        app.buttons["重命名"].tap()
+        let field = app.alerts.textFields.firstMatch
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        field.tap()
+        field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: "海边的最后一束光".count) + "重新命名")
+        app.alerts.buttons["保存"].tap()
+        let quickExport = app.buttons["导出重新命名"]
+        XCTAssertTrue(quickExport.waitForExistence(timeout: 5))
+        quickExport.tap()
+        XCTAssertTrue(app.staticTexts["制作与导出"].waitForExistence(timeout: 5))
+        screenshot(app, name: "19-quick-export")
+        app.buttons["静态照片"].tap()
+        app.buttons["本机作品 / 分享文件"].tap()
+        app.buttons["制作文件 · 1 个作品"].tap()
+        XCTAssertTrue(app.staticTexts["已制作 1 个作品"].waitForExistence(timeout: 30))
+    }
+
     @MainActor func testDraftSavingToggleAndTemporaryExportLifecycle() throws {
         let app = XCUIApplication()
         app.launchArguments = ["--test-library", UUID().uuidString, "-unlimitedDuration", "NO"]
@@ -254,6 +294,13 @@ final class StudioFlowTests: XCTestCase {
     }
 
     @MainActor func testPurchaseResultAndRelaunch() throws {
+        if UIDevice.current.systemVersion.hasPrefix("26.5") {
+            throw XCTSkip("iOS 26.5 StoreKitTest sync is affected by Apple FB22237318; use a supported runtime for transaction UI tests.")
+        }
+        let config = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "Unlimited", withExtension: "storekit"))
+        let session = try SKTestSession(contentsOf: config)
+        session.resetToDefaultState(); session.clearTransactions(); session.disableDialogs = true
+        defer { session.clearTransactions() }
         let app = XCUIApplication()
         app.launchArguments = ["--test-library", UUID().uuidString]
         app.launch()

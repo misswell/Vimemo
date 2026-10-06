@@ -16,8 +16,8 @@ struct SettingsView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
-                Text("按你的习惯").font(.system(size: 30, weight: .bold)).padding(.top, 22)
-                Text("给下一段回忆，设好默认选项。").font(.subheadline).foregroundStyle(StudioTheme.secondary)
+                Text("偏好设置").font(.system(size: 30, weight: .semibold, design: .rounded)).padding(.top, 22)
+                Text("保存方式、默认选项与本机空间。").font(.subheadline).foregroundStyle(StudioTheme.secondary)
                 StudioCard {
                     VStack(alignment: .leading, spacing: 20) {
                         SectionLabel(title: "新视频的默认设置")
@@ -74,7 +74,7 @@ struct SettingsView: View {
                     Label("离线处理 · 无账号 · 无水印", systemImage: "lock.shield").font(.caption).foregroundStyle(StudioTheme.secondary)
                     Text("Vimemo 实刻 · \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "")").font(.system(size: 11, design: .monospaced)).foregroundStyle(StudioTheme.secondary.opacity(0.6))
                 }.frame(maxWidth: .infinity).padding(.vertical, 15)
-            }.padding(.horizontal, 24)
+            }.frame(maxWidth: 680).frame(maxWidth: .infinity).padding(.horizontal, 24)
         }.scrollIndicators(.hidden).task { refreshStorage() }
             .onChange(of: store.exports.count) { _, _ in refreshStorage() }
             .alert("临时缓存已检查", isPresented: $showCacheResult) { Button("好", role: .cancel) {} } message: { Text("已清理可移除的临时文件。正在编辑或导出的文件、草稿及作品会保留。") }

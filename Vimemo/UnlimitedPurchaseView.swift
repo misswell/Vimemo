@@ -55,7 +55,7 @@ struct UnlimitedPurchaseView: View {
             .interactiveDismissDisabled(purchases.busy)
             .task { await purchases.prepare(); deliverUnlock() }
             .onChange(of: purchases.hasUnlimited) { _, _ in deliverUnlock() }
-        }.preferredColorScheme(.dark)
+        }.foregroundStyle(PurchaseTheme.text).preferredColorScheme(.dark)
     }
 
     private var hero: some View {

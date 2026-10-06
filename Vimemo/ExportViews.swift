@@ -39,7 +39,7 @@ struct ExportSheet: View {
                 ScrollView {
                     VStack(spacing: 20) {
                         if started { resultView } else { optionsView }
-                    }.padding(20)
+                    }.frame(maxWidth: 680).frame(maxWidth: .infinity).padding(20)
                 }.scrollIndicators(.hidden)
             }
             .navigationTitle(started ? "制作进度" : "制作与导出")
@@ -52,25 +52,33 @@ struct ExportSheet: View {
             .interactiveDismissDisabled(coordinator.running)
             .safeAreaInset(edge: .bottom) {
                 if !started {
-                    PrimaryButton(title: "\(saveToPhotos ? "制作并保存" : "制作文件") · \(count) 个作品", symbol: format.symbol) { start() }
-                        .disabled(count == 0 || coordinator.running)
-                        .padding(20).background(StudioTheme.background)
+                    VStack(spacing: 9) {
+                        Text(format == .gif ? "GIF · \(gifSize.title) · \(gifFrameRate.title)" : "\(format.title) · \(quality.title)")
+                            .font(.system(size: 11, weight: .medium, design: .monospaced)).foregroundStyle(StudioTheme.secondary)
+                        PrimaryButton(title: "\(saveToPhotos ? "制作并保存" : "制作文件") · \(count) 个作品", symbol: format.symbol) { start() }
+                            .disabled(count == 0 || coordinator.running)
+                    }.padding(.horizontal, 20).padding(.vertical, 12).background(StudioTheme.surface)
+                        .overlay(alignment: .top) { Rectangle().fill(StudioTheme.line).frame(height: 1) }
                 }
             }
             .sheet(isPresented: $sharing) {
                 ShareSheet(urls: coordinator.completed.flatMap { $0.files.map { store.url(for: $0) } })
             }
             .sheet(isPresented: $showPurchase) { UnlimitedPurchaseView { start() } }
-        }.preferredColorScheme(.dark)
+        }.preferredColorScheme(.light)
     }
 
     private var optionsView: some View {
         VStack(spacing: 20) {
             HStack {
-                Image(systemName: "square.stack.3d.up").font(.system(size: 25, weight: .light)).foregroundStyle(StudioTheme.accent)
+                Group {
+                    if let project = projects.first {
+                        ThumbnailImage(url: store.url(for: project.thumbnailFilename)).frame(width: 48, height: 60).clipShape(RoundedRectangle(cornerRadius: 6))
+                    }
+                }
                 VStack(alignment: .leading, spacing: 5) {
                     Text("\(projects.count) 个视频 · \(count) 个片段").font(.headline)
-                    Text("编辑效果会应用到全部输出。").font(.caption).foregroundStyle(StudioTheme.secondary)
+                    Text("选择格式，带走这一刻。").font(.caption).foregroundStyle(StudioTheme.secondary)
                 }
                 Spacer()
             }.padding(.vertical, 5)
@@ -89,13 +97,20 @@ struct ExportSheet: View {
                                     Text(item.title).font(.system(size: 13, weight: .medium))
                                     Spacer(minLength: 0)
                                     if format == item { Image(systemName: "checkmark").font(.system(size: 11, weight: .bold)) }
-                                }.padding(13).foregroundStyle(format == item ? StudioTheme.background : .white)
+                                }.padding(.horizontal, 13).frame(minHeight: 50).foregroundStyle(format == item ? .white : StudioTheme.ink)
                                     .background(format == item ? StudioTheme.accent : StudioTheme.raised, in: RoundedRectangle(cornerRadius: 12))
-                            }
+                            }.accessibilityValue(format == item ? "已选择" : "未选择")
                         }
-                    }
-                    Text(format == .livePhoto ? "保存到相册后，长按照片即可播放。文件分享会包含 JPG 与 MOV 两个配对原件。" : format == .gif ? "GIF 循环播放，不含声音。可选择尺寸和帧率，保留当前画面比例。" : format == .photo ? "导出所选封面帧，保留裁剪与调色。" : "导出裁剪后的 MOV 视频，保留声音与编辑效果。")
+                    }.buttonStyle(.plain)
+                    Text(format == .livePhoto ? "保存到相册后长按播放。分享文件包含 JPG 与 MOV 配对原件。" : format == .gif ? "GIF 循环播放，不含声音。尺寸和帧率可自由选择。" : format == .photo ? "导出所选封面帧，保留裁剪与调色。" : "导出裁剪后的 MOV 视频，保留声音与编辑效果。")
                         .font(.system(size: 11)).foregroundStyle(StudioTheme.secondary)
+                }
+            }
+            StudioCard {
+                VStack(alignment: .leading, spacing: 16) {
+                    SectionLabel(title: "保存到")
+                    Picker("保存位置", selection: $saveToPhotos) { Text("照片图库").tag(true); Text("本机作品 / 分享文件").tag(false) }.pickerStyle(.segmented)
+                    Label("本机始终保留一份，可在「作品」中再次分享。", systemImage: "internaldrive").font(.system(size: 11)).foregroundStyle(StudioTheme.secondary)
                 }
             }
             if format == .gif {
@@ -133,21 +148,16 @@ struct ExportSheet: View {
                 }
             }
             StudioCard {
-                VStack(alignment: .leading, spacing: 15) {
-                    SectionLabel(title: "拍摄信息")
-                    Toggle("保留原始拍摄时间", isOn: $preserveDate).font(.system(size: 14))
-                    Divider().overlay(.white.opacity(0.05))
-                    Toggle("保留原始位置", isOn: $preserveLocation).font(.system(size: 14))
-                    Text("仅保留导入文件中已有的信息。缺少拍摄时间时，相册使用导出时间。位置默认关闭。").font(.system(size: 11)).foregroundStyle(StudioTheme.secondary)
-                }
+                DisclosureGroup("拍摄信息与隐私") {
+                    VStack(alignment: .leading, spacing: 15) {
+                        Toggle("保留原始拍摄时间", isOn: $preserveDate).font(.system(size: 14))
+                        Divider()
+                        Toggle("保留原始位置", isOn: $preserveLocation).font(.system(size: 14))
+                        Text("仅保留导入文件中已有的信息。缺少拍摄时间时，相册使用导出时间。位置默认关闭。").font(.system(size: 11)).foregroundStyle(StudioTheme.secondary)
+                    }.padding(.top, 16)
+                }.font(.subheadline.weight(.medium))
             }
-            StudioCard {
-                VStack(alignment: .leading, spacing: 16) {
-                    SectionLabel(title: "保存到")
-                    Picker("保存位置", selection: $saveToPhotos) { Text("照片图库").tag(true); Text("本机作品 / 分享文件").tag(false) }.pickerStyle(.segmented)
-                    Label("本机始终保留一份，可在「作品」中再次分享。", systemImage: "internaldrive").font(.system(size: 11)).foregroundStyle(StudioTheme.secondary)
-                }
-            }
+
         }
     }
     @ViewBuilder private var resultView: some View {
@@ -226,7 +236,7 @@ struct MediaPreview: View {
         Group {
             if record.format == .livePhoto { LivePhotoPreview(urls: record.files.map { store.url(for: $0) }) }
             else if record.format == .video {
-                if let player { VideoPlayer(player: player) } else { ProgressView() }
+                if let player { VideoPlayer(player: player) } else { ProgressView().tint(.white) }
             } else if record.format == .gif, let file = record.files.first {
                 AnimatedGIF(url: store.url(for: file))
             } else {
@@ -250,14 +260,14 @@ struct LivePhotoPreview: View {
         ZStack(alignment: .bottom) {
             if let photo { LivePhotoSurface(photo: photo, playback: playback) }
             else if let error { Text(error).font(.caption).padding().frame(maxWidth: .infinity, maxHeight: .infinity) }
-            else { ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity) }
+            else { ProgressView().tint(.white).frame(maxWidth: .infinity, maxHeight: .infinity) }
             if photo != nil {
                 Button { playback += 1 } label: {
                     Label("长按画面，或点此播放实况", systemImage: "livephoto").font(.system(size: 11, weight: .medium))
                         .padding(.horizontal, 14).padding(.vertical, 9).background(.black.opacity(0.65), in: Capsule())
                 }.padding(12).foregroundStyle(.white)
             }
-        }.onAppear {
+        }.foregroundStyle(.white).onAppear {
             request = PHLivePhoto.request(withResourceFileURLs: urls, placeholderImage: nil, targetSize: CGSize(width: 1200, height: 1200), contentMode: .aspectFit) { result, info in
                 guard !(info[PHLivePhotoInfoIsDegradedKey] as? Bool ?? false) else { return }
                 DispatchQueue.main.async {
