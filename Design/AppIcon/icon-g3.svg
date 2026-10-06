@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+<!-- Vimemo 实刻 · 光迹系列 G3 流星拖尾 · 1024 全出血方图，圆角由系统图标蒙版处理 -->
+<defs>
+
+
+<linearGradient id="bgG" x1="0" y1="0" x2="0" y2="1024" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#170E12"/><stop offset="1" stop-color="#070408"/></linearGradient>
+<radialGradient id="gA" cx="760" cy="280" r="400" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#FF8A3D" stop-opacity="0.28"/><stop offset="1" stop-color="#FF8A3D" stop-opacity="0"/></radialGradient>
+<radialGradient id="gB" cx="512" cy="540" r="420" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#FF5470" stop-opacity="0.22"/><stop offset="1" stop-color="#FF5470" stop-opacity="0"/></radialGradient>
+<filter id="b30" x="-100%" y="-100%" width="300%" height="300%"><feGaussianBlur stdDeviation="30"/></filter>
+<linearGradient id="mt" x1="830" y1="195" x2="540" y2="490" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#FFC15E" stop-opacity="0"/><stop offset="0.45" stop-color="#FF9F0A" stop-opacity="0.7"/><stop offset="1" stop-color="#FF5470"/></linearGradient>
+</defs>
+<g>
+
+<rect width="1024" height="1024" fill="url(#bgG)"/>
+<circle cx="760" cy="280" r="400" fill="url(#gA)"/>
+<circle cx="512" cy="540" r="420" fill="url(#gB)"/>
+<path d="M 830 195 Q 722 404 550.1 550.2 A 54 54 0 0 1 473.9 473.8 Q 630 310 830 195 Z" fill="url(#mt)"/>
+<circle cx="665" cy="370" r="13" fill="#FFD9A0" opacity="0.5"/>
+<circle cx="735" cy="300" r="9" fill="#FFD9A0" opacity="0.32"/>
+<circle cx="795" cy="240" r="6" fill="#FFD9A0" opacity="0.2"/>
+<circle cx="512" cy="512" r="85" fill="#FFB35C" opacity="0.9" filter="url(#b30)"/>
+<circle cx="512" cy="512" r="46" fill="#FFFFFF"/>
+<g stroke="#FFFFFF" fill="none">
+<circle cx="512" cy="512" r="110" stroke-width="9" opacity="0.3"/>
+<circle cx="512" cy="512" r="175" stroke-width="7" opacity="0.15"/>
+<circle cx="512" cy="512" r="240" stroke-width="5" opacity="0.07"/>
+</g>
+</g>
+</svg>
