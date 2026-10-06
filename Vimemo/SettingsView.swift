@@ -3,6 +3,8 @@ import SwiftUI
 struct SettingsView: View {
     @EnvironmentObject private var store: ProjectStore
     @EnvironmentObject private var purchases: PurchaseStore
+    @AppStorage("appearance", store: AppAppearance.preferences) private var appearance = AppAppearance.system.rawValue
+    @Environment(\.colorScheme) private var colorScheme
     @AppStorage("defaultQuality") private var quality = ExportQuality.high.rawValue
     @AppStorage("defaultPreserveDate") private var preserveDate = true
     @AppStorage("defaultPreserveLocation") private var preserveLocation = false
@@ -18,6 +20,24 @@ struct SettingsView: View {
             VStack(alignment: .leading, spacing: 22) {
                 Text("偏好设置").font(.system(size: 30, weight: .semibold, design: .rounded)).padding(.top, 22)
                 Text("保存方式、默认选项与本机空间。").font(.subheadline).foregroundStyle(StudioTheme.secondary)
+                StudioCard {
+                    VStack(alignment: .leading, spacing: 16) {
+                        SectionLabel(title: "外观")
+                        HStack(spacing: 8) {
+                            ForEach(AppAppearance.allCases) { option in
+                                Button { appearance = option.rawValue } label: {
+                                    Text(option.title).font(.system(size: 14, weight: .semibold))
+                                        .frame(maxWidth: .infinity).frame(minHeight: 44)
+                                        .foregroundStyle(appearance == option.rawValue ? StudioTheme.onAccent : StudioTheme.ink)
+                                        .background(appearance == option.rawValue ? StudioTheme.accent : StudioTheme.raised, in: Capsule())
+                                }.buttonStyle(.plain).accessibilityIdentifier("appearance-\(option.rawValue)")
+                                    .accessibilityValue(appearance == option.rawValue ? "已选择" : "未选择")
+                            }
+                        }
+                        Text(colorScheme == .dark ? "当前深色" : "当前浅色").font(.caption)
+                            .foregroundStyle(StudioTheme.secondary).accessibilityIdentifier("appearanceStatus")
+                    }
+                }
                 StudioCard {
                     VStack(alignment: .leading, spacing: 20) {
                         SectionLabel(title: "新视频的默认设置")

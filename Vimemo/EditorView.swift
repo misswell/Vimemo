@@ -124,7 +124,7 @@ struct EditorView: View {
                 if let playerObserver { NotificationCenter.default.removeObserver(playerObserver) }
                 store.update(project); store.persist()
             }
-        }.preferredColorScheme(.light)
+        }
     }
 
     private var editorPanels: some View {
@@ -158,8 +158,8 @@ struct EditorView: View {
                 Image(systemName: playing ? "pause.fill" : "play.fill").font(.system(size: 19)).foregroundStyle(.white)
                     .frame(width: 48, height: 48).background(.black.opacity(0.4), in: Circle())
             }.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing).padding(13).accessibilityLabel(playing ? "暂停预览" : "播放编辑后片段")
-        }.accessibilityIdentifier("editorPreview").clipShape(RoundedRectangle(cornerRadius: 6))
-            .overlay(RoundedRectangle(cornerRadius: 6).stroke(StudioTheme.line, lineWidth: 1))
+        }.accessibilityIdentifier("editorPreview").clipShape(RoundedRectangle(cornerRadius: 20))
+            .overlay(RoundedRectangle(cornerRadius: 20).stroke(StudioTheme.line, lineWidth: 1))
     }
 
     private var clipSelector: some View {

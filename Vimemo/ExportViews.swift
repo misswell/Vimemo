@@ -65,7 +65,7 @@ struct ExportSheet: View {
                 ShareSheet(urls: coordinator.completed.flatMap { $0.files.map { store.url(for: $0) } })
             }
             .sheet(isPresented: $showPurchase) { UnlimitedPurchaseView { start() } }
-        }.preferredColorScheme(.light)
+        }
     }
 
     private var optionsView: some View {
@@ -97,7 +97,7 @@ struct ExportSheet: View {
                                     Text(item.title).font(.system(size: 13, weight: .medium))
                                     Spacer(minLength: 0)
                                     if format == item { Image(systemName: "checkmark").font(.system(size: 11, weight: .bold)) }
-                                }.padding(.horizontal, 13).frame(minHeight: 50).foregroundStyle(format == item ? .white : StudioTheme.ink)
+                                }.padding(.horizontal, 13).frame(minHeight: 50).foregroundStyle(format == item ? StudioTheme.onAccent : StudioTheme.ink)
                                     .background(format == item ? StudioTheme.accent : StudioTheme.raised, in: RoundedRectangle(cornerRadius: 12))
                             }.accessibilityValue(format == item ? "已选择" : "未选择")
                         }

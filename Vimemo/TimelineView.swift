@@ -69,7 +69,7 @@ struct TimelineView: View {
     }
     private var handle: some View {
         RoundedRectangle(cornerRadius: 5).fill(StudioTheme.accent).frame(width: 20, height: 61)
-            .overlay { Capsule().fill(.white.opacity(0.8)).frame(width: 2, height: 19) }
+            .overlay { Capsule().fill(StudioTheme.onAccent.opacity(0.8)).frame(width: 2, height: 19) }
             .frame(width: 44, height: 70).contentShape(Rectangle())
     }
 }

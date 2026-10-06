@@ -16,6 +16,52 @@ final class StudioFlowTests: XCTestCase {
         start.press(forDuration: 0.05, thenDragTo: end)
     }
 
+    @MainActor func testAppearanceSwitchingAndPersistence() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["--test-library", UUID().uuidString, "--test-purchase-unavailable"]
+        app.launch()
+        screenshot(app, name: "20-system-workspace")
+        app.buttons["设置"].tap()
+        XCTAssertEqual(app.buttons["appearance-system"].value as? String, "已选择")
+        app.buttons["appearance-dark"].tap()
+        XCTAssertTrue(app.staticTexts["当前深色"].waitForExistence(timeout: 5))
+        screenshot(app, name: "21-dark-settings")
+        app.buttons["工作台"].tap()
+        screenshot(app, name: "22-dark-workspace")
+        app.buttons["试试示例"].tap()
+        XCTAssertTrue(app.buttons["makeLivePhotos"].waitForExistence(timeout: 10))
+        screenshot(app, name: "26-dark-editor")
+        app.buttons["makeLivePhotos"].tap()
+        XCTAssertTrue(app.staticTexts["制作与导出"].waitForExistence(timeout: 5))
+        screenshot(app, name: "27-dark-export")
+        app.buttons["完成"].tap()
+        app.buttons["返回工作台"].tap()
+        screenshot(app, name: "28-dark-drafts")
+        app.terminate(); app.launch()
+        app.buttons["设置"].tap()
+        XCTAssertEqual(app.buttons["appearance-dark"].value as? String, "已选择")
+        XCTAssertTrue(app.staticTexts["当前深色"].exists)
+        app.buttons["appearance-light"].tap()
+        XCTAssertTrue(app.staticTexts["当前浅色"].waitForExistence(timeout: 5))
+        screenshot(app, name: "23-light-settings")
+        let unlock = app.buttons["unlockUnlimited"]
+        for _ in 0..<3 where !unlock.isHittable { app.swipeUp() }
+        unlock.tap()
+        XCTAssertTrue(app.buttons["reloadPurchase"].waitForExistence(timeout: 5))
+        screenshot(app, name: "29-light-purchase")
+        app.buttons["continueFree"].tap()
+        app.buttons["工作台"].tap()
+        screenshot(app, name: "24-light-workspace")
+        app.buttons["试试示例"].tap()
+        XCTAssertTrue(app.buttons["makeLivePhotos"].waitForExistence(timeout: 10))
+        screenshot(app, name: "25-light-editor")
+        app.buttons["返回工作台"].tap()
+        app.buttons["设置"].tap()
+        for _ in 0..<3 where !app.buttons["appearance-system"].isHittable { app.swipeDown() }
+        app.buttons["appearance-system"].tap()
+        XCTAssertEqual(app.buttons["appearance-system"].value as? String, "已选择")
+    }
+
     @MainActor func testPersistentToolsCoverResetAndQuickDraftExport() throws {
         let app = XCUIApplication()
         app.launchArguments = ["--test-library", UUID().uuidString]

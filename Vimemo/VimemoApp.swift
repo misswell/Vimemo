@@ -4,11 +4,12 @@ import SwiftUI
     @StateObject private var store = ProjectStore()
     @StateObject private var exporter = ExportCoordinator()
     @StateObject private var purchases = makePurchaseStore()
+    @AppStorage("appearance", store: AppAppearance.preferences) private var appearance = AppAppearance.system.rawValue
     @Environment(\.scenePhase) private var scenePhase
     var body: some Scene {
         WindowGroup {
             HomeView().environmentObject(store).environmentObject(exporter).environmentObject(purchases)
-                .foregroundStyle(StudioTheme.ink).preferredColorScheme(.light).tint(StudioTheme.accent)
+                .foregroundStyle(StudioTheme.ink).preferredColorScheme((AppAppearance(rawValue: appearance) ?? .system).colorScheme).tint(StudioTheme.accent)
                 .task { await purchases.prepare() }
                 .onChange(of: scenePhase) { _, phase in
                     if phase != .active { store.persist() }

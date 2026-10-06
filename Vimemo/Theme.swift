@@ -1,14 +1,40 @@
 import SwiftUI
 
+enum AppAppearance: String, CaseIterable, Identifiable {
+    case system, dark, light
+    var id: String { rawValue }
+    var title: String {
+        switch self { case .system: return "跟随系统"; case .dark: return "深色"; case .light: return "浅色" }
+    }
+    var colorScheme: ColorScheme? {
+        switch self { case .system: return nil; case .dark: return .dark; case .light: return .light }
+    }
+    static var preferences: UserDefaults {
+        #if DEBUG
+        let arguments = CommandLine.arguments
+        if let index = arguments.firstIndex(of: "--test-library"), arguments.count > index + 1,
+           let id = UUID(uuidString: arguments[index + 1]), let defaults = UserDefaults(suiteName: "VimemoUITests.\(id.uuidString)") { return defaults }
+        #endif
+        return .standard
+    }
+}
+
 enum StudioTheme {
-    static let background = Color(hex: 0xEDF2F3)
-    static let surface = Color.white
-    static let raised = Color(hex: 0xDFEAEC)
-    static let accent = Color(hex: 0x086C70)
-    static let ink = Color(hex: 0x183B43)
-    static let secondary = Color(hex: 0x5B727A)
-    static let peach = Color(hex: 0xB1523F)
-    static let line = Color(hex: 0xCCDADD)
+    static func adaptive(dark: UInt32, light: UInt32) -> Color {
+        Color(uiColor: UIColor { traits in
+            let hex = traits.userInterfaceStyle == .dark ? dark : light
+            return UIColor(red: CGFloat((hex >> 16) & 255) / 255, green: CGFloat((hex >> 8) & 255) / 255, blue: CGFloat(hex & 255) / 255, alpha: 1)
+        })
+    }
+    static let background = adaptive(dark: 0x0C1421, light: 0xF2F5F9)
+    static let surface = adaptive(dark: 0x172334, light: 0xFFFFFF)
+    static let raised = adaptive(dark: 0x223247, light: 0xE4EBF3)
+    static let accent = adaptive(dark: 0x91DDF0, light: 0x226781)
+    static let onAccent = adaptive(dark: 0x0C1421, light: 0xFFFFFF)
+    static let ink = adaptive(dark: 0xF0F4FA, light: 0x24344A)
+    static let secondary = adaptive(dark: 0x93A6BD, light: 0x61748D)
+    static let peach = adaptive(dark: 0xF4BC9A, light: 0xA4522A)
+    static let line = adaptive(dark: 0x31445B, light: 0xD9E2EC)
 }
 
 extension Color {
@@ -20,8 +46,8 @@ extension Color {
 struct StudioCard<Content: View>: View {
     @ViewBuilder var content: Content
     var body: some View {
-        content.padding(18).background(StudioTheme.surface, in: RoundedRectangle(cornerRadius: 16))
-            .overlay(RoundedRectangle(cornerRadius: 16).stroke(StudioTheme.line.opacity(0.65), lineWidth: 1))
+        content.padding(18).background(StudioTheme.surface, in: RoundedRectangle(cornerRadius: 20))
+            .overlay(RoundedRectangle(cornerRadius: 20).stroke(StudioTheme.line.opacity(0.35), lineWidth: 1))
     }
 }
 
@@ -45,8 +71,8 @@ struct PillButton: View {
         Button(action: action) {
             Text(title).font(.system(size: 13, weight: .semibold))
                 .padding(.horizontal, 16).frame(minHeight: 44)
-                .foregroundStyle(selected ? .white : StudioTheme.ink)
-                .background(selected ? StudioTheme.accent : StudioTheme.raised, in: RoundedRectangle(cornerRadius: 10))
+                .foregroundStyle(selected ? StudioTheme.onAccent : StudioTheme.ink)
+                .background(selected ? StudioTheme.accent : StudioTheme.raised, in: Capsule())
         }.buttonStyle(.plain).accessibilityValue(selected ? "已选择" : "未选择")
     }
 }
@@ -58,9 +84,9 @@ struct PrimaryButton: View {
     var body: some View {
         Button(action: action) {
             Label(title, systemImage: symbol).font(.system(size: 16, weight: .semibold))
-                .frame(maxWidth: .infinity).frame(minHeight: 52)
-                .foregroundStyle(.white)
-                .background(StudioTheme.accent, in: RoundedRectangle(cornerRadius: 14))
+                .frame(maxWidth: .infinity).frame(minHeight: 54)
+                .foregroundStyle(StudioTheme.onAccent)
+                .background(StudioTheme.accent, in: RoundedRectangle(cornerRadius: 18))
         }.buttonStyle(.plain)
     }
 }

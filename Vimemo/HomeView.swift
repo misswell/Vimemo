@@ -91,8 +91,8 @@ struct HomeView: View {
             VStack(alignment: .leading, spacing: 24) {
                 HStack(alignment: .center) {
                     VStack(alignment: .leading, spacing: 5) {
-                        Text("实刻").font(.system(size: 36, weight: .semibold, design: .rounded)).tracking(2)
-                        Text("VIMEMO / 视频转实况").font(.system(size: 10, weight: .medium, design: .monospaced)).tracking(1).foregroundStyle(StudioTheme.secondary)
+                        Text("Vimemo").font(.system(size: 28, weight: .bold, design: .rounded))
+                        Text("实刻 · 视频转实况").font(.system(size: 10, weight: .medium, design: .monospaced)).tracking(1).foregroundStyle(StudioTheme.secondary)
                     }
                     Spacer()
                     Image(systemName: "viewfinder").font(.system(size: 32, weight: .ultraLight)).foregroundStyle(StudioTheme.accent)
@@ -120,9 +120,9 @@ struct HomeView: View {
                         }.frame(maxWidth: .infinity, alignment: .leading).padding(.vertical, 24)
                             .overlay(alignment: .top) { Rectangle().fill(StudioTheme.line).frame(height: 1) }
                     } else {
-                        LazyVStack(spacing: 12) {
+                        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
                             ForEach(store.projects) { project in
-                                HStack(spacing: 0) {
+                                ZStack(alignment: .topTrailing) {
                                     Button {
                                         if batchMode {
                                             if batchIDs.contains(project.id) { batchIDs.remove(project.id) } else { batchIDs.insert(project.id) }
@@ -130,11 +130,11 @@ struct HomeView: View {
                                     } label: { projectCard(project) }.buttonStyle(.plain)
                                     if !batchMode {
                                         Button { exportProjects = [project]; exportSelection = ExportSelection(projects: [project]) } label: {
-                                            Image(systemName: "square.and.arrow.up").frame(width: 48, height: 64)
-                                        }.accessibilityLabel("导出\(project.title)")
+                                            Image(systemName: "square.and.arrow.up").font(.system(size: 16, weight: .semibold)).frame(width: 44, height: 44).foregroundStyle(.white).background(.black.opacity(0.5), in: Circle())
+                                        }.buttonStyle(.plain).padding(8).accessibilityLabel("导出\(project.title)")
                                     }
-                                }.padding(10).background(StudioTheme.surface, in: RoundedRectangle(cornerRadius: 16))
-                                    .overlay(RoundedRectangle(cornerRadius: 16).stroke(StudioTheme.line.opacity(0.6), lineWidth: 1))
+                                }.background(StudioTheme.surface, in: RoundedRectangle(cornerRadius: 20))
+                                    .overlay(RoundedRectangle(cornerRadius: 20).stroke(StudioTheme.line.opacity(0.35), lineWidth: 1))
                                     .contextMenu {
                                         Button("重命名", systemImage: "pencil") { renameText = project.title; renaming = project }
                                         Button("删除草稿", systemImage: "trash", role: .destructive) { deleting = project }
@@ -155,56 +155,57 @@ struct HomeView: View {
     }
 
     private var importCard: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            HStack(spacing: 18) {
-                contactFrames
-                VStack(alignment: .leading, spacing: 7) {
-                    Text("新建作品").font(.system(size: 24, weight: .semibold, design: .rounded))
-                    Text("从一段视频，\n留下一张会动的照片。")
-                        .font(.subheadline).foregroundStyle(StudioTheme.secondary).fixedSize(horizontal: false, vertical: true)
-                }
-                Spacer(minLength: 0)
-            }
+        VStack(spacing: 12) {
             PhotosPicker(selection: $selection, maxSelectionCount: 20, matching: .videos, preferredItemEncoding: .current) {
-                HStack { Image(systemName: "plus"); Text("导入视频"); Spacer(); Image(systemName: "arrow.up.right") }
-                    .font(.system(size: 16, weight: .semibold)).padding(.horizontal, 18).frame(minHeight: 54)
-                    .foregroundStyle(.white).background(StudioTheme.accent, in: RoundedRectangle(cornerRadius: 12))
-            }.buttonStyle(.plain).accessibilityIdentifier("importVideos")
-            HStack {
-                Button { fileImporter = true } label: { Label("从文件导入", systemImage: "folder") }
-                Spacer()
-                Button { Task { if let demo = await store.importDemo() { editing = demo } } } label: { Label("试试示例", systemImage: "play.rectangle") }
-            }.font(.system(size: 13, weight: .medium)).buttonStyle(.plain).frame(minHeight: 44)
-        }.padding(20).background(StudioTheme.surface, in: RoundedRectangle(cornerRadius: 20))
-            .overlay(RoundedRectangle(cornerRadius: 20).stroke(StudioTheme.line, lineWidth: 1))
-    }
-
-    private var contactFrames: some View {
-        HStack(spacing: 3) {
-            ForEach(1...3, id: \.self) { index in
-                if let url = Bundle.main.url(forResource: "Paywall-\(index)", withExtension: "jpg"), let image = UIImage(contentsOfFile: url.path) {
-                    Image(uiImage: image).resizable().scaledToFill().frame(width: 24, height: 84).clipped()
+                ZStack(alignment: .bottomLeading) {
+                    if let url = Bundle.main.url(forResource: "DemoPoster", withExtension: "jpg"), let image = UIImage(contentsOfFile: url.path) {
+                        Image(uiImage: image).resizable().scaledToFill().frame(height: 230).clipped()
+                    }
+                    LinearGradient(colors: [.clear, .black.opacity(0.78)], startPoint: .center, endPoint: .bottom)
+                    VStack(alignment: .leading, spacing: 16) {
+                        Text("让这一刻，继续发生。").font(.system(size: 25, weight: .semibold, design: .rounded)).foregroundStyle(.white)
+                        HStack {
+                            Label("导入视频", systemImage: "plus").font(.system(size: 15, weight: .semibold))
+                                .padding(.horizontal, 18).frame(height: 44).foregroundStyle(StudioTheme.onAccent)
+                                .background(StudioTheme.accent, in: Capsule())
+                            Spacer()
+                            Text("本地制作 · 无水印").font(.caption).foregroundStyle(.white.opacity(0.8))
+                        }
+                    }.padding(22)
+                }.frame(height: 230).clipShape(RoundedRectangle(cornerRadius: 24))
+            }.buttonStyle(.plain).accessibilityLabel("导入视频").accessibilityIdentifier("importVideos")
+            HStack(spacing: 12) {
+                Button { fileImporter = true } label: {
+                    Label("从文件导入", systemImage: "folder").frame(maxWidth: .infinity).frame(minHeight: 46)
                 }
-            }
-        }.padding(5).background(StudioTheme.ink, in: RoundedRectangle(cornerRadius: 5))
-            .overlay(alignment: .bottom) { Text("MOTION").font(.system(size: 6, design: .monospaced)).tracking(1).foregroundStyle(.white).offset(y: 12) }
-            .padding(.bottom, 8).accessibilityHidden(true)
+                Button { Task { if let demo = await store.importDemo() { editing = demo } } } label: {
+                    Label("试试示例", systemImage: "play.rectangle").frame(maxWidth: .infinity).frame(minHeight: 46)
+                }
+            }.font(.system(size: 13, weight: .medium)).buttonStyle(.plain)
+                .foregroundStyle(StudioTheme.accent).background(StudioTheme.surface, in: RoundedRectangle(cornerRadius: 16))
+        }
     }
 
     private func projectCard(_ project: VideoProject) -> some View {
-        HStack(spacing: 14) {
-            ThumbnailImage(url: store.url(for: project.thumbnailFilename)).frame(width: 76, height: 88)
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-            VStack(alignment: .leading, spacing: 8) {
-                Text(project.title).font(.system(size: 15, weight: .semibold)).lineLimit(2).multilineTextAlignment(.leading)
-                Text("\(project.clips.count) 个片段 · \(project.sizeLabel)").font(.caption).foregroundStyle(StudioTheme.secondary)
-                Text(project.duration.timeLabel).font(.system(size: 11, design: .monospaced)).foregroundStyle(StudioTheme.accent)
-            }
-            Spacer(minLength: 0)
-            if batchMode {
-                Image(systemName: batchIDs.contains(project.id) ? "checkmark.circle.fill" : "circle").font(.title2).foregroundStyle(StudioTheme.accent)
-            }
+        VStack(alignment: .leading, spacing: 0) {
+            ThumbnailImage(url: store.url(for: project.thumbnailFilename)).frame(height: 145).clipped()
+                .overlay(alignment: .bottomLeading) {
+                    Text(project.duration.timeLabel).font(.system(size: 11, weight: .medium, design: .monospaced))
+                        .padding(.horizontal, 9).padding(.vertical, 5).foregroundStyle(.white)
+                        .background(.black.opacity(0.5), in: Capsule()).padding(10)
+                }
+            VStack(alignment: .leading, spacing: 7) {
+                Text(project.title).font(.system(size: 14, weight: .semibold)).lineLimit(1)
+                Text("\(project.clips.count) 个片段 · \(project.sizeLabel)").font(.system(size: 11)).foregroundStyle(StudioTheme.secondary)
+            }.padding(12)
         }.frame(maxWidth: .infinity, alignment: .leading).foregroundStyle(StudioTheme.ink)
+            .clipShape(RoundedRectangle(cornerRadius: 20))
+            .overlay(alignment: .topTrailing) {
+                if batchMode {
+                    Image(systemName: batchIDs.contains(project.id) ? "checkmark.circle.fill" : "circle").font(.title2)
+                        .foregroundStyle(StudioTheme.accent).padding(12)
+                }
+            }
     }
 
     private var tabBar: some View {
@@ -218,12 +219,12 @@ struct HomeView: View {
     }
     private func tabButton(_ title: String, symbol: String, index: Int) -> some View {
         Button { if tab == 0 && index != 0 { store.endWorkspaceSession(); batchIDs = []; batchMode = false }; tab = index } label: {
-            HStack(spacing: 7) {
+            VStack(spacing: 6) {
                 Image(systemName: symbol).font(.system(size: 16))
                 Text(title).font(.system(size: 12, weight: .semibold))
-            }.frame(maxWidth: .infinity).frame(minHeight: 44)
-                .foregroundStyle(tab == index ? .white : StudioTheme.secondary)
-                .background(tab == index ? StudioTheme.accent : .clear, in: RoundedRectangle(cornerRadius: 12))
+            }.frame(maxWidth: .infinity).frame(minHeight: 54)
+                .foregroundStyle(tab == index ? StudioTheme.accent : StudioTheme.secondary)
+                .background(tab == index ? StudioTheme.accent.opacity(0.1) : .clear, in: RoundedRectangle(cornerRadius: 12))
         }.buttonStyle(.plain).accessibilityValue(tab == index ? "已选择" : "未选择")
     }
 }

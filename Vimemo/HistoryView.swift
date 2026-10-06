@@ -103,6 +103,6 @@ struct ExportDetailView: View {
                 .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("完成") { dismiss() } } }
                 .sheet(isPresented: $sharing) { ShareSheet(urls: record.files.map { store.url(for: $0) }) }
                 .alert("照片图库", isPresented: Binding(get: { message != nil }, set: { if !$0 { message = nil } })) { Button("知道了") { message = nil } } message: { Text(message ?? "") }
-        }.preferredColorScheme(.light)
+        }
     }
 }

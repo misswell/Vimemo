@@ -43,7 +43,7 @@ struct CoverPickerView: View {
                         PhotosPicker(selection: $photoItem, matching: .images) {
                             Label("相册照片", systemImage: "photo").font(.system(size: 13, weight: .medium))
                                 .padding(.horizontal, 16).padding(.vertical, 12)
-                                .foregroundStyle(photoFilename == nil ? StudioTheme.ink : .white)
+                                .foregroundStyle(photoFilename == nil ? StudioTheme.ink : StudioTheme.onAccent)
                                 .background(photoFilename == nil ? StudioTheme.raised : StudioTheme.accent, in: Capsule())
                         }.accessibilityIdentifier("pickCoverPhoto")
                     }
@@ -97,7 +97,7 @@ struct CoverPickerView: View {
                         try? FileManager.default.removeItem(at: store.url(for: importedFilename))
                     }
                 }
-        }.preferredColorScheme(.light)
+        }
     }
 
     private func loadPhoto(_ item: PhotosPickerItem?) {

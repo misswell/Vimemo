@@ -16,7 +16,7 @@
 - GIF 支持最大边长 320 / 480 / 640 / 960 / 1280 像素，以及 5 / 10 / 12 / 15 / 20 / 24 / 30 帧/秒；选择随草稿保存。
 - 多视频、多片段顺序制作，进度显示、取消；已完成结果保留，未完成输出清理。
 - 保存到照片图库，或在本机作品中预览、再次保存、分享和存储到文件。
-- 原创浅灰与深青色影像工作台：导入、继续编辑和草稿快速导出集中呈现，长按草稿直接重命名。
+- 恢复深蓝与浅蓝的影像工作台、照片导入封面及圆角草稿网格；保留草稿快速导出与长按重命名。设置支持跟随系统（默认）、深色和浅色，立即生效并保存选择，覆盖编辑、导出及购买页。
 - 编辑器固定预览、封面入口和底部工具栏，构图与调色时随时查看效果；精确裁剪与候选片段按需展开，重置前确认。iPad 使用预览与参数双栏布局。
 - 导出页先选择格式与保存位置，底部固定显示参数摘要和制作按钮；拍摄信息与隐私选项按需展开。
 - 草稿默认自动保存，可在设置中关闭；关闭后返回时清理本次编辑文件，已有草稿和导出作品保留。支持重命名、删除、存储占用分类和临时缓存清理。
@@ -135,7 +135,7 @@ swiftc -target arm64-apple-macos14.0 -parse-as-library \
 
 ## GitHub 发布
 
-源码仓库：[misswell/Vimemo](https://github.com/misswell/Vimemo)。当前源码发布版本为 1.0.7（8），GitHub tag 为 `v1.0.7`；首次发布为 1.0.1（2）。
+源码仓库：[misswell/Vimemo](https://github.com/misswell/Vimemo)。当前源码发布版本为 1.0.8（9），GitHub tag 为 `v1.0.8`；首次发布为 1.0.1（2）。
 Release 附带 Apple Distribution 签名的 App Store IPA，仅供 App Store Connect 上传；日常安装请使用下方 TestFlight 邀请。
 `build/`、参考录屏截图、个人 Xcode 配置和签名凭据均不纳入 Git。
 
@@ -144,6 +144,6 @@ Release 附带 Apple Distribution 签名的 App Store IPA，仅供 App Store Con
 1.0.0（1）正式签名包已生成并验证：`build/TestFlight/Export/Vimemo.ipa`。
 归档：`build/TestFlight/Vimemo-1.0.0-1.xcarchive`。中文测试说明：`build/TestFlight/WhatToTest.zh-Hans.txt`。
 2026-10-06 已上传并处理通过，内部测试状态为 `IN_BETA_TESTING`。测试邀请已发送到 `misswell@foxmail.com`，可通过邀请邮件在 iPhone / iPad 的 TestFlight 安装。
-最新内部测试版本为 1.0.7（8），构建 ID `bade3bf9-8ed1-4be2-a62a-0c09ec4f94ce`，状态 `VALID` / `IN_BETA_TESTING`。重新设计影像工作台、固定预览与底部工具、草稿快速导出与重命名、iPad 双栏布局，保留保存草稿开关、GIF 导出与两种封面选择。通过现有邀请在 TestFlight 中覆盖安装，不必先删除应用。TestFlight 内购使用 Apple 沙盒，不实际扣款；商品价格加载失败时可在固定按钮处查看错误并重试。
+最新内部测试版本为 1.0.8（9），构建 ID `24d7dc1e-9493-456f-80d3-e6bc01237116`，状态 `VALID` / `IN_BETA_TESTING`。恢复深蓝背景、浅蓝按钮、照片封面及圆角草稿网格，新增跟随系统（默认）/深色/浅色外观，覆盖编辑、封面、导出和购买页。保留固定预览与工具、草稿快速导出/重命名、iPad 双栏、保存草稿开关及 GIF 导出。通过现有邀请在 TestFlight 中覆盖安装，不必先删除应用。TestFlight 内购使用 Apple 沙盒，不实际扣款；商品价格加载失败时可在固定按钮处查看错误并重试。
 App Store Connect：[Vimemo 实刻 TestFlight](https://appstoreconnect.apple.com/apps/6819492441/testflight/ios)。
 应用 ID：`6819492441`；构建 ID：`54e012e6-b4cc-4c50-a763-8058c9640432`；内部测试组：`58d7d5de-0316-4bf2-a7a5-5acf1387b9d5`。

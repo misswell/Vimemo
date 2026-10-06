@@ -1,12 +1,13 @@
 import SwiftUI
 
 private enum PurchaseTheme {
-    static let background = Color(hex: 0x100F0D)
-    static let card = Color(hex: 0x252320)
-    static let gold = Color(hex: 0xFFB84D)
-    static let orange = Color(hex: 0xF47D27)
-    static let text = Color(hex: 0xF6F1E8)
-    static let secondary = Color(hex: 0xAEA79E)
+    static let buttonText = StudioTheme.adaptive(dark: 0x100F0D, light: 0xFFFFFF)
+    static let background = StudioTheme.adaptive(dark: 0x100F0D, light: 0xF5F3EE)
+    static let card = StudioTheme.adaptive(dark: 0x252320, light: 0xFFFFFF)
+    static let gold = StudioTheme.adaptive(dark: 0xFFB84D, light: 0xA96800)
+    static let orange = StudioTheme.adaptive(dark: 0xF47D27, light: 0xB95D16)
+    static let text = StudioTheme.adaptive(dark: 0xF6F1E8, light: 0x302B24)
+    static let secondary = StudioTheme.adaptive(dark: 0xAEA79E, light: 0x71695F)
 }
 
 struct UnlimitedPurchaseView: View {
@@ -48,14 +49,14 @@ struct UnlimitedPurchaseView: View {
                     Image(systemName: "xmark").font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(PurchaseTheme.secondary)
                         .frame(width: 36, height: 36)
-                        .background(.white.opacity(0.07), in: Circle())
+                        .background(PurchaseTheme.text.opacity(0.07), in: Circle())
                 }.disabled(purchases.busy).accessibilityLabel("关闭").padding(.trailing, 20).padding(.top, 8)
             }
             .safeAreaInset(edge: .bottom, spacing: 0) { purchaseFooter }
             .interactiveDismissDisabled(purchases.busy)
             .task { await purchases.prepare(); deliverUnlock() }
             .onChange(of: purchases.hasUnlimited) { _, _ in deliverUnlock() }
-        }.foregroundStyle(PurchaseTheme.text).preferredColorScheme(.dark)
+        }.foregroundStyle(PurchaseTheme.text)
     }
 
     private var hero: some View {
@@ -122,7 +123,7 @@ struct UnlimitedPurchaseView: View {
                 Spacer()
                 Text("一次性购买").font(.caption.weight(.semibold))
                     .padding(.horizontal, 10).padding(.vertical, 5)
-                    .foregroundStyle(PurchaseTheme.background)
+                    .foregroundStyle(PurchaseTheme.buttonText)
                     .background(PurchaseTheme.gold, in: Capsule())
             }
             HStack(alignment: .firstTextBaseline, spacing: 8) {
@@ -160,11 +161,11 @@ struct UnlimitedPurchaseView: View {
                 }
             } label: {
                 HStack(spacing: 10) {
-                    if purchases.loadingProduct || purchases.busy { ProgressView().tint(PurchaseTheme.background) }
+                    if purchases.loadingProduct || purchases.busy { ProgressView().tint(PurchaseTheme.buttonText) }
                     Text(buttonTitle).font(.system(.headline, design: .rounded, weight: .bold))
                         .multilineTextAlignment(.center)
                 }.frame(maxWidth: .infinity).padding(.vertical, 20)
-                    .foregroundStyle(PurchaseTheme.background)
+                    .foregroundStyle(PurchaseTheme.buttonText)
                     .background(LinearGradient(colors: [PurchaseTheme.gold, PurchaseTheme.orange], startPoint: .leading, endPoint: .trailing), in: Capsule())
                     .shadow(color: PurchaseTheme.orange.opacity(0.2), radius: 18, y: 7)
                     .opacity(purchases.loadingProduct || purchases.busy ? 0.65 : 1)

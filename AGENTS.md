@@ -1,6 +1,6 @@
 # Vimemo 项目规则
 
-- 主界面采用浅灰、白色与深青色的原创影像工作台布局。编辑器固定预览、封面入口和底部工具，参数区独立滚动；宽屏双栏展示。精确参数按需展开，重置画面先确认。工作台导出使用携带完整项目快照的 `sheet(item:)`，避免布尔 sheet 初始化时读到旧的空数组；关闭导出只结束所选项目的临时编辑。
+- 主界面恢复深蓝背景、浅蓝按钮、照片封面及圆角草稿网格，保持原有视觉风格并小幅优化。外观默认跟随系统，可选择深色或浅色；使用动态 UIColor 随 trait 更新，编辑、导出及购买页不得强制独立深浅色。外观偏好持久化，DEBUG UI 测试随独立库隔离。编辑器固定预览、封面入口和底部工具，参数区独立滚动；宽屏双栏展示。精确参数按需展开，重置画面先确认。工作台导出使用携带完整项目快照的 `sheet(item:)`，避免布尔 sheet 初始化时读到旧的空数组；关闭导出只结束所选项目的临时编辑。
 - 原生 iOS SwiftUI 应用，最低 iOS 18；使用 Apple AVFoundation、Photos、Core Image，没有第三方运行时依赖。
 - `project.yml` 是工程配置来源；调整 target、资源、权限或 scheme 后运行 `xcodegen generate`。
 - 保持视频转换在设备本地。使用 PhotosPicker / 文件选择器导入，照片权限仅请求 `.addOnly`。
@@ -28,3 +28,4 @@
 - 需显示 macOS GUI 时优先使用 AgentSpace。后台会话不可用时先说明，再使用命令行或明确说明的回退方式。
 - 2026-10-06 已更新 TestFlight 内部测试至 1.0.6（7），构建 ID `3447f7bb-5e49-463f-ae6b-a63ab9363b93`，状态 `VALID` / `IN_BETA_TESTING`；正式包为 `build/Release/Vimemo-1.0.6-7.ipa`，新增可关闭草稿保存与安全缓存清理。29 项单元测试、3 项界面测试通过；1 项既有 StoreKit 集成测试因 iOS 26.5 的 Apple FB22237318 问题跳过。
 - 2026-10-06 已更新 TestFlight 内部测试至 1.0.7（8），构建 ID `bade3bf9-8ed1-4be2-a62a-0c09ec4f94ce`，状态 `VALID` / `IN_BETA_TESTING`；正式包为 `build/Release/Vimemo-1.0.7-8.ipa`，包含原创影像工作台、固定编辑工具、草稿直接导出/重命名及 iPad 双栏布局。29 项单元测试、10 项界面测试通过，另通过 iPhone SE 和 iPad mini 操作流程；3 项 StoreKit 商品/交易测试因 iOS 26.5 的 Apple FB22237318 问题跳过，购买交易 UI 测试须使用显式 SKTestSession 初始化测试商品。
+- 2026-10-06 已更新 TestFlight 内部测试至 1.0.8（9），构建 ID `24d7dc1e-9493-456f-80d3-e6bc01237116`，状态 `VALID` / `IN_BETA_TESTING`；正式包为 `build/Release/Vimemo-1.0.8-9.ipa`。恢复原来的深蓝/浅蓝、照片封面和草稿网格，新增持久化外观设置，默认跟随系统；保留操作优化。29 项单元测试与 11 项界面测试通过，3 项既有 StoreKit 测试因 iOS 26.5 问题跳过；另通过扩展外观测试及 iPhone SE 外观/编辑/快速导出流程。实际验证系统深浅色变化无需重启，发布 IPA 未包含测试商品及 StoreKitTest。
