@@ -14,6 +14,39 @@ final class StudioFlowTests: XCTestCase {
         start.press(forDuration: 0.05, thenDragTo: end)
     }
 
+    @MainActor func testGIFOptionsExportAndRestoreDraft() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["--test-library", UUID().uuidString, "--demo-editor", "-unlimitedDuration", "NO"]
+        app.launch()
+        XCTAssertTrue(app.buttons["makeLivePhotos"].waitForExistence(timeout: 10))
+        app.buttons["makeLivePhotos"].tap()
+        app.buttons["GIF 动图"].tap()
+        let size = app.buttons["gifSize480"]
+        XCTAssertTrue(size.waitForExistence(timeout: 5))
+        size.tap()
+        XCTAssertEqual(size.value as? String, "已选择")
+        app.swipeUp()
+        let fps = app.buttons["gifFPS24"]
+        XCTAssertTrue(fps.waitForExistence(timeout: 5))
+        fps.tap()
+        XCTAssertEqual(fps.value as? String, "已选择")
+        screenshot(app, name: "15-gif-size-and-frame-rate")
+        app.swipeUp()
+        app.buttons["本机作品 / 分享文件"].tap()
+        app.buttons["制作文件 · 1 个作品"].tap()
+        XCTAssertTrue(app.staticTexts["已制作 1 个作品"].waitForExistence(timeout: 30))
+        XCTAssertTrue(app.staticTexts["已保存到本机作品"].exists)
+        screenshot(app, name: "16-gif-result")
+        app.terminate()
+        app.launch()
+        XCTAssertTrue(app.buttons["makeLivePhotos"].waitForExistence(timeout: 10))
+        app.buttons["makeLivePhotos"].tap()
+        XCTAssertTrue(app.buttons["gifSize480"].waitForExistence(timeout: 5))
+        XCTAssertEqual(app.buttons["gifSize480"].value as? String, "已选择")
+        app.swipeUp()
+        XCTAssertEqual(app.buttons["gifFPS24"].value as? String, "已选择")
+    }
+
     @MainActor func testCreateTwoLivePhotosSaveToPhotosAndRestoreDraft() throws {
         let app = XCUIApplication()
         app.launchArguments = ["--test-library", UUID().uuidString]

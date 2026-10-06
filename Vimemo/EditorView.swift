@@ -74,7 +74,7 @@ struct EditorView: View {
             }
             .safeAreaInset(edge: .bottom) {
                 VStack(spacing: 0) {
-                    PrimaryButton(title: "制作 \(project.clips.count) 张实况", symbol: "livephoto") {
+                    PrimaryButton(title: "制作与导出 · \(project.clips.count) 个片段", symbol: "square.and.arrow.up") {
                         playing = false; player.pause(); store.update(project); store.persist(); showExport = true
                     }.disabled(exporter.running).accessibilityIdentifier("makeLivePhotos")
                 }.padding(.horizontal, 20).padding(.top, 12).padding(.bottom, 10).background(StudioTheme.background)

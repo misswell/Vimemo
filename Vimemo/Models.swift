@@ -28,6 +28,18 @@ enum ExportQuality: String, Codable, CaseIterable, Identifiable {
     var maxDimension: Double { switch self { case .original: 4096; case .high: 1920; case .compact: 1280 } }
 }
 
+enum GIFSize: Int, Codable, CaseIterable, Identifiable {
+    case small = 320, medium = 480, standard = 640, large = 960, extraLarge = 1280
+    var id: Int { rawValue }
+    var title: String { "\(rawValue) px" }
+}
+
+enum GIFFrameRate: Int, Codable, CaseIterable, Identifiable {
+    case five = 5, ten = 10, twelve = 12, fifteen = 15, twenty = 20, twentyFour = 24, thirty = 30
+    var id: Int { rawValue }
+    var title: String { "\(rawValue) 帧/秒" }
+}
+
 struct Clip: Codable, Identifiable, Equatable {
     var id = UUID()
     var start: Double = 0
@@ -61,6 +73,10 @@ struct EditSettings: Codable, Equatable {
     var format: OutputFormat = .livePhoto
     var cropX: Double = 0.5
     var cropY: Double = 0.5
+    var gifSize: GIFSize? = nil
+    var gifFrameRate: GIFFrameRate? = nil
+    var effectiveGIFSize: GIFSize { gifSize ?? .standard }
+    var effectiveGIFFrameRate: GIFFrameRate { gifFrameRate ?? .twelve }
     var unlimitedDuration: Bool? = nil
     var maxOutputDuration: Double? { unlimitedDuration == true ? nil : 3 }
 }

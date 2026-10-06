@@ -10,6 +10,8 @@ struct ExportSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State var projects: [VideoProject]
     @State private var format: OutputFormat
+    @State private var gifSize: GIFSize
+    @State private var gifFrameRate: GIFFrameRate
     @State private var quality: ExportQuality
     @State private var preserveDate: Bool
     @State private var preserveLocation: Bool
@@ -23,6 +25,8 @@ struct ExportSheet: View {
         let settings = projects.first?.settings ?? EditSettings()
         _format = State(initialValue: settings.format)
         _quality = State(initialValue: settings.quality)
+        _gifSize = State(initialValue: settings.effectiveGIFSize)
+        _gifFrameRate = State(initialValue: settings.effectiveGIFFrameRate)
         _preserveDate = State(initialValue: settings.preserveDate)
         _preserveLocation = State(initialValue: settings.preserveLocation)
     }
@@ -90,17 +94,42 @@ struct ExportSheet: View {
                             }
                         }
                     }
-                    Text(format == .livePhoto ? "保存到相册后，长按照片即可播放。文件分享会包含 JPG 与 MOV 两个配对原件。" : format == .gif ? "GIF 循环播放，不含声音，最大边长 640 像素、12 帧/秒。" : format == .photo ? "导出所选封面帧，保留裁剪与调色。" : "导出裁剪后的 MOV 视频，保留声音与编辑效果。")
+                    Text(format == .livePhoto ? "保存到相册后，长按照片即可播放。文件分享会包含 JPG 与 MOV 两个配对原件。" : format == .gif ? "GIF 循环播放，不含声音。可选择尺寸和帧率，保留当前画面比例。" : format == .photo ? "导出所选封面帧，保留裁剪与调色。" : "导出裁剪后的 MOV 视频，保留声音与编辑效果。")
                         .font(.system(size: 11)).foregroundStyle(StudioTheme.secondary)
                 }
             }
-            StudioCard {
-                VStack(alignment: .leading, spacing: 17) {
-                    SectionLabel(title: "输出尺寸", detail: "不放大小尺寸原片")
-                    HStack(spacing: 8) {
-                        ForEach(ExportQuality.allCases) { item in PillButton(title: item.title, selected: quality == item) { quality = item } }
+            if format == .gif {
+                StudioCard {
+                    VStack(alignment: .leading, spacing: 16) {
+                        SectionLabel(title: "GIF 尺寸", detail: "最大边长 · 不放大原片")
+                        LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 3), spacing: 8) {
+                            ForEach(GIFSize.allCases) { item in
+                                PillButton(title: item.title, selected: gifSize == item) { gifSize = item }
+                                    .accessibilityIdentifier("gifSize\(item.rawValue)")
+                                    .accessibilityValue(gifSize == item ? "已选择" : "未选择")
+                            }
+                        }
+                        SectionLabel(title: "GIF 帧率")
+                        LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 3), spacing: 8) {
+                            ForEach(GIFFrameRate.allCases) { item in
+                                PillButton(title: item.title, selected: gifFrameRate == item) { gifFrameRate = item }
+                                    .accessibilityIdentifier("gifFPS\(item.rawValue)")
+                                    .accessibilityValue(gifFrameRate == item ? "已选择" : "未选择")
+                            }
+                        }
+                        Text("尺寸越大、帧率越高，文件越大，制作时间越长。低帧率适合轻量分享，高帧率播放更流畅。")
+                            .font(.system(size: 11)).foregroundStyle(StudioTheme.secondary)
                     }
-                    Text("原始尺寸最大边长 4096 像素；1080p / 720p 的最大边长为 1920 / 1280 像素。").font(.system(size: 11)).foregroundStyle(StudioTheme.secondary)
+                }
+            } else {
+                StudioCard {
+                    VStack(alignment: .leading, spacing: 17) {
+                        SectionLabel(title: "输出尺寸", detail: "不放大小尺寸原片")
+                        HStack(spacing: 8) {
+                            ForEach(ExportQuality.allCases) { item in PillButton(title: item.title, selected: quality == item) { quality = item } }
+                        }
+                        Text("原始尺寸最大边长 4096 像素；1080p / 720p 的最大边长为 1920 / 1280 像素。").font(.system(size: 11)).foregroundStyle(StudioTheme.secondary)
+                    }
                 }
             }
             StudioCard {
@@ -171,6 +200,8 @@ struct ExportSheet: View {
         for index in projects.indices {
             projects[index].settings.format = format
             projects[index].settings.quality = quality
+            projects[index].settings.gifSize = gifSize
+            projects[index].settings.gifFrameRate = gifFrameRate
             projects[index].settings.preserveDate = preserveDate
             projects[index].settings.preserveLocation = preserveLocation
             store.update(projects[index])
@@ -253,24 +284,4 @@ struct LivePhotoSurface: UIViewRepresentable {
         if playback != context.coordinator.token { context.coordinator.token = playback; uiView.startPlayback(with: .full) }
     }
     static func dismantleUIView(_ uiView: PHLivePhotoView, coordinator: Coordinator) { uiView.stopPlayback() }
-}
-
-struct AnimatedGIF: UIViewRepresentable {
-    let url: URL
-    func makeUIView(context: Context) -> UIImageView {
-        let view = UIImageView(); view.contentMode = .scaleAspectFit
-        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else { return view }
-        let count = CGImageSourceGetCount(source)
-        var images: [UIImage] = []
-        var duration = 0.0
-        for index in 0..<count {
-            if let image = CGImageSourceCreateImageAtIndex(source, index, nil) { images.append(UIImage(cgImage: image)) }
-            let properties = CGImageSourceCopyPropertiesAtIndex(source, index, nil) as? [String: Any]
-            let gif = properties?[kCGImagePropertyGIFDictionary as String] as? [String: Any]
-            duration += gif?[kCGImagePropertyGIFDelayTime as String] as? Double ?? 1 / 12
-        }
-        view.image = UIImage.animatedImage(with: images, duration: duration)
-        return view
-    }
-    func updateUIView(_ uiView: UIImageView, context: Context) {}
 }

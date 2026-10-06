@@ -43,7 +43,7 @@ actor LivePhotoExporter {
         var urls = settings.format == .livePhoto ? [thumbnail, movie] : [movie]
         if settings.format == .gif {
             let gif = directory.appendingPathComponent("animation.gif")
-            try await writeGIF(movie: movie, url: gif, duration: duration, progress: progress)
+            try await writeGIF(movie: movie, url: gif, duration: duration, size: settings.effectiveGIFSize, frameRate: settings.effectiveGIFFrameRate, progress: progress)
             try FileManager.default.removeItem(at: movie)
             urls = [gif]
         }
@@ -189,17 +189,25 @@ actor LivePhotoExporter {
         success = true
     }
 
-    private func writeGIF(movie: URL, url: URL, duration: Double, progress: @escaping @Sendable (Double) -> Void) async throws {
-        let count = max(2, Int(ceil(duration * 12)))
+    private func writeGIF(movie: URL, url: URL, duration: Double, size: GIFSize, frameRate: GIFFrameRate, progress: @escaping @Sendable (Double) -> Void) async throws {
+        let fps = Double(frameRate.rawValue)
+        let count = max(1, Int(ceil(duration * fps - 1e-9)))
         guard let destination = CGImageDestinationCreateWithURL(url as CFURL, UTType.gif.identifier as CFString, count, nil) else { throw StudioError.message("无法创建 GIF 文件。") }
         CGImageDestinationSetProperties(destination, [kCGImagePropertyGIFDictionary: [kCGImagePropertyGIFLoopCount: 0]] as CFDictionary)
         let generator = AVAssetImageGenerator(asset: AVURLAsset(url: movie))
         generator.appliesPreferredTrackTransform = true
-        generator.maximumSize = CGSize(width: 640, height: 640)
+        generator.maximumSize = CGSize(width: size.rawValue, height: size.rawValue)
+        generator.requestedTimeToleranceBefore = .zero
+        generator.requestedTimeToleranceAfter = .zero
         for index in 0..<count {
             try Task.checkCancellation()
-            let result = try await generator.image(at: CMTime(seconds: Double(index) * duration / Double(count), preferredTimescale: 600))
-            CGImageDestinationAddImage(destination, result.image, [kCGImagePropertyGIFDictionary: [kCGImagePropertyGIFDelayTime: duration / Double(count)]] as CFDictionary)
+            let result = try await generator.image(at: CMTime(seconds: Double(index) / fps, preferredTimescale: 600))
+            // GIF stores hundredths of a second. Round cumulative boundaries so
+            // rates such as 12/24/30 fps retain the correct overall playback speed.
+            let begin = (Double(index) / fps * 100).rounded()
+            let end = (min(duration, Double(index + 1) / fps) * 100).rounded()
+            let delay = max(1, end - begin) / 100
+            CGImageDestinationAddImage(destination, result.image, [kCGImagePropertyGIFDictionary: [kCGImagePropertyGIFDelayTime: delay, kCGImagePropertyGIFUnclampedDelayTime: delay]] as CFDictionary)
             progress(0.85 + 0.14 * Double(index + 1) / Double(count))
         }
         guard CGImageDestinationFinalize(destination) else { throw StudioError.message("GIF 写入失败。") }
