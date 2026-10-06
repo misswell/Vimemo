@@ -7,6 +7,9 @@
 - 裁剪、滤镜、旋转、翻转必须在封面、动态预览与最终输出中保持一致。
 - 默认实况输出最多 3 秒；设置中的“不限制时长”允许选择源视频内任意长度，适用于已有草稿和新导入。更改倍速时按当前时长策略归一化片段；关闭开关时将已有片段缩短至 3 秒输出。仅保留源文件已有且用户选择保留的拍摄信息。
 - 封面支持视频逐帧选择与 PhotosPicker 相册照片；照片拷贝至草稿目录，封面预览和输出共享裁剪、旋转、翻转与调色管线。旧草稿缺少新增可选字段时继续使用默认 3 秒与视频封面。
+- 超过 3 秒的实际动态导出（实况/MOV/GIF）需要 StoreKit 2 非消耗型内购；静态照片、3 秒内动态导出与全部编辑功能免费。统一在 ExportCoordinator 检查整批任务，并在长导出开始前重新验证权益；不通过 UserDefaults、启动参数或明文缓存解锁。旧长草稿不得因权益缺失而自动截短。
+- 内购商品 `com.vimemo.live.unlimited`，App Store Connect ID `6819497962`，准备提交版本 `bc805805-7c62-455e-8de4-28bd6a07314d`。美国基准价 0.99 美元，中国大陆手动价 6 元；客户端显示 StoreKit 实际本地价格。首次内购随应用版本审核，未批准上架前不宣称正式收费已上线。
+- `VimemoTests/Fixtures/Unlimited.storekit` 仅属于测试 target；测试购买不得使用真实账户支付，不得将测试商品或 StoreKitTest 框架打包进正式应用。
 - UI 测试用 DEBUG 下的 `--test-library <UUID>` 创建独立库，不能清空用户草稿。`--demo-editor` 可进入原创示例编辑器。
 - 正式资源不包含用户提供的参考录屏或测试音频；`VimemoTests/Fixtures/AudioFixture.mov` 只属于测试 target。
 - 构建产物放在 `build/`；交付产物保存到 `build/Products/Simulator/Vimemo.app` 和 `build/Products/iOS/Vimemo.app`。后者无签名时不能直接安装到真机。

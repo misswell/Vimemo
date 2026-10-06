@@ -6,6 +6,7 @@ import ImageIO
 struct ExportSheet: View {
     @EnvironmentObject private var store: ProjectStore
     @EnvironmentObject private var coordinator: ExportCoordinator
+    @EnvironmentObject private var purchases: PurchaseStore
     @Environment(\.dismiss) private var dismiss
     @State var projects: [VideoProject]
     @State private var format: OutputFormat
@@ -15,6 +16,7 @@ struct ExportSheet: View {
     @State private var saveToPhotos = true
     @State private var started = false
     @State private var sharing = false
+    @State private var showPurchase = false
 
     init(projects: [VideoProject]) {
         _projects = State(initialValue: projects)
@@ -54,6 +56,7 @@ struct ExportSheet: View {
             .sheet(isPresented: $sharing) {
                 ShareSheet(urls: coordinator.completed.flatMap { $0.files.map { store.url(for: $0) } })
             }
+            .sheet(isPresented: $showPurchase) { UnlimitedPurchaseView { start() } }
         }.preferredColorScheme(.dark)
     }
 
@@ -67,6 +70,10 @@ struct ExportSheet: View {
                 }
                 Spacer()
             }.padding(.vertical, 5)
+            if ExportAccess.requiresUnlimited(projects, format: format) {
+                Label(purchases.hasUnlimited ? "不限制时长 · 已解锁" : "超过 3 秒的导出需一次性解锁", systemImage: purchases.hasUnlimited ? "checkmark.circle" : "lock")
+                    .font(.caption).foregroundStyle(StudioTheme.peach).accessibilityIdentifier("longExportNotice")
+            }
             StudioCard {
                 VStack(alignment: .leading, spacing: 16) {
                     SectionLabel(title: "输出格式")
@@ -158,6 +165,9 @@ struct ExportSheet: View {
         }
     }
     private func start() {
+        guard !ExportAccess.requiresUnlimited(projects, format: format) || purchases.hasUnlimited else {
+            showPurchase = true; return
+        }
         for index in projects.indices {
             projects[index].settings.format = format
             projects[index].settings.quality = quality
@@ -166,8 +176,8 @@ struct ExportSheet: View {
             store.update(projects[index])
         }
         store.persist()
-        started = true
-        coordinator.start(projects: projects, store: store, saveToPhotos: saveToPhotos)
+        started = coordinator.start(projects: projects, store: store, saveToPhotos: saveToPhotos, purchases: purchases)
+        if !started && ExportAccess.requiresUnlimited(projects) { showPurchase = true }
     }
 }
 

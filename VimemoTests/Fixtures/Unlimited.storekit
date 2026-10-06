@@ -1,0 +1,30 @@
+{
+  "identifier" : "D8161A9E-9663-47A6-96AD-47052C760C68",
+  "nonRenewingSubscriptions" : [],
+  "products" : [
+    {
+      "displayPrice" : "0.99",
+      "familyShareable" : false,
+      "internalID" : "6819497962",
+      "localizations" : [
+        {
+          "description" : "One-time unlock for exports longer than 3 seconds.",
+          "displayName" : "Unlimited Duration",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "com.vimemo.live.unlimited",
+      "referenceName" : "Unlimited Duration",
+      "type" : "NonConsumable"
+    }
+  ],
+  "settings" : {
+    "_applicationInternalID" : "",
+    "_developerTeamID" : "",
+    "_failTransactionsEnabled" : false,
+    "_locale" : "en_US",
+    "_storefront" : "USA"
+  },
+  "subscriptionGroups" : [],
+  "version" : { "major" : 3, "minor" : 0 }
+}

@@ -8,8 +8,8 @@ settings:
   base:
     SWIFT_VERSION: '5.0'
     DEVELOPMENT_TEAM: U8U443D7ZL
-    MARKETING_VERSION: '1.0.2'
-    CURRENT_PROJECT_VERSION: '3'
+    MARKETING_VERSION: '1.0.3'
+    CURRENT_PROJECT_VERSION: '4'
     ENABLE_USER_SCRIPT_SANDBOXING: YES
 targets:
   Vimemo:
@@ -40,12 +40,18 @@ targets:
     type: bundle.unit-test
     platform: iOS
     sources: [VimemoTests]
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
     dependencies:
       - target: Vimemo
   VimemoUITests:
     type: bundle.ui-testing
     platform: iOS
     sources: [VimemoUITests]
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
     dependencies:
       - target: Vimemo
 schemes:
@@ -53,5 +59,8 @@ schemes:
     build:
       targets:
         Vimemo: all
+    run:
+      config: Debug
+      storeKitConfiguration: VimemoTests/Fixtures/Unlimited.storekit
     test:
       targets: [VimemoTests, VimemoUITests]

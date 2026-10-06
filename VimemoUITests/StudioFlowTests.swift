@@ -57,19 +57,12 @@ final class StudioFlowTests: XCTestCase {
         screenshot(app, name: "06-live-photo-playback")
     }
 
-    @MainActor func testUnlimitedDurationAndBothCoverChoices() throws {
+    @MainActor func testFreeExportsAndBothCoverChoices() throws {
         let app = XCUIApplication()
         app.launchArguments = ["--test-library", UUID().uuidString]
         app.launch()
-        app.buttons["设置"].tap()
-        let unlimited = app.switches["unlimitedDuration"]
-        XCTAssertTrue(unlimited.waitForExistence(timeout: 5))
-        if unlimited.value as? String != "1" { unlimited.tap() }
-        app.buttons["工作台"].tap()
         app.buttons["试试示例"].tap()
         XCTAssertTrue(app.buttons["makeLivePhotos"].waitForExistence(timeout: 10))
-        XCTAssertTrue(app.buttons["useFullVideo"].exists)
-        app.buttons["useFullVideo"].tap()
         app.buttons["chooseCover"].tap()
         let coverTime = app.sliders["手动封面时间"]
         XCTAssertTrue(coverTime.waitForExistence(timeout: 5))
@@ -93,11 +86,70 @@ final class StudioFlowTests: XCTestCase {
         app.buttons["makeLivePhotos"].tap()
         app.buttons["制作并保存 · 1 个作品"].tap()
         XCTAssertTrue(app.staticTexts["已制作 1 个作品"].waitForExistence(timeout: 30))
-        screenshot(app, name: "10-unlimited-live-photo")
+        screenshot(app, name: "10-free-live-photo")
         app.buttons["完成"].firstMatch.tap()
         app.buttons["返回工作台"].tap()
+    }
+
+    @MainActor func testLockedSettingShowsPurchaseAndCanContinueFree() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["--test-library", UUID().uuidString, "-unlimitedDuration", "NO"]
+        app.launch()
         app.buttons["设置"].tap()
-        if unlimited.value as? String == "1" { unlimited.tap() }
+        let unlimited = app.switches["unlimitedDuration"]
+        XCTAssertTrue(unlimited.waitForExistence(timeout: 5))
+        unlimited.tap()
+        XCTAssertTrue(app.buttons["restoreUnlimited"].waitForExistence(timeout: 5))
+        screenshot(app, name: "11-unlimited-purchase")
+        app.buttons["continueFree"].tap()
+        XCTAssertEqual(unlimited.value as? String, "0")
+        app.buttons["工作台"].tap()
+        app.buttons["试试示例"].tap()
+        XCTAssertTrue(app.buttons["makeLivePhotos"].waitForExistence(timeout: 10))
+    }
+
+    @MainActor func testPurchaseResultAndRelaunch() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["--test-library", UUID().uuidString]
+        app.launch()
+        app.buttons["设置"].tap()
+        app.buttons["unlockUnlimited"].tap()
+        let buy = app.buttons["buyUnlimited"]
+        XCTAssertTrue(buy.waitForExistence(timeout: 10))
+        screenshot(app, name: "13-purchase-price")
+        buy.tap()
+        let confirmation = app.buttons.matching(NSPredicate(format: "label == '购买' OR label == 'Buy'")).firstMatch
+        if confirmation.waitForExistence(timeout: 3) { confirmation.tap() }
+        let rejected = app.staticTexts["无法验证这次购买，请尝试恢复购买。"]
+        if rejected.waitForExistence(timeout: 3) {
+            screenshot(app, name: "14-unverified-purchase-rejected")
+            app.buttons["continueFree"].tap()
+            XCTAssertTrue(app.buttons["unlockUnlimited"].exists)
+            app.terminate(); app.launch()
+            app.buttons["设置"].tap()
+            XCTAssertTrue(app.buttons["unlockUnlimited"].waitForExistence(timeout: 5))
+            return
+        }
+        XCTAssertTrue(app.staticTexts["已解锁"].waitForExistence(timeout: 10))
+        app.terminate(); app.launch()
+        app.buttons["设置"].tap()
+        XCTAssertTrue(app.staticTexts["已解锁"].waitForExistence(timeout: 10))
+    }
+
+    @MainActor func testLegacyLongDraftRequiresUnlockButStaticPhotoRemainsFree() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["--test-library", UUID().uuidString, "--demo-editor", "-unlimitedDuration", "YES"]
+        app.launch()
+        XCTAssertTrue(app.buttons["makeLivePhotos"].waitForExistence(timeout: 10))
+        app.buttons["makeLivePhotos"].tap()
+        XCTAssertTrue(app.otherElements["longExportNotice"].exists || app.staticTexts["longExportNotice"].exists)
+        app.buttons["制作并保存 · 1 个作品"].tap()
+        XCTAssertTrue(app.buttons["continueFree"].waitForExistence(timeout: 5))
+        app.buttons["continueFree"].tap()
+        app.buttons["静态照片"].tap()
+        app.buttons["制作并保存 · 1 个作品"].tap()
+        XCTAssertTrue(app.staticTexts["已制作 1 个作品"].waitForExistence(timeout: 15))
+        screenshot(app, name: "12-free-photo-from-long-draft")
     }
 
     @MainActor func testAdjustmentsAndStaticPhotoExport() throws {

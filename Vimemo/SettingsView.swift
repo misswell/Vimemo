@@ -2,12 +2,15 @@ import SwiftUI
 
 struct SettingsView: View {
     @EnvironmentObject private var store: ProjectStore
+    @EnvironmentObject private var purchases: PurchaseStore
     @AppStorage("defaultQuality") private var quality = ExportQuality.high.rawValue
     @AppStorage("defaultPreserveDate") private var preserveDate = true
     @AppStorage("defaultPreserveLocation") private var preserveLocation = false
     @AppStorage("defaultMuted") private var muted = false
     @AppStorage("unlimitedDuration") private var unlimitedDuration = false
     @State private var usage = "计算中…"
+    @State private var showPurchase = false
+    @State private var showRestoreResult = false
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
@@ -24,8 +27,19 @@ struct SettingsView: View {
                 }
                 StudioCard {
                     VStack(alignment: .leading, spacing: 14) {
-                        SectionLabel(title: "片段时长")
-                        Toggle("不限制时长", isOn: $unlimitedDuration).accessibilityIdentifier("unlimitedDuration")
+                        SectionLabel(title: "片段时长", detail: purchases.hasUnlimited ? "已解锁" : "一次性购买")
+                        Toggle("不限制时长", isOn: Binding(get: { unlimitedDuration }, set: { enabled in
+                            if enabled && !purchases.hasUnlimited { showPurchase = true }
+                            else { unlimitedDuration = enabled }
+                        })).accessibilityIdentifier("unlimitedDuration")
+                        if !purchases.hasUnlimited {
+                            Button("解锁不限制时长") { showPurchase = true }.accessibilityIdentifier("unlockUnlimited")
+                            Text("仅超过 3 秒的动态导出需要购买。3 秒内导出、静态照片和全部编辑功能免费。")
+                                .font(.caption).foregroundStyle(StudioTheme.secondary)
+                        }
+                        Button(purchases.busy ? "正在恢复…" : "恢复购买") {
+                            Task { await purchases.restore(); showRestoreResult = true }
+                        }.disabled(purchases.busy).font(.caption).accessibilityIdentifier("settingsRestorePurchase")
                         Text("开启后可选择整段视频，已有草稿也可延长。关闭后，超过 3 秒的片段会缩短到 3 秒。长片段需要更多时间和存储空间，系统实况播放与动态壁纸效果由 iOS 决定。")
                             .font(.caption).foregroundStyle(StudioTheme.secondary)
                     }.font(.system(size: 14))
@@ -54,6 +68,12 @@ struct SettingsView: View {
             }.padding(.horizontal, 24)
         }.scrollIndicators(.hidden).task { usage = store.diskUsage }
             .onChange(of: unlimitedDuration) { _, enabled in store.setUnlimitedDuration(enabled) }
+            .sheet(isPresented: $showPurchase) {
+                UnlimitedPurchaseView { unlimitedDuration = true }
+            }
+            .alert("恢复购买", isPresented: $showRestoreResult) {
+                Button("好", role: .cancel) {}
+            } message: { Text(purchases.message ?? "已恢复不限制时长。") }
     }
     private func tip(_ title: String, _ content: String) -> some View {
         VStack(alignment: .leading, spacing: 7) { Text(title).font(.system(size: 13, weight: .medium)); Text(content).font(.system(size: 12)).foregroundStyle(StudioTheme.secondary).lineSpacing(3) }

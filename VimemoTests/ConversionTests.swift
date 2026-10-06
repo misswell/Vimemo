@@ -159,7 +159,7 @@ final class ConversionTests: XCTestCase {
         var imported = try await store.importVideo(source, title: "Batch test")
         imported.clips = [Clip(start: 0, end: 2, cover: 1), Clip(start: 3, end: 6, cover: 4.5)]
         let coordinator = ExportCoordinator()
-        coordinator.start(projects: [imported], store: store, saveToPhotos: false)
+        coordinator.start(projects: [imported], store: store, saveToPhotos: false, purchases: PurchaseStore(observeTransactions: false))
         let deadline = Date().addingTimeInterval(30)
         while coordinator.running && Date() < deadline { try await Task.sleep(for: .milliseconds(50)) }
         XCTAssertFalse(coordinator.running)

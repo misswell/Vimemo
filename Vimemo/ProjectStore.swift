@@ -216,8 +216,12 @@ struct ImportedMovie: Transferable {
 
     func cancel() { job?.cancel() }
 
-    func start(projects: [VideoProject], store: ProjectStore, saveToPhotos: Bool) {
-        guard !running else { return }
+    @discardableResult func start(projects: [VideoProject], store: ProjectStore, saveToPhotos: Bool, purchases: PurchaseStore) -> Bool {
+        guard !running else { return false }
+        let requiresUnlimited = ExportAccess.requiresUnlimited(projects)
+        guard !requiresUnlimited || purchases.hasUnlimited else {
+            errorMessage = "超过 3 秒的导出需要解锁不限制时长。"; return false
+        }
         running = true; progress = 0; completed = []; errorMessage = nil; cancelled = false
         let entries = projects.flatMap { project in project.clips.map { (project, $0) } }
         job = Task { [weak self] in
@@ -231,6 +235,10 @@ struct ImportedMovie: Transferable {
             }
             var saveFailures: [String] = []
             do {
+                if requiresUnlimited {
+                    await purchases.refreshEntitlement()
+                    guard purchases.hasUnlimited else { throw StudioError.message("购买权益尚未确认，请恢复购买后重试。") }
+                }
                 for (index, entry) in entries.enumerated() {
                     try Task.checkCancellation()
                     let (project, clip) = entry
@@ -257,5 +265,6 @@ struct ImportedMovie: Transferable {
                 self.status = "导出中断，完成的作品已保留"
             }
         }
+        return true
     }
 }
