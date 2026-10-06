@@ -16,6 +16,21 @@ final class StudioFlowTests: XCTestCase {
         start.press(forDuration: 0.05, thenDragTo: end)
     }
 
+    @MainActor func testPortraitPreviewUsesSourceAspectRatio() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["--test-library", UUID().uuidString, "--demo-editor"]
+        app.launch()
+        XCTAssertTrue(app.buttons["makeLivePhotos"].waitForExistence(timeout: 10))
+
+        let preview = app.descendants(matching: .any)["editorPreview"]
+        XCTAssertTrue(preview.waitForExistence(timeout: 5))
+        screenshot(app, name: "portrait-preview")
+        let bounds = preview.frame
+        XCTAssertGreaterThan(bounds.height, 0)
+        XCTAssertEqual(bounds.width / bounds.height, 0.75, accuracy: 0.08,
+                       "Portrait video preview should use the source aspect ratio instead of a landscape frame.")
+    }
+
     @MainActor func testAppearanceSwitchingAndPersistence() throws {
         let app = XCUIApplication()
         app.launchArguments = ["--test-library", UUID().uuidString, "--test-purchase-unavailable"]

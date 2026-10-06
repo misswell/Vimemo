@@ -37,6 +37,16 @@ struct EditorView: View {
     }
     private var sourceURL: URL { store.url(for: project.filename) }
     private var maxSourceClipDuration: Double { project.settings.maxOutputDuration.map { $0 * project.settings.speed } ?? project.duration }
+    private var previewDimensions: CGSize {
+        MediaProcessor.dimensions(CGSize(width: project.width, height: project.height), settings: project.settings)
+    }
+
+    private func previewSize(availableWidth: CGFloat, maxHeight: CGFloat) -> CGSize {
+        let dimensions = previewDimensions
+        let aspectRatio = dimensions.width / max(1, dimensions.height)
+        let width = min(max(1, availableWidth), max(1, maxHeight) * aspectRatio)
+        return CGSize(width: width, height: width / aspectRatio)
+    }
 
     var body: some View {
         NavigationStack {
@@ -44,17 +54,25 @@ struct EditorView: View {
                 StudioTheme.background.ignoresSafeArea()
                 GeometryReader { geometry in
                     if geometry.size.width > 700 {
+                        let previewSize = previewSize(
+                            availableWidth: geometry.size.width * 0.46,
+                            maxHeight: min(520, max(260, geometry.size.height - 92))
+                        )
                         HStack(alignment: .top, spacing: 24) {
                             VStack(spacing: 12) {
-                                preview.frame(height: min(520, max(260, geometry.size.height - 92)))
+                                preview.frame(width: previewSize.width, height: previewSize.height)
                                 coverControls
                             }.frame(width: geometry.size.width * 0.46)
                             editorPanels
                         }.padding(.horizontal, 24).padding(.vertical, 12)
                     } else {
+                        let previewSize = previewSize(
+                            availableWidth: geometry.size.width - 32,
+                            maxHeight: min(280, max(136, geometry.size.height * 0.34))
+                        )
                         VStack(spacing: 0) {
-                            preview.frame(height: min(280, max(136, geometry.size.height * 0.34)))
-                                .padding(.horizontal, 16).padding(.top, 6)
+                            preview.frame(width: previewSize.width, height: previewSize.height)
+                                .padding(.top, 6)
                             coverControls.padding(.horizontal, 20).padding(.vertical, 8)
                             editorPanels
                         }
