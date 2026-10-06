@@ -128,17 +128,18 @@ struct HomeView: View {
                                             if batchIDs.contains(project.id) { batchIDs.remove(project.id) } else { batchIDs.insert(project.id) }
                                         } else { editing = project }
                                     } label: { projectCard(project) }.buttonStyle(.plain)
+                                        .accessibilityIdentifier("draft-\(project.id.uuidString)")
+                                        .contextMenu {
+                                            Button("重命名", systemImage: "pencil") { renameText = project.title; renaming = project }
+                                            Button("删除草稿", systemImage: "trash", role: .destructive) { deleting = project }
+                                        }
                                     if !batchMode {
                                         Button { exportProjects = [project]; exportSelection = ExportSelection(projects: [project]) } label: {
-                                            Image(systemName: "square.and.arrow.up").font(.system(size: 16, weight: .semibold)).frame(width: 44, height: 44).foregroundStyle(.white).background(.black.opacity(0.5), in: Circle())
-                                        }.buttonStyle(.plain).padding(8).accessibilityLabel("导出\(project.title)")
+                                            Image(systemName: "square.and.arrow.up").font(.system(size: 16, weight: .semibold)).frame(width: 44, height: 44).foregroundStyle(.white).contentShape(Circle())
+                                        }.studioGlassButton(circular: true, overImage: true).contentShape(Circle()).padding(8).zIndex(1).accessibilityLabel("导出\(project.title)")
                                     }
                                 }.background(StudioTheme.surface, in: RoundedRectangle(cornerRadius: 20))
                                     .overlay(RoundedRectangle(cornerRadius: 20).stroke(StudioTheme.line.opacity(0.35), lineWidth: 1))
-                                    .contextMenu {
-                                        Button("重命名", systemImage: "pencil") { renameText = project.title; renaming = project }
-                                        Button("删除草稿", systemImage: "trash", role: .destructive) { deleting = project }
-                                    }
                             }
                         }
                     }
@@ -176,10 +177,10 @@ struct HomeView: View {
             }.buttonStyle(.plain).accessibilityLabel("导入视频").accessibilityIdentifier("importVideos")
             HStack(spacing: 12) {
                 Button { fileImporter = true } label: {
-                    Label("从文件导入", systemImage: "folder").frame(maxWidth: .infinity).frame(minHeight: 46)
+                    Label("从文件导入", systemImage: "folder").frame(maxWidth: .infinity).frame(minHeight: 46).contentShape(Rectangle())
                 }
                 Button { Task { if let demo = await store.importDemo() { editing = demo } } } label: {
-                    Label("试试示例", systemImage: "play.rectangle").frame(maxWidth: .infinity).frame(minHeight: 46)
+                    Label("试试示例", systemImage: "play.rectangle").frame(maxWidth: .infinity).frame(minHeight: 46).contentShape(Rectangle())
                 }
             }.font(.system(size: 13, weight: .medium)).buttonStyle(.plain)
                 .foregroundStyle(StudioTheme.accent).background(StudioTheme.surface, in: RoundedRectangle(cornerRadius: 16))
@@ -213,8 +214,7 @@ struct HomeView: View {
             tabButton("工作台", symbol: "viewfinder", index: 0)
             tabButton("作品", symbol: "rectangle.stack", index: 1)
             tabButton("设置", symbol: "slider.horizontal.3", index: 2)
-        }.padding(6).background(StudioTheme.surface, in: RoundedRectangle(cornerRadius: 18))
-            .overlay(RoundedRectangle(cornerRadius: 18).stroke(StudioTheme.line.opacity(0.7), lineWidth: 1))
+        }.padding(6).studioGlass(in: RoundedRectangle(cornerRadius: 24), interactive: false)
             .padding(.horizontal, 24).padding(.top, 8).padding(.bottom, 8)
     }
     private func tabButton(_ title: String, symbol: String, index: Int) -> some View {
@@ -224,7 +224,7 @@ struct HomeView: View {
                 Text(title).font(.system(size: 12, weight: .semibold))
             }.frame(maxWidth: .infinity).frame(minHeight: 54)
                 .foregroundStyle(tab == index ? StudioTheme.accent : StudioTheme.secondary)
-                .background(tab == index ? StudioTheme.accent.opacity(0.1) : .clear, in: RoundedRectangle(cornerRadius: 12))
+                .background(tab == index ? StudioTheme.accent.opacity(0.1) : .clear, in: RoundedRectangle(cornerRadius: 18))
         }.buttonStyle(.plain).accessibilityValue(tab == index ? "已选择" : "未选择")
     }
 }

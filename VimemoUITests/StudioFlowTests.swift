@@ -31,6 +31,16 @@ final class StudioFlowTests: XCTestCase {
         app.buttons["试试示例"].tap()
         XCTAssertTrue(app.buttons["makeLivePhotos"].waitForExistence(timeout: 10))
         screenshot(app, name: "26-dark-editor")
+        let playback = app.buttons["previewPlayback"]
+        XCTAssertTrue(playback.isHittable)
+        playback.tap()
+        XCTAssertEqual(playback.label, "暂停预览")
+        playback.tap()
+        XCTAssertEqual(playback.label, "播放编辑后片段")
+        app.buttons["chooseCover"].tap()
+        XCTAssertTrue(app.buttons["confirmCover"].waitForExistence(timeout: 5))
+        app.buttons["confirmCover"].tap()
+        XCTAssertTrue(app.buttons["chooseCover"].waitForExistence(timeout: 5))
         app.buttons["makeLivePhotos"].tap()
         XCTAssertTrue(app.staticTexts["制作与导出"].waitForExistence(timeout: 5))
         screenshot(app, name: "27-dark-export")
@@ -82,10 +92,12 @@ final class StudioFlowTests: XCTestCase {
         XCTAssertTrue(app.buttons["chooseCover"].isHittable)
         screenshot(app, name: "18-persistent-editor-tools")
         app.buttons["返回工作台"].tap()
-        let draft = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "海边的最后一束光")).firstMatch
+        let draft = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label CONTAINS %@", "draft-", "海边的最后一束光")).firstMatch
         XCTAssertTrue(draft.waitForExistence(timeout: 5))
         draft.press(forDuration: 1)
-        app.buttons["重命名"].tap()
+        let rename = app.buttons["重命名"]
+        XCTAssertTrue(rename.waitForExistence(timeout: 5))
+        rename.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
         let field = app.alerts.textFields.firstMatch
         XCTAssertTrue(field.waitForExistence(timeout: 5))
         field.tap()
@@ -94,6 +106,7 @@ final class StudioFlowTests: XCTestCase {
         let quickExport = app.buttons["导出重新命名"]
         XCTAssertTrue(quickExport.waitForExistence(timeout: 5))
         quickExport.tap()
+        screenshot(app, name: "30-quick-export-after-tap")
         XCTAssertTrue(app.staticTexts["制作与导出"].waitForExistence(timeout: 5))
         screenshot(app, name: "19-quick-export")
         app.buttons["静态照片"].tap()

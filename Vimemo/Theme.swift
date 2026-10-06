@@ -90,3 +90,69 @@ struct PrimaryButton: View {
         }.buttonStyle(.plain)
     }
 }
+
+struct StudioGlassGroup<Content: View>: View {
+    var spacing: CGFloat = 8
+    @ViewBuilder var content: Content
+    var body: some View {
+        if #available(iOS 26.0, *) {
+            GlassEffectContainer(spacing: spacing) { content }
+        } else { content }
+    }
+}
+
+private struct StudioGlassModifier<Surface: Shape>: ViewModifier {
+    var shape: Surface
+    var interactive: Bool
+    var overImage: Bool
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.colorScheme) private var colorScheme
+
+    @ViewBuilder func body(content: Content) -> some View {
+        if reduceTransparency {
+            content.background(overImage ? Color.black : StudioTheme.raised, in: shape)
+                .overlay(shape.stroke(StudioTheme.line.opacity(0.5), lineWidth: 1))
+        } else if #available(iOS 26.0, *) {
+            content.glassEffect(.regular.tint(overImage ? .black.opacity(0.2) : nil).interactive(interactive), in: shape)
+                .environment(\.colorScheme, overImage ? .dark : colorScheme)
+        } else {
+            content.background(.regularMaterial, in: shape)
+                .overlay(shape.stroke(.white.opacity(colorScheme == .dark ? 0.12 : 0.5), lineWidth: 1))
+                .environment(\.colorScheme, overImage ? .dark : colorScheme)
+        }
+    }
+}
+
+extension View {
+    func studioGlass<Surface: Shape>(in shape: Surface, interactive: Bool = true, overImage: Bool = false) -> some View {
+        modifier(StudioGlassModifier(shape: shape, interactive: interactive, overImage: overImage))
+    }
+}
+
+private struct StudioGlassButtonModifier: ViewModifier {
+    var circular: Bool
+    var overImage: Bool
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.colorScheme) private var colorScheme
+    private var shape: AnyShape { circular ? AnyShape(Circle()) : AnyShape(Capsule()) }
+
+    @ViewBuilder func body(content: Content) -> some View {
+        if reduceTransparency {
+            content.buttonStyle(.plain).background(overImage ? Color.black : StudioTheme.raised, in: shape)
+                .overlay(shape.stroke(StudioTheme.line.opacity(0.5), lineWidth: 1))
+        } else if #available(iOS 26.0, *) {
+            content.buttonStyle(.glass).buttonBorderShape(circular ? .circle : .capsule)
+                .controlSize(.mini).environment(\.colorScheme, overImage ? .dark : colorScheme)
+        } else {
+            content.buttonStyle(.plain).background(.regularMaterial, in: shape)
+                .overlay(shape.stroke(.white.opacity(colorScheme == .dark ? 0.12 : 0.5), lineWidth: 1))
+                .environment(\.colorScheme, overImage ? .dark : colorScheme)
+        }
+    }
+}
+
+extension View {
+    func studioGlassButton(circular: Bool = false, overImage: Bool = false) -> some View {
+        modifier(StudioGlassButtonModifier(circular: circular, overImage: overImage))
+    }
+}

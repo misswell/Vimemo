@@ -156,9 +156,9 @@ struct EditorView: View {
             }.padding(13).foregroundStyle(.white).background(LinearGradient(colors: [.black.opacity(0.4), .clear], startPoint: .top, endPoint: .bottom))
             Button { togglePlayback() } label: {
                 Image(systemName: playing ? "pause.fill" : "play.fill").font(.system(size: 19)).foregroundStyle(.white)
-                    .frame(width: 48, height: 48).background(.black.opacity(0.4), in: Circle())
-            }.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing).padding(13).accessibilityLabel(playing ? "暂停预览" : "播放编辑后片段")
-        }.accessibilityIdentifier("editorPreview").clipShape(RoundedRectangle(cornerRadius: 20))
+                    .frame(width: 48, height: 48).contentShape(Circle())
+            }.studioGlassButton(circular: true, overImage: true).contentShape(Circle()).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing).padding(13).accessibilityLabel(playing ? "暂停预览" : "播放编辑后片段").accessibilityIdentifier("previewPlayback")
+        }.accessibilityElement(children: .contain).accessibilityIdentifier("editorPreview").clipShape(RoundedRectangle(cornerRadius: 20))
             .overlay(RoundedRectangle(cornerRadius: 20).stroke(StudioTheme.line, lineWidth: 1))
     }
 
@@ -258,22 +258,27 @@ struct EditorView: View {
         }.buttonStyle(.plain)
     }
     private var coverControls: some View {
-        HStack(spacing: 12) {
-            Button {
-                coverTask?.cancel(); findingCover = false; playing = false; player.pause(); showCoverPicker = true
-            } label: {
-                Label("选择封面", systemImage: "photo.on.rectangle").font(.system(size: 13, weight: .semibold)).frame(minHeight: 44)
-            }.accessibilityIdentifier("chooseCover")
-            Spacer(minLength: 0)
-            if clip.coverPhotoFilename != nil {
-                Text("已使用相册照片作为封面").font(.system(size: 10)).foregroundStyle(StudioTheme.secondary).lineLimit(2)
-            } else {
-                Button { findClearCover() } label: {
-                    if findingCover { ProgressView().controlSize(.small).frame(minHeight: 44) }
-                    else { Label("自动选帧", systemImage: "sparkle").font(.system(size: 12)).frame(minHeight: 44) }
-                }.disabled(findingCover).accessibilityLabel("自动选清晰封面")
-            }
-        }.buttonStyle(.plain)
+        StudioGlassGroup {
+            HStack(spacing: 12) {
+                Button {
+                    coverTask?.cancel(); findingCover = false; playing = false; player.pause(); showCoverPicker = true
+                } label: {
+                    Label("选择封面", systemImage: "photo.on.rectangle").font(.system(size: 13, weight: .semibold))
+                        .padding(.horizontal, 16).frame(minHeight: 44).contentShape(Capsule())
+                }.studioGlassButton().accessibilityIdentifier("chooseCover")
+                Spacer(minLength: 0)
+                if clip.coverPhotoFilename != nil {
+                    Text("已使用相册照片作为封面").font(.system(size: 10)).foregroundStyle(StudioTheme.secondary).lineLimit(2)
+                } else {
+                    Button { findClearCover() } label: {
+                        Group {
+                            if findingCover { ProgressView().controlSize(.small) }
+                            else { Label("自动选帧", systemImage: "sparkle").font(.system(size: 12)) }
+                        }.padding(.horizontal, 16).frame(minHeight: 44).contentShape(Capsule())
+                    }.studioGlassButton().disabled(findingCover).accessibilityLabel("自动选清晰封面")
+                }
+            }.buttonStyle(.plain)
+        }
     }
     private func resetPicture() {
         project.settings.ratio = .original; project.settings.rotation = 0; project.settings.mirrored = false
