@@ -23,15 +23,18 @@ struct SettingsView: View {
                 StudioCard {
                     VStack(alignment: .leading, spacing: 16) {
                         SectionLabel(title: "外观")
-                        HStack(spacing: 8) {
-                            ForEach(AppAppearance.allCases) { option in
-                                Button { appearance = option.rawValue } label: {
-                                    Text(option.title).font(.system(size: 14, weight: .semibold))
-                                        .frame(maxWidth: .infinity).frame(minHeight: 44)
-                                        .foregroundStyle(appearance == option.rawValue ? StudioTheme.onAccent : StudioTheme.ink)
-                                        .background(appearance == option.rawValue ? StudioTheme.accent : StudioTheme.raised, in: Capsule())
-                                }.buttonStyle(.plain).accessibilityIdentifier("appearance-\(option.rawValue)")
-                                    .accessibilityValue(appearance == option.rawValue ? "已选择" : "未选择")
+                        StudioGlassGroup(spacing: 8) {
+                            HStack(spacing: 8) {
+                                ForEach(AppAppearance.allCases) { option in
+                                    Button { appearance = option.rawValue } label: {
+                                        Text(option.title).font(.system(size: 14, weight: .semibold))
+                                            .frame(maxWidth: .infinity).frame(minHeight: 44)
+                                            .foregroundStyle(appearance == option.rawValue ? StudioTheme.accent : StudioTheme.ink)
+                                            .contentShape(Capsule())
+                                            .studioGlass(in: Capsule(), interactive: true, tint: appearance == option.rawValue ? StudioTheme.accent.opacity(0.18) : nil)
+                                    }.buttonStyle(.plain).accessibilityIdentifier("appearance-\(option.rawValue)")
+                                        .accessibilityValue(appearance == option.rawValue ? "已选择" : "未选择")
+                                }
                             }
                         }
                         Text(colorScheme == .dark ? "当前深色" : "当前浅色").font(.caption)
@@ -55,13 +58,13 @@ struct SettingsView: View {
                             else { unlimitedDuration = enabled }
                         })).accessibilityIdentifier("unlimitedDuration")
                         if !purchases.hasUnlimited {
-                            Button("解锁不限制时长") { showPurchase = true }.accessibilityIdentifier("unlockUnlimited")
+                            Button("解锁不限制时长") { showPurchase = true }.studioGlassButton(tint: StudioTheme.accent.opacity(0.12)).accessibilityIdentifier("unlockUnlimited")
                             Text("仅超过 3 秒的动态导出需要购买。3 秒内导出、静态照片和全部编辑功能免费。")
                                 .font(.caption).foregroundStyle(StudioTheme.secondary)
                         }
                         Button(purchases.busy ? "正在恢复…" : "恢复购买") {
                             Task { await purchases.restore(); showRestoreResult = true }
-                        }.disabled(purchases.busy).font(.caption).accessibilityIdentifier("settingsRestorePurchase")
+                        }.disabled(purchases.busy).font(.caption).studioGlassButton(tint: StudioTheme.accent.opacity(0.08)).accessibilityIdentifier("settingsRestorePurchase")
                         Text("开启后可选择整段视频，已有草稿也可延长。关闭后，超过 3 秒的片段会缩短到 3 秒。长片段需要更多时间和存储空间，系统实况播放与动态壁纸效果由 iOS 决定。")
                             .font(.caption).foregroundStyle(StudioTheme.secondary)
                     }.font(.system(size: 14))
@@ -76,6 +79,7 @@ struct SettingsView: View {
                         Text("\(store.savedDraftCount) 个草稿 · \(store.exports.count) 个作品").font(.subheadline)
                         Text(storageDetail).font(.caption).foregroundStyle(StudioTheme.secondary)
                         Button("清理临时缓存") { store.clearTemporaryCache(); refreshStorage(); showCacheResult = true }
+                            .studioGlassButton(tint: StudioTheme.accent.opacity(0.08))
                             .accessibilityIdentifier("clearTemporaryCache")
                         Text("长按工作台的草稿或收藏中的作品可删除本机文件。相册中的原视频和已保存作品不会随之删除。").font(.caption).foregroundStyle(StudioTheme.secondary)
                     }

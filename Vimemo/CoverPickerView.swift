@@ -35,17 +35,19 @@ struct CoverPickerView: View {
                         if let preview { Image(uiImage: preview).resizable().scaledToFit() }
                         else { ProgressView().tint(.white) }
                     }.foregroundStyle(.white).frame(height: 290).clipShape(RoundedRectangle(cornerRadius: 20))
-                    HStack(spacing: 12) {
-                        PillButton(title: "视频画面", selected: photoFilename == nil) {
-                            photoTask?.cancel(); photoGeneration = UUID(); loadingPhoto = false
-                            photoItem = nil; photoFilename = nil
+                    StudioGlassGroup(spacing: 12) {
+                        HStack(spacing: 12) {
+                            PillButton(title: "视频画面", selected: photoFilename == nil) {
+                                photoTask?.cancel(); photoGeneration = UUID(); loadingPhoto = false
+                                photoItem = nil; photoFilename = nil
+                            }
+                            PhotosPicker(selection: $photoItem, matching: .images) {
+                                Label("相册照片", systemImage: "photo").font(.system(size: 13, weight: .medium))
+                                    .padding(.horizontal, 16).frame(minHeight: 44).contentShape(Capsule())
+                                    .foregroundStyle(photoFilename == nil ? StudioTheme.ink : StudioTheme.accent)
+                            }.studioGlassButton(tint: photoFilename == nil ? nil : StudioTheme.accent.opacity(0.18))
+                                .accessibilityIdentifier("pickCoverPhoto")
                         }
-                        PhotosPicker(selection: $photoItem, matching: .images) {
-                            Label("相册照片", systemImage: "photo").font(.system(size: 13, weight: .medium))
-                                .padding(.horizontal, 16).padding(.vertical, 12)
-                                .foregroundStyle(photoFilename == nil ? StudioTheme.ink : StudioTheme.onAccent)
-                                .background(photoFilename == nil ? StudioTheme.raised : StudioTheme.accent, in: Capsule())
-                        }.accessibilityIdentifier("pickCoverPhoto")
                     }
                     if loadingPhoto { ProgressView("正在读取照片…").font(.caption) }
                     if photoFilename == nil {
@@ -55,10 +57,11 @@ struct CoverPickerView: View {
                                 Slider(value: $time, in: clip.start...max(clip.start + 0.001, lastFrame), step: 1 / max(1, project.frameRate))
                                     .tint(StudioTheme.peach).accessibilityLabel("手动封面时间")
                                 HStack {
-                                    Button { time = max(clip.start, time - 1 / max(1, project.frameRate)) } label: { Label("上一帧", systemImage: "backward.end.fill") }
+                                    Button { time = max(clip.start, time - 1 / max(1, project.frameRate)) } label: { Label("上一帧", systemImage: "backward.end.fill").frame(minHeight: 44).contentShape(Capsule()) }
                                     Spacer()
-                                    Button { time = min(lastFrame, time + 1 / max(1, project.frameRate)) } label: { Label("下一帧", systemImage: "forward.end.fill") }
-                                }.font(.system(size: 13)).buttonStyle(.plain)
+                                    Button { time = min(lastFrame, time + 1 / max(1, project.frameRate)) } label: { Label("下一帧", systemImage: "forward.end.fill").frame(minHeight: 44).contentShape(Capsule()) }
+                                }.font(.system(size: 13)).foregroundStyle(StudioTheme.accent)
+                                    .studioGlassButton(tint: StudioTheme.accent.opacity(0.08))
                                 Text("第 \(Int((time * project.frameRate).rounded())) 帧 · 从当前片段内选择")
                                     .font(.caption).foregroundStyle(StudioTheme.secondary)
                             }

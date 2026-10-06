@@ -71,8 +71,9 @@ struct PillButton: View {
         Button(action: action) {
             Text(title).font(.system(size: 13, weight: .semibold))
                 .padding(.horizontal, 16).frame(minHeight: 44)
-                .foregroundStyle(selected ? StudioTheme.onAccent : StudioTheme.ink)
-                .background(selected ? StudioTheme.accent : StudioTheme.raised, in: Capsule())
+                .foregroundStyle(selected ? StudioTheme.accent : StudioTheme.ink)
+                .contentShape(Capsule())
+                .studioGlass(in: Capsule(), interactive: true, tint: selected ? StudioTheme.accent.opacity(0.18) : nil)
         }.buttonStyle(.plain).accessibilityValue(selected ? "已选择" : "未选择")
     }
 }
@@ -105,18 +106,20 @@ private struct StudioGlassModifier<Surface: Shape>: ViewModifier {
     var shape: Surface
     var interactive: Bool
     var overImage: Bool
+    var tint: Color?
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @Environment(\.colorScheme) private var colorScheme
 
     @ViewBuilder func body(content: Content) -> some View {
         if reduceTransparency {
-            content.background(overImage ? Color.black : StudioTheme.raised, in: shape)
+            content.background(tint ?? (overImage ? Color.black : StudioTheme.raised), in: shape)
                 .overlay(shape.stroke(StudioTheme.line.opacity(0.5), lineWidth: 1))
         } else if #available(iOS 26.0, *) {
-            content.glassEffect(.regular.tint(overImage ? .black.opacity(0.2) : nil).interactive(interactive), in: shape)
+            content.glassEffect(.regular.tint(tint ?? (overImage ? .black.opacity(0.2) : nil)).interactive(interactive), in: shape)
                 .environment(\.colorScheme, overImage ? .dark : colorScheme)
         } else {
-            content.background(.regularMaterial, in: shape)
+            content.background(tint ?? .clear, in: shape)
+                .background(.regularMaterial, in: shape)
                 .overlay(shape.stroke(.white.opacity(colorScheme == .dark ? 0.12 : 0.5), lineWidth: 1))
                 .environment(\.colorScheme, overImage ? .dark : colorScheme)
         }
@@ -124,27 +127,29 @@ private struct StudioGlassModifier<Surface: Shape>: ViewModifier {
 }
 
 extension View {
-    func studioGlass<Surface: Shape>(in shape: Surface, interactive: Bool = true, overImage: Bool = false) -> some View {
-        modifier(StudioGlassModifier(shape: shape, interactive: interactive, overImage: overImage))
+    func studioGlass<Surface: Shape>(in shape: Surface, interactive: Bool = true, overImage: Bool = false, tint: Color? = nil) -> some View {
+        modifier(StudioGlassModifier(shape: shape, interactive: interactive, overImage: overImage, tint: tint))
     }
 }
 
 private struct StudioGlassButtonModifier: ViewModifier {
     var circular: Bool
     var overImage: Bool
+    var tint: Color?
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @Environment(\.colorScheme) private var colorScheme
     private var shape: AnyShape { circular ? AnyShape(Circle()) : AnyShape(Capsule()) }
 
     @ViewBuilder func body(content: Content) -> some View {
         if reduceTransparency {
-            content.buttonStyle(.plain).background(overImage ? Color.black : StudioTheme.raised, in: shape)
+            content.buttonStyle(.plain).background(tint ?? (overImage ? Color.black : StudioTheme.raised), in: shape)
                 .overlay(shape.stroke(StudioTheme.line.opacity(0.5), lineWidth: 1))
         } else if #available(iOS 26.0, *) {
-            content.buttonStyle(.glass).buttonBorderShape(circular ? .circle : .capsule)
+            content.tint(tint).buttonStyle(.glass).buttonBorderShape(circular ? .circle : .capsule)
                 .controlSize(.mini).environment(\.colorScheme, overImage ? .dark : colorScheme)
         } else {
-            content.buttonStyle(.plain).background(.regularMaterial, in: shape)
+            content.buttonStyle(.plain).background(tint ?? .clear, in: shape)
+                .background(.regularMaterial, in: shape)
                 .overlay(shape.stroke(.white.opacity(colorScheme == .dark ? 0.12 : 0.5), lineWidth: 1))
                 .environment(\.colorScheme, overImage ? .dark : colorScheme)
         }
@@ -152,7 +157,7 @@ private struct StudioGlassButtonModifier: ViewModifier {
 }
 
 extension View {
-    func studioGlassButton(circular: Bool = false, overImage: Bool = false) -> some View {
-        modifier(StudioGlassButtonModifier(circular: circular, overImage: overImage))
+    func studioGlassButton(circular: Bool = false, overImage: Bool = false, tint: Color? = nil) -> some View {
+        modifier(StudioGlassButtonModifier(circular: circular, overImage: overImage, tint: tint))
     }
 }

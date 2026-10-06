@@ -16,9 +16,11 @@ struct HistoryView: View {
                 }.padding(.top, 22)
                 Text("实况、动图和照片，随时查看与分享。").font(.subheadline).foregroundStyle(StudioTheme.secondary)
                 ScrollView(.horizontal) {
-                    HStack(spacing: 8) {
-                        PillButton(title: "全部", selected: filter == nil) { filter = nil }
-                        ForEach(OutputFormat.allCases) { item in PillButton(title: item.title, selected: filter == item) { filter = item } }
+                    StudioGlassGroup(spacing: 8) {
+                        HStack(spacing: 8) {
+                            PillButton(title: "全部", selected: filter == nil) { filter = nil }
+                            ForEach(OutputFormat.allCases) { item in PillButton(title: item.title, selected: filter == item) { filter = item } }
+                        }
                     }
                 }.scrollIndicators(.hidden)
                 if filtered.isEmpty {

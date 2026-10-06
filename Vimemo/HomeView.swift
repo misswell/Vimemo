@@ -108,8 +108,11 @@ struct HomeView: View {
                         }
                         Spacer()
                         if !store.projects.isEmpty {
-                            Button(batchMode ? "完成" : "批量制作") { batchMode.toggle(); batchIDs = [] }
-                                .font(.system(size: 13, weight: .semibold)).frame(minHeight: 44)
+                            Button { batchMode.toggle(); batchIDs = [] } label: {
+                                    Text(batchMode ? "完成" : "批量制作").font(.system(size: 13, weight: .semibold))
+                                    .padding(.horizontal, 14).frame(minHeight: 44).contentShape(Capsule())
+                                    .studioGlass(in: Capsule(), interactive: false, tint: StudioTheme.accent.opacity(0.14))
+                            }.buttonStyle(.plain)
                         }
                     }
                     if store.projects.isEmpty {
@@ -177,13 +180,14 @@ struct HomeView: View {
             }.buttonStyle(.plain).accessibilityLabel("导入视频").accessibilityIdentifier("importVideos")
             HStack(spacing: 12) {
                 Button { fileImporter = true } label: {
-                    Label("从文件导入", systemImage: "folder").frame(maxWidth: .infinity).frame(minHeight: 46).contentShape(Rectangle())
-                }
+                    Label("从文件导入", systemImage: "folder").frame(maxWidth: .infinity).frame(minHeight: 46).contentShape(Capsule())
+                        .studioGlass(in: Capsule(), interactive: false, tint: StudioTheme.accent.opacity(0.08))
+                }.buttonStyle(.plain)
                 Button { Task { if let demo = await store.importDemo() { editing = demo } } } label: {
-                    Label("试试示例", systemImage: "play.rectangle").frame(maxWidth: .infinity).frame(minHeight: 46).contentShape(Rectangle())
-                }
-            }.font(.system(size: 13, weight: .medium)).buttonStyle(.plain)
-                .foregroundStyle(StudioTheme.accent).background(StudioTheme.surface, in: RoundedRectangle(cornerRadius: 16))
+                    Label("试试示例", systemImage: "play.rectangle").frame(maxWidth: .infinity).frame(minHeight: 46).contentShape(Capsule())
+                        .studioGlass(in: Capsule(), interactive: false, tint: StudioTheme.accent.opacity(0.08))
+                }.buttonStyle(.plain)
+            }.font(.system(size: 13, weight: .medium)).foregroundStyle(StudioTheme.accent)
         }
     }
 
@@ -225,7 +229,8 @@ struct HomeView: View {
             }.frame(maxWidth: .infinity).frame(minHeight: 54)
                 .foregroundStyle(tab == index ? StudioTheme.accent : StudioTheme.secondary)
                 .background(tab == index ? StudioTheme.accent.opacity(0.1) : .clear, in: RoundedRectangle(cornerRadius: 18))
-        }.buttonStyle(.plain).accessibilityValue(tab == index ? "已选择" : "未选择")
+        }.buttonStyle(.plain).contentShape(RoundedRectangle(cornerRadius: 18))
+            .accessibilityValue(tab == index ? "已选择" : "未选择")
     }
 }
 

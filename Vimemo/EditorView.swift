@@ -247,7 +247,8 @@ struct EditorView: View {
                     } else { value.end += Double(direction) / max(1, project.frameRate) }
                     value.normalize(sourceDuration: project.duration, speed: project.settings.speed, maxOutputDuration: project.settings.maxOutputDuration)
                     project.clips[clipIndex] = value
-                } label: { Image(systemName: direction == -1 ? "minus" : "plus").font(.system(size: 10)).frame(width: 44, height: 44).background(StudioTheme.raised, in: RoundedRectangle(cornerRadius: 6)) }
+                } label: { Image(systemName: direction == -1 ? "minus" : "plus").font(.system(size: 10)).frame(width: 44, height: 44).contentShape(Circle()) }
+                    .studioGlassButton(circular: true, tint: StudioTheme.accent.opacity(0.12))
                     .accessibilityLabel("\(isStart ? "入点" : "出点")\(direction == -1 ? "前移" : "后移")一帧")
             }
         }.buttonStyle(.plain)
@@ -258,22 +259,25 @@ struct EditorView: View {
             coverTask?.cancel()
             project.clips[clipIndex].coverPhotoFilename = nil
             project.clips[clipIndex].cover = min(clip.end - 1.0 / 600, max(clip.start, clip.cover + delta / max(1, project.frameRate)))
-        } label: { Label(title, systemImage: symbol).font(.system(size: 11, weight: .medium)).frame(maxWidth: .infinity).frame(minHeight: 44).background(StudioTheme.raised, in: RoundedRectangle(cornerRadius: 10)) }
+        } label: { Label(title, systemImage: symbol).font(.system(size: 11, weight: .medium)).frame(maxWidth: .infinity).frame(minHeight: 44).contentShape(RoundedRectangle(cornerRadius: 12)) }
+            .studioGlass(in: RoundedRectangle(cornerRadius: 12), interactive: true, tint: StudioTheme.accent.opacity(0.08))
     }
 
     private var toolSelector: some View {
-        HStack(spacing: 4) {
-            ForEach(Array([("片段", "scissors"), ("画面", "crop.rotate"), ("调色", "camera.filters"), ("播放", "speedometer")].enumerated()), id: \.offset) { index, item in
-                Button { tool = index } label: {
-                    VStack(spacing: 6) {
+        StudioGlassGroup(spacing: 8) {
+            HStack(spacing: 4) {
+                ForEach(Array([("片段", "scissors"), ("画面", "crop.rotate"), ("调色", "camera.filters"), ("播放", "speedometer")].enumerated()), id: \.offset) { index, item in
+                    Button { tool = index } label: {
                         Label(item.0, systemImage: item.1).font(.system(size: 12, weight: .semibold))
-                        Capsule().fill(tool == index ? StudioTheme.accent : .clear).frame(height: 3)
-                    }.foregroundStyle(tool == index ? StudioTheme.accent : StudioTheme.secondary)
-                        .frame(maxWidth: .infinity).frame(minHeight: 44)
-                }.accessibilityIdentifier("editorTool\(index)")
-                    .accessibilityValue(tool == index ? "已选择" : "未选择")
-            }
-        }.buttonStyle(.plain)
+                            .foregroundStyle(tool == index ? StudioTheme.accent : StudioTheme.secondary)
+                            .frame(maxWidth: .infinity).frame(minHeight: 44)
+                            .background(tool == index ? StudioTheme.accent.opacity(0.12) : .clear, in: Capsule())
+                            .contentShape(Capsule())
+                    }.buttonStyle(.plain).accessibilityIdentifier("editorTool\(index)")
+                        .accessibilityValue(tool == index ? "已选择" : "未选择")
+                }
+            }.padding(5).studioGlass(in: Capsule(), interactive: false)
+        }
     }
     private var coverControls: some View {
         StudioGlassGroup {

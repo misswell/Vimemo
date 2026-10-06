@@ -112,7 +112,7 @@ final class StudioFlowTests: XCTestCase {
         draft.press(forDuration: 1)
         let rename = app.buttons["重命名"]
         XCTAssertTrue(rename.waitForExistence(timeout: 5))
-        rename.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        rename.tap()
         let field = app.alerts.textFields.firstMatch
         XCTAssertTrue(field.waitForExistence(timeout: 5))
         field.tap()

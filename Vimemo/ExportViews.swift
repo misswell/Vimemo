@@ -89,19 +89,22 @@ struct ExportSheet: View {
             StudioCard {
                 VStack(alignment: .leading, spacing: 16) {
                     SectionLabel(title: "输出格式")
-                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-                        ForEach(OutputFormat.allCases) { item in
-                            Button { format = item } label: {
-                                HStack {
-                                    Image(systemName: item.symbol)
-                                    Text(item.title).font(.system(size: 13, weight: .medium))
-                                    Spacer(minLength: 0)
-                                    if format == item { Image(systemName: "checkmark").font(.system(size: 11, weight: .bold)) }
-                                }.padding(.horizontal, 13).frame(minHeight: 50).foregroundStyle(format == item ? StudioTheme.onAccent : StudioTheme.ink)
-                                    .background(format == item ? StudioTheme.accent : StudioTheme.raised, in: RoundedRectangle(cornerRadius: 12))
-                            }.accessibilityValue(format == item ? "已选择" : "未选择")
+                    StudioGlassGroup(spacing: 10) {
+                        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+                            ForEach(OutputFormat.allCases) { item in
+                                Button { format = item } label: {
+                                    HStack {
+                                        Image(systemName: item.symbol)
+                                        Text(item.title).font(.system(size: 13, weight: .medium))
+                                        Spacer(minLength: 0)
+                                        if format == item { Image(systemName: "checkmark").font(.system(size: 11, weight: .bold)) }
+                                    }.padding(.horizontal, 13).frame(minHeight: 50).foregroundStyle(format == item ? StudioTheme.accent : StudioTheme.ink)
+                                        .contentShape(RoundedRectangle(cornerRadius: 12))
+                                        .studioGlass(in: RoundedRectangle(cornerRadius: 12), interactive: true, tint: format == item ? StudioTheme.accent.opacity(0.18) : nil)
+                                }.buttonStyle(.plain).accessibilityValue(format == item ? "已选择" : "未选择")
+                            }
                         }
-                    }.buttonStyle(.plain)
+                    }
                     Text(format == .livePhoto ? "保存到相册后长按播放。分享文件包含 JPG 与 MOV 配对原件。" : format == .gif ? "GIF 循环播放，不含声音。尺寸和帧率可自由选择。" : format == .photo ? "导出所选封面帧，保留裁剪与调色。" : "导出裁剪后的 MOV 视频，保留声音与编辑效果。")
                         .font(.system(size: 11)).foregroundStyle(StudioTheme.secondary)
                 }
@@ -117,19 +120,23 @@ struct ExportSheet: View {
                 StudioCard {
                     VStack(alignment: .leading, spacing: 16) {
                         SectionLabel(title: "GIF 尺寸", detail: "最大边长 · 不放大原片")
-                        LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 3), spacing: 8) {
-                            ForEach(GIFSize.allCases) { item in
-                                PillButton(title: item.title, selected: gifSize == item) { gifSize = item }
-                                    .accessibilityIdentifier("gifSize\(item.rawValue)")
-                                    .accessibilityValue(gifSize == item ? "已选择" : "未选择")
+                        StudioGlassGroup(spacing: 8) {
+                            LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 3), spacing: 8) {
+                                ForEach(GIFSize.allCases) { item in
+                                    PillButton(title: item.title, selected: gifSize == item) { gifSize = item }
+                                        .accessibilityIdentifier("gifSize\(item.rawValue)")
+                                        .accessibilityValue(gifSize == item ? "已选择" : "未选择")
+                                }
                             }
                         }
                         SectionLabel(title: "GIF 帧率")
-                        LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 3), spacing: 8) {
-                            ForEach(GIFFrameRate.allCases) { item in
-                                PillButton(title: item.title, selected: gifFrameRate == item) { gifFrameRate = item }
-                                    .accessibilityIdentifier("gifFPS\(item.rawValue)")
-                                    .accessibilityValue(gifFrameRate == item ? "已选择" : "未选择")
+                        StudioGlassGroup(spacing: 8) {
+                            LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 3), spacing: 8) {
+                                ForEach(GIFFrameRate.allCases) { item in
+                                    PillButton(title: item.title, selected: gifFrameRate == item) { gifFrameRate = item }
+                                        .accessibilityIdentifier("gifFPS\(item.rawValue)")
+                                        .accessibilityValue(gifFrameRate == item ? "已选择" : "未选择")
+                                }
                             }
                         }
                         Text("尺寸越大、帧率越高，文件越大，制作时间越长。低帧率适合轻量分享，高帧率播放更流畅。")
@@ -140,8 +147,10 @@ struct ExportSheet: View {
                 StudioCard {
                     VStack(alignment: .leading, spacing: 17) {
                         SectionLabel(title: "输出尺寸", detail: "不放大小尺寸原片")
-                        HStack(spacing: 8) {
-                            ForEach(ExportQuality.allCases) { item in PillButton(title: item.title, selected: quality == item) { quality = item } }
+                        StudioGlassGroup(spacing: 8) {
+                            HStack(spacing: 8) {
+                                ForEach(ExportQuality.allCases) { item in PillButton(title: item.title, selected: quality == item) { quality = item } }
+                            }
                         }
                         Text("原始尺寸最大边长 4096 像素；1080p / 720p 的最大边长为 1920 / 1280 像素。").font(.system(size: 11)).foregroundStyle(StudioTheme.secondary)
                     }
