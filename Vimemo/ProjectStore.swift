@@ -3,6 +3,7 @@ import AVFoundation
 import PhotosUI
 import UniformTypeIdentifiers
 import CoreTransferable
+import ImageIO
 
 struct ImportedMovie: Transferable {
     let url: URL
@@ -56,6 +57,27 @@ struct ImportedMovie: Transferable {
     }
 
     func url(for filename: String) -> URL { root.appendingPathComponent(filename) }
+    func setUnlimitedDuration(_ enabled: Bool) {
+        UserDefaults.standard.set(enabled, forKey: "unlimitedDuration")
+        for index in projects.indices {
+            projects[index].settings.unlimitedDuration = enabled
+            for clipIndex in projects[index].clips.indices {
+                projects[index].clips[clipIndex].normalize(sourceDuration: projects[index].duration, speed: projects[index].settings.speed, maxOutputDuration: projects[index].settings.maxOutputDuration)
+            }
+        }
+        persist()
+    }
+
+    func importCoverPhoto(_ data: Data, project: VideoProject) throws -> String {
+        guard let source = CGImageSourceCreateWithData(data as CFData, nil),
+              let image = CGImageSourceCreateThumbnailAtIndex(source, 0, [kCGImageSourceCreateThumbnailFromImageAlways: true, kCGImageSourceCreateThumbnailWithTransform: true, kCGImageSourceThumbnailMaxPixelSize: 4096] as CFDictionary),
+              let jpeg = UIImage(cgImage: image).jpegData(compressionQuality: 0.95) else {
+            throw StudioError.message("无法读取这张照片，请选择另一张图片。")
+        }
+        let filename = "Projects/\(project.id.uuidString)/cover-\(UUID().uuidString).jpg"
+        try jpeg.write(to: url(for: filename), options: .atomic)
+        return filename
+    }
     func persist() {
         do {
             let data = try JSONEncoder().encode(Library(projects: projects, exports: exports))
@@ -151,12 +173,14 @@ struct ImportedMovie: Transferable {
             }
             if item.identifier == .quickTimeMetadataLocationISO6709 { location = try? await item.load(.stringValue) }
         }
-        let end = min(3, duration)
+        let unlimitedDuration = UserDefaults.standard.bool(forKey: "unlimitedDuration")
+        let end = unlimitedDuration ? duration : min(3, duration)
         var project = VideoProject(id: id, title: title ?? "视频 · \(Date().formatted(.dateTime.month().day().hour().minute()))", filename: filename, thumbnailFilename: thumbnailFilename, duration: duration, width: abs(oriented.width), height: abs(oriented.height), frameRate: Double(frameRate), originalDate: date, locationISO6709: location, clips: [Clip(start: 0, end: end, cover: end / 2)])
         project.settings.quality = ExportQuality(rawValue: UserDefaults.standard.string(forKey: "defaultQuality") ?? "") ?? .high
         project.settings.preserveDate = UserDefaults.standard.object(forKey: "defaultPreserveDate") as? Bool ?? true
         project.settings.preserveLocation = UserDefaults.standard.bool(forKey: "defaultPreserveLocation")
         project.settings.muted = UserDefaults.standard.bool(forKey: "defaultMuted")
+        project.settings.unlimitedDuration = unlimitedDuration
         project.hasAudio = !(try await asset.loadTracks(withMediaType: .audio)).isEmpty
         projects.insert(project, at: 0)
         persist()

@@ -20,9 +20,13 @@ actor LivePhotoExporter {
         var completed = false
         defer { if !completed { try? FileManager.default.removeItem(at: directory) } }
         let settings = project.settings
+        var clip = clip
+        clip.normalize(sourceDuration: project.duration, speed: settings.speed, maxOutputDuration: settings.maxOutputDuration)
         let thumbnail = directory.appendingPathComponent("cover.jpg")
         let identifier = UUID().uuidString
-        let coverImage = try await MediaProcessor.frame(url: source, time: clip.cover, settings: settings, maxSize: CGSize(width: 4096, height: 4096))
+        // Cover photos live alongside the project's source, including in restored drafts.
+        let photo = clip.coverPhotoFilename.map { source.deletingLastPathComponent().appendingPathComponent(URL(fileURLWithPath: $0).lastPathComponent) }
+        let coverImage = try await MediaProcessor.cover(source: source, project: project, clip: clip, photo: photo, maxSize: CGSize(width: 4096, height: 4096))
         try writeJPEG(coverImage, to: thumbnail, identifier: settings.format == .livePhoto ? identifier : nil, date: settings.preserveDate ? project.originalDate : nil, location: settings.preserveLocation ? project.locationISO6709 : nil)
         progress(0.05)
         if settings.format == .photo {

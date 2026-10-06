@@ -30,7 +30,7 @@ enum MediaProcessor {
         return CGSize(width: max(2, floor(width * scale / 2) * 2), height: max(2, floor(height * scale / 2) * 2))
     }
 
-    static func transformed(_ source: CIImage, settings: EditSettings, outputSize: CGSize? = nil) -> CIImage {
+    static func transformed(_ source: CIImage, settings: EditSettings, outputSize: CGSize? = nil, cropRatio: Double? = nil) -> CIImage {
         var image = source.transformed(by: CGAffineTransform(translationX: -source.extent.minX, y: -source.extent.minY))
         if settings.rotation != 0 {
             image = image.transformed(by: CGAffineTransform(rotationAngle: -CGFloat(settings.rotation) * .pi / 2))
@@ -39,7 +39,7 @@ enum MediaProcessor {
         if settings.mirrored { image = image.transformed(by: CGAffineTransform(a: -1, b: 0, c: 0, d: 1, tx: image.extent.width, ty: 0)) }
         let extent = image.extent
         var crop = extent
-        if let ratio = settings.ratio.value {
+        if let ratio = cropRatio ?? settings.ratio.value {
             if extent.width / extent.height > ratio {
                 crop.size.width = extent.height * ratio
                 crop.origin.x = (extent.width - crop.width) * settings.cropX
@@ -52,6 +52,21 @@ enum MediaProcessor {
         let target = outputSize ?? dimensions(source.extent.size, settings: settings)
         image = image.transformed(by: CGAffineTransform(scaleX: target.width / crop.width, y: target.height / crop.height))
         return filtered(image, settings: settings).cropped(to: CGRect(origin: .zero, size: target))
+    }
+
+    static func cover(source: URL, project: VideoProject, clip: Clip, photo: URL?, maxSize: CGSize = CGSize(width: 800, height: 800)) async throws -> CGImage {
+        guard let photo else { return try await frame(url: source, time: clip.cover, settings: project.settings, maxSize: maxSize) }
+        guard let image = CIImage(contentsOf: photo, options: [.applyOrientationProperty: true]) else {
+            throw StudioError.message("封面照片无法读取，请重新选择。")
+        }
+        let size = dimensions(CGSize(width: project.width, height: project.height), settings: project.settings)
+        let scale = min(1, maxSize.width / size.width, maxSize.height / size.height)
+        let target = CGSize(width: max(2, floor(size.width * scale)), height: max(2, floor(size.height * scale)))
+        let result = transformed(image, settings: project.settings, outputSize: target, cropRatio: size.width / size.height)
+        guard let rendered = context.createCGImage(result, from: CGRect(origin: .zero, size: target)) else {
+            throw StudioError.message("无法生成封面照片。")
+        }
+        return rendered
     }
 
     /// Composition handles geometry; the reader and preview apply the same color pipeline.

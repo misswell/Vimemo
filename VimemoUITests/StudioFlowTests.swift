@@ -57,6 +57,49 @@ final class StudioFlowTests: XCTestCase {
         screenshot(app, name: "06-live-photo-playback")
     }
 
+    @MainActor func testUnlimitedDurationAndBothCoverChoices() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["--test-library", UUID().uuidString]
+        app.launch()
+        app.buttons["设置"].tap()
+        let unlimited = app.switches["unlimitedDuration"]
+        XCTAssertTrue(unlimited.waitForExistence(timeout: 5))
+        if unlimited.value as? String != "1" { unlimited.tap() }
+        app.buttons["工作台"].tap()
+        app.buttons["试试示例"].tap()
+        XCTAssertTrue(app.buttons["makeLivePhotos"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["useFullVideo"].exists)
+        app.buttons["useFullVideo"].tap()
+        app.buttons["chooseCover"].tap()
+        let coverTime = app.sliders["手动封面时间"]
+        XCTAssertTrue(coverTime.waitForExistence(timeout: 5))
+        coverTime.adjust(toNormalizedSliderPosition: 0.85)
+        let confirm = app.buttons["confirmCover"]
+        let previewReady = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true"), object: confirm)
+        XCTAssertEqual(XCTWaiter.wait(for: [previewReady], timeout: 10), .completed)
+        screenshot(app, name: "08-manual-video-cover")
+        confirm.tap()
+        app.buttons["chooseCover"].tap()
+        app.buttons["pickCoverPhoto"].tap()
+        let photo = app.images["PXGGridLayout-Info"].firstMatch
+        XCTAssertTrue(photo.waitForExistence(timeout: 10))
+        photo.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        XCTAssertTrue(confirm.waitForExistence(timeout: 10))
+        let photoReady = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true"), object: confirm)
+        XCTAssertEqual(XCTWaiter.wait(for: [photoReady], timeout: 15), .completed)
+        screenshot(app, name: "09-album-cover")
+        confirm.tap()
+        XCTAssertTrue(app.staticTexts["已使用相册照片作为封面"].waitForExistence(timeout: 5))
+        app.buttons["makeLivePhotos"].tap()
+        app.buttons["制作并保存 · 1 个作品"].tap()
+        XCTAssertTrue(app.staticTexts["已制作 1 个作品"].waitForExistence(timeout: 30))
+        screenshot(app, name: "10-unlimited-live-photo")
+        app.buttons["完成"].firstMatch.tap()
+        app.buttons["返回工作台"].tap()
+        app.buttons["设置"].tap()
+        if unlimited.value as? String == "1" { unlimited.tap() }
+    }
+
     @MainActor func testAdjustmentsAndStaticPhotoExport() throws {
         let app = XCUIApplication()
         app.launchArguments = ["--test-library", UUID().uuidString, "--demo-editor"]

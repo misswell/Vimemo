@@ -6,6 +6,7 @@ struct SettingsView: View {
     @AppStorage("defaultPreserveDate") private var preserveDate = true
     @AppStorage("defaultPreserveLocation") private var preserveLocation = false
     @AppStorage("defaultMuted") private var muted = false
+    @AppStorage("unlimitedDuration") private var unlimitedDuration = false
     @State private var usage = "计算中…"
     var body: some View {
         ScrollView {
@@ -22,6 +23,14 @@ struct SettingsView: View {
                     }.font(.system(size: 14))
                 }
                 StudioCard {
+                    VStack(alignment: .leading, spacing: 14) {
+                        SectionLabel(title: "片段时长")
+                        Toggle("不限制时长", isOn: $unlimitedDuration).accessibilityIdentifier("unlimitedDuration")
+                        Text("开启后可选择整段视频，已有草稿也可延长。关闭后，超过 3 秒的片段会缩短到 3 秒。长片段需要更多时间和存储空间，系统实况播放与动态壁纸效果由 iOS 决定。")
+                            .font(.caption).foregroundStyle(StudioTheme.secondary)
+                    }.font(.system(size: 14))
+                }
+                StudioCard {
                     VStack(alignment: .leading, spacing: 16) {
                         SectionLabel(title: "本机存储", detail: usage)
                         Text("\(store.projects.count) 个草稿 · \(store.exports.count) 个作品").font(.subheadline)
@@ -32,17 +41,19 @@ struct SettingsView: View {
                     VStack(alignment: .leading, spacing: 18) {
                         SectionLabel(title: "关于实况")
                         tip("怎样播放？", "保存到照片 App 后，打开实况照片并长按。应用内也可以在作品预览中播放。")
-                        tip("为什么最长 3 秒？", "较短片段更适合实况照片。我们把编辑后的输出限制在 3 秒以内；一段长视频可以制作多个片段。")
+                        tip("怎样制作长片段？", "默认输出最长 3 秒。开启「不限制时长」后，在编辑器选择「使用整段视频」或拖动裁剪两端，自行决定长度。")
+                        tip("怎样选封面？", "在编辑器点击「选择封面」，逐帧挑选视频画面，或从相册选择一张照片。自选照片会按视频输出比例裁切。")
                         tip("分享为什么有两个文件？", "实况照片由照片和视频配对组成。要保留实况，优先从照片 App 通过 AirDrop 或 iCloud 分享。普通聊天软件可能只发送静态照片。")
                         tip("能设置动态壁纸吗？", "能否作为动态锁屏由 iOS 版本和系统对素材的判断决定，保存为实况照片不保证锁屏动画可用。")
                     }
                 }
                 VStack(spacing: 9) {
                     Label("离线处理 · 无账号 · 无水印", systemImage: "lock.shield").font(.caption).foregroundStyle(StudioTheme.secondary)
-                    Text("Vimemo 实刻 · 1.0.0").font(.system(size: 11, design: .monospaced)).foregroundStyle(StudioTheme.secondary.opacity(0.6))
+                    Text("Vimemo 实刻 · \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "")").font(.system(size: 11, design: .monospaced)).foregroundStyle(StudioTheme.secondary.opacity(0.6))
                 }.frame(maxWidth: .infinity).padding(.vertical, 15)
             }.padding(.horizontal, 24)
         }.scrollIndicators(.hidden).task { usage = store.diskUsage }
+            .onChange(of: unlimitedDuration) { _, enabled in store.setUnlimitedDuration(enabled) }
     }
     private func tip(_ title: String, _ content: String) -> some View {
         VStack(alignment: .leading, spacing: 7) { Text(title).font(.system(size: 13, weight: .medium)); Text(content).font(.system(size: 12)).foregroundStyle(StudioTheme.secondary).lineSpacing(3) }

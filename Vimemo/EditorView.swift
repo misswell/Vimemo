@@ -14,6 +14,7 @@ struct EditorView: View {
     @State private var tool = 0
     @State private var showExport = false
     @State private var showRename = false
+    @State private var showCoverPicker = false
     @State private var titleDraft = ""
     @State private var previewTask: Task<Void, Never>?
     @State private var frameTask: Task<Void, Never>?
@@ -34,6 +35,7 @@ struct EditorView: View {
         Binding(get: { clip }, set: { project.clips[clipIndex] = $0 })
     }
     private var sourceURL: URL { store.url(for: project.filename) }
+    private var maxSourceClipDuration: Double { project.settings.maxOutputDuration.map { $0 * project.settings.speed } ?? project.duration }
 
     var body: some View {
         NavigationStack {
@@ -80,6 +82,13 @@ struct EditorView: View {
             .sheet(isPresented: $showExport, onDismiss: {
                 if let saved = store.projects.first(where: { $0.id == project.id }) { project = saved }
             }) { ExportSheet(projects: [project]) }
+            .sheet(isPresented: $showCoverPicker) {
+                CoverPickerView(project: project, clip: clip) { time, filename in
+                    project.clips[clipIndex].cover = time
+                    project.clips[clipIndex].coverPhotoFilename = filename
+                    store.update(project); store.persist()
+                }
+            }
             .alert("重命名视频", isPresented: $showRename) {
                 TextField("视频名称", text: $titleDraft)
                 Button("取消", role: .cancel) {}
@@ -90,7 +99,7 @@ struct EditorView: View {
                 refreshPreview()
             }
             .onChange(of: project.settings) { _, _ in
-                for index in project.clips.indices { project.clips[index].normalize(sourceDuration: project.duration, speed: project.settings.speed) }
+                for index in project.clips.indices { project.clips[index].normalize(sourceDuration: project.duration, speed: project.settings.speed, maxOutputDuration: project.settings.maxOutputDuration) }
                 store.update(project)
                 refreshPreview()
             }
@@ -134,9 +143,9 @@ struct EditorView: View {
                         .frame(width: 78, height: 40).fixedSize()
                 }
                 Button {
-                    let start = min(clip.end, max(0, project.duration - 3 * project.settings.speed))
-                    var newClip = Clip(start: start, end: min(project.duration, start + 3 * project.settings.speed), cover: start + min(1.5 * project.settings.speed, (project.duration - start) / 2))
-                    newClip.normalize(sourceDuration: project.duration, speed: project.settings.speed)
+                    let start = min(clip.end, max(0, project.duration - maxSourceClipDuration))
+                    var newClip = Clip(start: start, end: min(project.duration, start + maxSourceClipDuration), cover: start + min(1.5 * project.settings.speed, (project.duration - start) / 2))
+                    newClip.normalize(sourceDuration: project.duration, speed: project.settings.speed, maxOutputDuration: project.settings.maxOutputDuration)
                     project.clips.append(newClip); activeClipID = newClip.id
                 } label: { Image(systemName: "plus").font(.system(size: 14, weight: .medium)).padding(12).background(StudioTheme.surface, in: Circle()) }
                     .frame(width: 40, height: 40).fixedSize()
@@ -157,14 +166,30 @@ struct EditorView: View {
         StudioCard {
             VStack(spacing: 16) {
                 SectionLabel(title: "选择这一刻", detail: "原视频 \(project.duration.timeLabel)")
-                TimelineView(clip: clipBinding, duration: project.duration, speed: project.settings.speed, thumbnails: thumbnails) { time in seekFrame(time) }
-                VStack(spacing: 8) {
+                TimelineView(clip: clipBinding, duration: project.duration, speed: project.settings.speed, maxOutputDuration: project.settings.maxOutputDuration, thumbnails: thumbnails) { time in seekFrame(time) }
+                if project.settings.maxOutputDuration == nil {
+                    Button("使用整段视频") {
+                        var value = clip; value.start = 0; value.end = project.duration
+                        value.normalize(sourceDuration: project.duration, speed: project.settings.speed, maxOutputDuration: nil)
+                        project.clips[clipIndex] = value
+                    }.font(.system(size: 12, weight: .medium)).accessibilityIdentifier("useFullVideo")
+                }
+                Button {
+                    coverTask?.cancel(); findingCover = false; playing = false; player.pause()
+                    showCoverPicker = true
+                } label: {
+                    Label("选择封面", systemImage: "photo.on.rectangle").font(.system(size: 14, weight: .semibold))
+                        .frame(maxWidth: .infinity).padding(.vertical, 12).background(StudioTheme.raised, in: RoundedRectangle(cornerRadius: 12))
+                }.accessibilityIdentifier("chooseCover")
+                if clip.coverPhotoFilename != nil {
+                    Text("已使用相册照片作为封面").font(.caption).foregroundStyle(StudioTheme.peach)
+                } else { VStack(spacing: 8) {
                     HStack {
                         Text("封面帧").font(.system(size: 12)).foregroundStyle(StudioTheme.secondary)
                         Spacer()
                         Text("第 \(Int((clip.cover * max(1, project.frameRate)).rounded())) 帧").font(.system(size: 10, design: .monospaced)).foregroundStyle(StudioTheme.peach)
                     }
-                    Slider(value: Binding(get: { clip.cover }, set: { project.clips[clipIndex].cover = $0 }), in: clip.start...max(clip.start + 0.001, clip.end - 1.0 / 600)).tint(StudioTheme.peach).accessibilityLabel("选择封面时间")
+                    Slider(value: Binding(get: { clip.cover }, set: { coverTask?.cancel(); project.clips[clipIndex].cover = $0 }), in: clip.start...max(clip.start + 0.001, clip.end - 1.0 / 600)).tint(StudioTheme.peach).accessibilityLabel("选择封面时间")
                     HStack(spacing: 12) {
                         frameButton("上一帧", symbol: "backward.end.fill", delta: -1)
                         Button { togglePlayback() } label: {
@@ -172,7 +197,7 @@ struct EditorView: View {
                         }.accessibilityLabel("预览片段")
                         frameButton("下一帧", symbol: "forward.end.fill", delta: 1)
                     }.foregroundStyle(.white)
-                }
+                } }
                 HStack {
                     Text("精确裁剪").font(.caption).foregroundStyle(StudioTheme.secondary)
                     Spacer()
@@ -199,9 +224,9 @@ struct EditorView: View {
                     var value = clip
                     if isStart {
                         value.start = min(value.end - 0.1, max(0, value.start + Double(direction) / max(1, project.frameRate)))
-                        value.start = max(value.start, value.end - 3 * project.settings.speed)
+                        if let maximum = project.settings.maxOutputDuration { value.start = max(value.start, value.end - maximum * project.settings.speed) }
                     } else { value.end += Double(direction) / max(1, project.frameRate) }
-                    value.normalize(sourceDuration: project.duration, speed: project.settings.speed)
+                    value.normalize(sourceDuration: project.duration, speed: project.settings.speed, maxOutputDuration: project.settings.maxOutputDuration)
                     project.clips[clipIndex] = value
                 } label: { Image(systemName: direction == -1 ? "minus" : "plus").font(.system(size: 10)).frame(width: 23, height: 28).background(StudioTheme.raised, in: RoundedRectangle(cornerRadius: 6)) }
                     .accessibilityLabel("\(isStart ? "入点" : "出点")\(direction == -1 ? "前移" : "后移")一帧")
@@ -211,6 +236,8 @@ struct EditorView: View {
 
     private func frameButton(_ title: String, symbol: String, delta: Double) -> some View {
         Button {
+            coverTask?.cancel()
+            project.clips[clipIndex].coverPhotoFilename = nil
             project.clips[clipIndex].cover = min(clip.end - 1.0 / 600, max(clip.start, clip.cover + delta / max(1, project.frameRate)))
         } label: { Label(title, systemImage: symbol).font(.system(size: 11, weight: .medium)).frame(maxWidth: .infinity).padding(.vertical, 11).background(StudioTheme.raised, in: Capsule()) }
     }
@@ -245,7 +272,7 @@ struct EditorView: View {
                     HStack(spacing: 10) {
                         ForEach(0..<min(6, max(1, Int(ceil(project.duration / 3)))), id: \.self) { index in
                             let count = min(6, max(1, Int(ceil(project.duration / 3))))
-                            let start = count > 1 ? Double(index) / Double(count - 1) * max(0, project.duration - 3 * project.settings.speed) : 0
+                            let start = count > 1 ? Double(index) / Double(count - 1) * max(0, project.duration - min(3 * project.settings.speed, maxSourceClipDuration)) : 0
                             VStack(alignment: .leading, spacing: 8) {
                                 if !thumbnails.isEmpty {
                                     let thumbnailIndex = min(thumbnails.count - 1, Int(start / project.duration * Double(thumbnails.count)))
@@ -267,7 +294,7 @@ struct EditorView: View {
         }
     }
     private func suggestedClip(start: Double, id: UUID) -> Clip {
-        let end = min(project.duration, start + 3 * project.settings.speed)
+        let end = min(project.duration, start + maxSourceClipDuration)
         return Clip(id: id, start: start, end: end, cover: (start + end) / 2)
     }
     private var cropPanel: some View {
@@ -315,7 +342,7 @@ struct EditorView: View {
                     ForEach([0.5, 1, 1.5, 2], id: \.self) { speed in PillButton(title: "\(speed.formatted())×", selected: project.settings.speed == speed) { project.settings.speed = speed } }
                 }
                 Toggle("静音", isOn: $project.settings.muted).font(.system(size: 14)).disabled(!project.hasAudio)
-                Text(project.hasAudio ? "实况片段输出最长 3 秒。调整倍速时，过长片段会自动缩短。" : "这个视频没有音轨。实况片段输出最长 3 秒。")
+                Text(project.settings.maxOutputDuration == nil ? "当前不限制时长。调整倍速会改变输出长度。" : "输出最长 3 秒。可在设置中开启「不限制时长」。")
                     .font(.system(size: 11)).foregroundStyle(StudioTheme.secondary)
             }
         }
@@ -341,7 +368,8 @@ struct EditorView: View {
             defer { findingCover = false }
             do {
                 let time = try await FrameAnalysis.bestCover(source: source, clip: selectedClip, settings: settings)
-                guard !Task.isCancelled, activeClipID == selectedClip.id, project.settings == settings else { return }
+                guard !Task.isCancelled, activeClipID == selectedClip.id, project.settings == settings, clip == selectedClip else { return }
+                project.clips[clipIndex].coverPhotoFilename = nil
                 project.clips[clipIndex].cover = time
             } catch is CancellationError {} catch { store.errorMessage = "自动选帧失败：\(error.localizedDescription)" }
         }
@@ -350,11 +378,13 @@ struct EditorView: View {
         playing = false; player.pause()
         frameTask?.cancel()
         let generation = UUID(); frameGeneration = generation
-        let source = sourceURL, settings = project.settings
+        let source = sourceURL, currentProject = project
+        var currentClip = clip; currentClip.cover = time
+        let photo = currentClip.coverPhotoFilename.map { store.url(for: $0) }
         frameTask = Task {
             do {
                 try await Task.sleep(for: .milliseconds(50))
-                let image = try await MediaProcessor.frame(url: source, time: time, settings: settings)
+                let image = try await MediaProcessor.cover(source: source, project: currentProject, clip: currentClip, photo: photo)
                 guard !Task.isCancelled, frameGeneration == generation else { return }
                 coverImage = UIImage(cgImage: image)
             } catch is CancellationError {} catch { store.errorMessage = "封面预览失败：\(error.localizedDescription)" }

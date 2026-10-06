@@ -4,6 +4,7 @@ struct TimelineView: View {
     @Binding var clip: Clip
     var duration: Double
     var speed: Double
+    var maxOutputDuration: Double? = 3
     var thumbnails: [UIImage]
     var onSeek: (Double) -> Void
     @State private var dragStart: Clip?
@@ -41,8 +42,8 @@ struct TimelineView: View {
                         if dragStart == nil { dragStart = clip }
                         let start = (dragStart?.start ?? clip.start) + value.translation.width / width * total
                         clip.start = min(max(0, start), clip.end - min(0.1, total))
-                        clip.start = max(clip.start, clip.end - 3 * speed)
-                        clip.normalize(sourceDuration: duration, speed: speed)
+                        if let maximum = maxOutputDuration { clip.start = max(clip.start, clip.end - maximum * speed) }
+                        clip.normalize(sourceDuration: duration, speed: speed, maxOutputDuration: maxOutputDuration)
                         onSeek(clip.start)
                     }.onEnded { _ in dragStart = nil; onSeek(clip.cover) })
                     handle.offset(x: right - 10).simultaneousGesture(DragGesture(minimumDistance: 0).onChanged { value in
@@ -50,7 +51,7 @@ struct TimelineView: View {
                         if dragStart == nil { dragStart = clip }
                         let end = (dragStart?.end ?? clip.end) + value.translation.width / width * total
                         clip.end = min(total, max(clip.start + min(0.1, total), end))
-                        clip.normalize(sourceDuration: duration, speed: speed)
+                        clip.normalize(sourceDuration: duration, speed: speed, maxOutputDuration: maxOutputDuration)
                         onSeek(clip.end - 1 / 30)
                     }.onEnded { _ in dragStart = nil; onSeek(clip.cover) })
                     Rectangle().fill(StudioTheme.peach).frame(width: 2, height: 70).offset(x: cover - 1).allowsHitTesting(false)

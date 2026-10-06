@@ -33,13 +33,14 @@ struct Clip: Codable, Identifiable, Equatable {
     var start: Double = 0
     var end: Double = 3
     var cover: Double = 1.5
+    var coverPhotoFilename: String? = nil
     var duration: Double { end - start }
 
-    mutating func normalize(sourceDuration: Double, speed: Double = 1) {
+    mutating func normalize(sourceDuration: Double, speed: Double = 1, maxOutputDuration: Double? = 3) {
         let total = max(0.1, sourceDuration)
         start = min(max(0, start), max(0, total - 0.1))
         end = min(total, max(start + 0.1, end))
-        end = min(end, start + 3 * speed)
+        if let maximum = maxOutputDuration { end = min(end, start + maximum * speed) }
         cover = min(max(start, cover), max(start, end - 1.0 / 600))
     }
 }
@@ -60,6 +61,8 @@ struct EditSettings: Codable, Equatable {
     var format: OutputFormat = .livePhoto
     var cropX: Double = 0.5
     var cropY: Double = 0.5
+    var unlimitedDuration: Bool? = nil
+    var maxOutputDuration: Double? { unlimitedDuration == true ? nil : 3 }
 }
 
 struct VideoProject: Codable, Identifiable {
