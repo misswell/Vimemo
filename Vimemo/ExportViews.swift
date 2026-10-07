@@ -59,8 +59,7 @@ struct ExportSheet: View {
                             .font(.system(size: 11, weight: .medium, design: .monospaced)).foregroundStyle(StudioTheme.secondary)
                         PrimaryButton(title: "\(saveToPhotos ? "制作并保存" : "制作文件") · \(count) 个作品", symbol: format.symbol) { start() }
                             .disabled(count == 0 || coordinator.running)
-                    }.padding(.horizontal, 20).padding(.vertical, 12).background(StudioTheme.surface)
-                        .overlay(alignment: .top) { Rectangle().fill(StudioTheme.line).frame(height: 1) }
+                    }.padding(.horizontal, 20).padding(.vertical, 12).background(.bar)
                 }
             }
             .sheet(isPresented: $sharing) {

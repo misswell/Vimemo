@@ -103,8 +103,7 @@ struct EditorView: View {
                         playing = false; player.pause(); store.update(project); store.persist(); showExport = true
                     }.disabled(exporter.running).accessibilityIdentifier("makeLivePhotos")
                 }.frame(maxWidth: 680).frame(maxWidth: .infinity).padding(.horizontal, 16).padding(.top, 8).padding(.bottom, 8)
-                    .background(StudioTheme.surface)
-                    .overlay(alignment: .top) { Rectangle().fill(StudioTheme.line).frame(height: 1) }
+                    .background(.bar)
             }
             .sheet(isPresented: $showExport, onDismiss: {
                 if let saved = store.projects.first(where: { $0.id == project.id }) { project = saved }

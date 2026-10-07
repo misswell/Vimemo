@@ -1,13 +1,13 @@
 import SwiftUI
 
 private enum PurchaseTheme {
-    static let buttonText = StudioTheme.adaptive(dark: 0x100F0D, light: 0xFFFFFF)
-    static let background = StudioTheme.adaptive(dark: 0x100F0D, light: 0xF5F3EE)
-    static let card = StudioTheme.adaptive(dark: 0x252320, light: 0xFFFFFF)
-    static let gold = StudioTheme.adaptive(dark: 0xFFB84D, light: 0xA96800)
-    static let orange = StudioTheme.adaptive(dark: 0xF47D27, light: 0xB95D16)
-    static let text = StudioTheme.adaptive(dark: 0xF6F1E8, light: 0x302B24)
-    static let secondary = StudioTheme.adaptive(dark: 0xAEA79E, light: 0x71695F)
+    static let buttonText = StudioTheme.onAccent
+    static let background = StudioTheme.background
+    static let card = Color(uiColor: .secondarySystemBackground)
+    static let gold = StudioTheme.accent
+    static let orange = StudioTheme.accent
+    static let text = StudioTheme.ink
+    static let secondary = StudioTheme.secondary
 }
 
 struct UnlimitedPurchaseView: View {
@@ -23,7 +23,7 @@ struct UnlimitedPurchaseView: View {
                     hero
                     VStack(spacing: 8) {
                         Text("让回忆，完整发生。")
-                            .font(.system(.title, design: .rounded, weight: .bold))
+                            .font(.system(.title, design: .default, weight: .bold))
                             .multilineTextAlignment(.center)
                         Text("解锁不限制时长，留下完整的那一刻。")
                             .font(.subheadline).foregroundStyle(PurchaseTheme.secondary)
@@ -79,7 +79,7 @@ struct UnlimitedPurchaseView: View {
                     .frame(height: 85).frame(maxHeight: .infinity, alignment: .bottom)
                 HStack(spacing: 8) {
                     Image(systemName: "livephoto").foregroundStyle(PurchaseTheme.gold)
-                    Text("实刻").font(.system(.headline, design: .rounded, weight: .bold))
+                    Text("实刻").font(.system(.headline, design: .default, weight: .bold))
                 }.padding(.horizontal, 16).padding(.vertical, 10)
                     .background(.ultraThinMaterial, in: Capsule())
                     .overlay(Capsule().stroke(.white.opacity(0.1), lineWidth: 1))
@@ -107,7 +107,7 @@ struct UnlimitedPurchaseView: View {
                 .background(PurchaseTheme.gold.opacity(0.12), in: Circle())
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 6) {
-                Text(title).font(.system(.subheadline, design: .rounded, weight: .bold))
+                Text(title).font(.system(.subheadline, design: .default, weight: .bold))
                     .foregroundStyle(PurchaseTheme.text)
                 Text(detail).font(.caption).foregroundStyle(PurchaseTheme.secondary)
                     .fixedSize(horizontal: false, vertical: true).lineSpacing(2)
@@ -119,7 +119,7 @@ struct UnlimitedPurchaseView: View {
     private var lifetimePlan: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
-                Text("永久解锁").font(.system(.title3, design: .rounded, weight: .bold))
+                Text("永久解锁").font(.system(.title3, design: .default, weight: .bold))
                 Spacer()
                 Text("一次性购买").font(.caption.weight(.semibold))
                     .padding(.horizontal, 10).padding(.vertical, 5)
@@ -128,7 +128,7 @@ struct UnlimitedPurchaseView: View {
             }
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 if let product = purchases.product {
-                    Text(product.displayPrice).font(.system(.largeTitle, design: .rounded, weight: .bold))
+                    Text(product.displayPrice).font(.system(.largeTitle, design: .default, weight: .bold))
                         .accessibilityIdentifier("unlimitedPrice")
                     Text("/ 永久").font(.subheadline).foregroundStyle(PurchaseTheme.secondary)
                 } else {
@@ -162,7 +162,7 @@ struct UnlimitedPurchaseView: View {
             } label: {
                 HStack(spacing: 10) {
                     if purchases.loadingProduct || purchases.busy { ProgressView().tint(PurchaseTheme.buttonText) }
-                    Text(buttonTitle).font(.system(.headline, design: .rounded, weight: .bold))
+                    Text(buttonTitle).font(.system(.headline, design: .default, weight: .bold))
                         .multilineTextAlignment(.center)
                 }.frame(maxWidth: .infinity).padding(.vertical, 20)
                     .foregroundStyle(PurchaseTheme.buttonText)

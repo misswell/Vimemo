@@ -9,11 +9,49 @@ final class StudioFlowTests: XCTestCase {
         attachment.name = name; attachment.lifetime = .keepAlways
         add(attachment)
     }
+    private func selectTab(_ app: XCUIApplication, title: String) {
+        let tab = app.buttons.matching(NSPredicate(format: "label == %@", title)).firstMatch
+        // Music-style navigation minimizes after scrolling; tap the active tab to expand it.
+        if !tab.exists { app.tabBars.buttons.firstMatch.tap() }
+        XCTAssertTrue(tab.waitForExistence(timeout: 5))
+        tab.tap()
+    }
     private func scrollEditor(_ app: XCUIApplication) {
         let scroll = app.scrollViews["editorScroll"]
         let start = scroll.coordinate(withNormalizedOffset: CGVector(dx: 0.97, dy: 0.72))
         let end = scroll.coordinate(withNormalizedOffset: CGVector(dx: 0.97, dy: 0.20))
         start.press(forDuration: 0.05, thenDragTo: end)
+    }
+
+    @MainActor func testNativeMusicStyleNavigation() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["--test-library", UUID().uuidString]
+        app.launch()
+        let isPhone = UIDevice.current.userInterfaceIdiom == .phone
+        if isPhone {
+            XCTAssertTrue(app.tabBars.firstMatch.waitForExistence(timeout: 5), "Navigation must use the system tab bar")
+            XCTAssertTrue(app.tabBars.buttons["工作台"].isSelected)
+        } else {
+            XCTAssertTrue(app.buttons["工作台"].waitForExistence(timeout: 5))
+        }
+        screenshot(app, name: "music-home")
+        selectTab(app, title: "作品")
+        XCTAssertTrue(app.navigationBars["片刻收藏"].waitForExistence(timeout: 5))
+        if isPhone { XCTAssertTrue(app.tabBars.buttons["作品"].isSelected) }
+        screenshot(app, name: "music-library")
+        selectTab(app, title: "设置")
+        XCTAssertTrue(app.buttons["appearance-dark"].waitForExistence(timeout: 5))
+        screenshot(app, name: "music-settings")
+        selectTab(app, title: "工作台")
+        app.buttons["试试示例"].tap()
+        XCTAssertTrue(app.buttons["makeLivePhotos"].waitForExistence(timeout: 10))
+        app.buttons["返回工作台"].tap()
+        XCTAssertTrue(app.buttons["工作台"].waitForExistence(timeout: 5))
+        if isPhone { XCTAssertTrue(app.tabBars.buttons["工作台"].isSelected) }
+        screenshot(app, name: "music-drafts")
+        selectTab(app, title: "作品")
+        selectTab(app, title: "工作台")
+        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "draft-")).firstMatch.exists)
     }
 
     @MainActor func testPortraitPreviewUsesSourceAspectRatio() throws {
@@ -36,12 +74,12 @@ final class StudioFlowTests: XCTestCase {
         app.launchArguments = ["--test-library", UUID().uuidString, "--test-purchase-unavailable"]
         app.launch()
         screenshot(app, name: "20-system-workspace")
-        app.buttons["设置"].tap()
+        selectTab(app, title: "设置")
         XCTAssertEqual(app.buttons["appearance-system"].value as? String, "已选择")
         app.buttons["appearance-dark"].tap()
         XCTAssertTrue(app.staticTexts["当前深色"].waitForExistence(timeout: 5))
         screenshot(app, name: "21-dark-settings")
-        app.buttons["工作台"].tap()
+        selectTab(app, title: "工作台")
         screenshot(app, name: "22-dark-workspace")
         app.buttons["试试示例"].tap()
         XCTAssertTrue(app.buttons["makeLivePhotos"].waitForExistence(timeout: 10))
@@ -63,7 +101,7 @@ final class StudioFlowTests: XCTestCase {
         app.buttons["返回工作台"].tap()
         screenshot(app, name: "28-dark-drafts")
         app.terminate(); app.launch()
-        app.buttons["设置"].tap()
+        selectTab(app, title: "设置")
         XCTAssertEqual(app.buttons["appearance-dark"].value as? String, "已选择")
         XCTAssertTrue(app.staticTexts["当前深色"].exists)
         app.buttons["appearance-light"].tap()
@@ -75,13 +113,13 @@ final class StudioFlowTests: XCTestCase {
         XCTAssertTrue(app.buttons["reloadPurchase"].waitForExistence(timeout: 5))
         screenshot(app, name: "29-light-purchase")
         app.buttons["continueFree"].tap()
-        app.buttons["工作台"].tap()
+        selectTab(app, title: "工作台")
         screenshot(app, name: "24-light-workspace")
         app.buttons["试试示例"].tap()
         XCTAssertTrue(app.buttons["makeLivePhotos"].waitForExistence(timeout: 10))
         screenshot(app, name: "25-light-editor")
         app.buttons["返回工作台"].tap()
-        app.buttons["设置"].tap()
+        selectTab(app, title: "设置")
         for _ in 0..<3 where !app.buttons["appearance-system"].isHittable { app.swipeDown() }
         app.buttons["appearance-system"].tap()
         XCTAssertEqual(app.buttons["appearance-system"].value as? String, "已选择")
@@ -134,15 +172,15 @@ final class StudioFlowTests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = ["--test-library", UUID().uuidString, "-unlimitedDuration", "NO"]
         app.launch()
-        app.buttons["设置"].tap()
+        selectTab(app, title: "设置")
         let toggle = app.switches["saveDrafts"]
         for _ in 0..<4 where !toggle.isHittable { app.swipeUp() }
         XCTAssertTrue(toggle.waitForExistence(timeout: 5))
         XCTAssertEqual(toggle.value as? String, "1")
-        toggle.tap()
+        toggle.coordinate(withNormalizedOffset: CGVector(dx: 0.93, dy: 0.5)).tap()
         XCTAssertEqual(toggle.value as? String, "0")
         screenshot(app, name: "17-draft-storage-setting")
-        app.buttons["工作台"].tap()
+        selectTab(app, title: "工作台")
         app.buttons["试试示例"].tap()
         XCTAssertTrue(app.buttons["makeLivePhotos"].waitForExistence(timeout: 10))
         app.buttons["makeLivePhotos"].tap()
@@ -155,16 +193,16 @@ final class StudioFlowTests: XCTestCase {
         app.buttons["返回工作台"].tap()
         XCTAssertTrue(app.staticTexts["下一张实况，从这里开始"].waitForExistence(timeout: 5))
         app.terminate(); app.launch()
-        app.buttons["作品"].tap()
+        selectTab(app, title: "作品")
         XCTAssertTrue(app.staticTexts["海边的最后一束光"].waitForExistence(timeout: 5))
-        app.buttons["设置"].tap()
+        selectTab(app, title: "设置")
         for _ in 0..<4 where !toggle.isHittable { app.swipeUp() }
         XCTAssertEqual(toggle.value as? String, "0")
         app.buttons["clearTemporaryCache"].tap()
         XCTAssertTrue(app.alerts["临时缓存已检查"].waitForExistence(timeout: 5))
         app.alerts.buttons["好"].tap()
-        toggle.tap()
-        app.buttons["工作台"].tap()
+        toggle.coordinate(withNormalizedOffset: CGVector(dx: 0.93, dy: 0.5)).tap()
+        selectTab(app, title: "工作台")
         app.buttons["试试示例"].tap()
         XCTAssertTrue(app.buttons["返回工作台"].waitForExistence(timeout: 10))
         app.buttons["返回工作台"].tap()
@@ -236,7 +274,7 @@ final class StudioFlowTests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = ["--test-library", UUID().uuidString, "--test-purchase-unavailable"]
         app.launch()
-        app.buttons["设置"].tap()
+        selectTab(app, title: "设置")
         app.buttons["unlockUnlimited"].tap()
         let retry = app.buttons["reloadPurchase"]
         XCTAssertTrue(retry.waitForExistence(timeout: 5))
@@ -258,7 +296,7 @@ final class StudioFlowTests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = ["--test-library", UUID().uuidString, "--test-purchase-loading"]
         app.launch()
-        app.buttons["设置"].tap()
+        selectTab(app, title: "设置")
         app.buttons["unlockUnlimited"].tap()
         let button = app.buttons["reloadPurchase"]
         XCTAssertTrue(button.waitForExistence(timeout: 5))
@@ -284,7 +322,7 @@ final class StudioFlowTests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = ["--test-library", UUID().uuidString]
         app.launch()
-        app.buttons["设置"].tap()
+        selectTab(app, title: "设置")
         app.buttons["unlockUnlimited"].tap()
         let button = app.buttons["buyUnlimited"]
         XCTAssertTrue(button.waitForExistence(timeout: 10))
@@ -331,7 +369,7 @@ final class StudioFlowTests: XCTestCase {
         app.terminate()
         app.launch()
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "2 个片段")).firstMatch.waitForExistence(timeout: 5))
-        app.buttons["作品"].tap()
+        selectTab(app, title: "作品")
         XCTAssertTrue(app.staticTexts["片刻收藏"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["2 个作品"].exists)
         screenshot(app, name: "05-library")
@@ -381,15 +419,15 @@ final class StudioFlowTests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = ["--test-library", UUID().uuidString, "-unlimitedDuration", "NO"]
         app.launch()
-        app.buttons["设置"].tap()
+        selectTab(app, title: "设置")
         let unlimited = app.switches["unlimitedDuration"]
         XCTAssertTrue(unlimited.waitForExistence(timeout: 5))
-        unlimited.tap()
+        unlimited.coordinate(withNormalizedOffset: CGVector(dx: 0.93, dy: 0.5)).tap()
         XCTAssertTrue(app.buttons["restoreUnlimited"].waitForExistence(timeout: 5))
         screenshot(app, name: "11-unlimited-purchase")
         app.buttons["continueFree"].tap()
         XCTAssertEqual(unlimited.value as? String, "0")
-        app.buttons["工作台"].tap()
+        selectTab(app, title: "工作台")
         app.buttons["试试示例"].tap()
         XCTAssertTrue(app.buttons["makeLivePhotos"].waitForExistence(timeout: 10))
     }
@@ -405,7 +443,7 @@ final class StudioFlowTests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = ["--test-library", UUID().uuidString]
         app.launch()
-        app.buttons["设置"].tap()
+        selectTab(app, title: "设置")
         app.buttons["unlockUnlimited"].tap()
         let buy = app.buttons["buyUnlimited"]
         XCTAssertTrue(buy.waitForExistence(timeout: 10))
@@ -419,13 +457,13 @@ final class StudioFlowTests: XCTestCase {
             app.buttons["continueFree"].tap()
             XCTAssertTrue(app.buttons["unlockUnlimited"].exists)
             app.terminate(); app.launch()
-            app.buttons["设置"].tap()
+            selectTab(app, title: "设置")
             XCTAssertTrue(app.buttons["unlockUnlimited"].waitForExistence(timeout: 5))
             return
         }
         XCTAssertTrue(app.staticTexts["已解锁"].waitForExistence(timeout: 10))
         app.terminate(); app.launch()
-        app.buttons["设置"].tap()
+        selectTab(app, title: "设置")
         XCTAssertTrue(app.staticTexts["已解锁"].waitForExistence(timeout: 10))
     }
 

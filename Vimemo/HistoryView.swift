@@ -9,12 +9,7 @@ struct HistoryView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
-                HStack(alignment: .lastTextBaseline) {
-                    Text("片刻收藏").font(.system(size: 30, weight: .semibold, design: .rounded))
-                    Spacer()
-                    Text("\(store.exports.count) 个作品").font(.caption).foregroundStyle(StudioTheme.secondary)
-                }.padding(.top, 22)
-                Text("实况、动图和照片，随时查看与分享。").font(.subheadline).foregroundStyle(StudioTheme.secondary)
+                Text("\(store.exports.count) 个作品").font(.subheadline).foregroundStyle(StudioTheme.secondary)
                 ScrollView(.horizontal) {
                     StudioGlassGroup(spacing: 8) {
                         HStack(spacing: 8) {
@@ -32,17 +27,17 @@ struct HistoryView: View {
                         }.frame(maxWidth: .infinity).padding(.vertical, 40)
                     }
                 } else {
-                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 18) {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 16)], spacing: 22) {
                         ForEach(filtered) { item in
                             Button { selected = item } label: {
                                 VStack(alignment: .leading, spacing: 9) {
                                     ZStack(alignment: .bottomLeading) {
-                                        ThumbnailImage(url: store.url(for: item.thumbnailFilename)).frame(height: 174).clipped().clipShape(RoundedRectangle(cornerRadius: 16))
+                                        ThumbnailImage(url: store.url(for: item.thumbnailFilename)).aspectRatio(1, contentMode: .fit).clipShape(RoundedRectangle(cornerRadius: 10))
                                         Label(item.format.title, systemImage: item.format.symbol).font(.system(size: 10, weight: .medium)).padding(7).foregroundStyle(.white).background(.black.opacity(0.6), in: Capsule()).padding(8)
                                     }
-                                    Text(item.projectTitle).font(.system(size: 13, weight: .medium)).lineLimit(1)
-                                    Text(item.createdAt.formatted(.dateTime.month().day().hour().minute())).font(.system(size: 10)).foregroundStyle(StudioTheme.secondary)
-                                }.padding(10).background(StudioTheme.surface, in: RoundedRectangle(cornerRadius: 14)).foregroundStyle(StudioTheme.ink)
+                                    Text(item.projectTitle).font(.subheadline.weight(.medium)).lineLimit(1)
+                                    Text(item.createdAt.formatted(.dateTime.month().day().hour().minute())).font(.caption).foregroundStyle(StudioTheme.secondary)
+                                }.foregroundStyle(StudioTheme.ink)
                             }.buttonStyle(.plain).contextMenu {
                                 Button("查看 / 分享", systemImage: "square.and.arrow.up") { selected = item }
                                 Button("删除本机作品", systemImage: "trash", role: .destructive) { deleting = item }
@@ -50,8 +45,9 @@ struct HistoryView: View {
                         }
                     }
                 }
-            }.frame(maxWidth: 680).frame(maxWidth: .infinity).padding(.horizontal, 24).padding(.bottom, 24)
-        }.scrollIndicators(.hidden)
+            }.frame(maxWidth: 1000).frame(maxWidth: .infinity).padding(.horizontal, 20).padding(.top, 12).padding(.bottom, 24)
+        }.scrollIndicators(.hidden).background(StudioTheme.background)
+            .navigationTitle("片刻收藏").navigationBarTitleDisplayMode(.large)
             .sheet(item: $selected) { record in ExportDetailView(record: record) }
             .confirmationDialog("删除本机作品？照片图库中的作品不受影响。", isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }), titleVisibility: .visible) {
                 Button("删除本机作品", role: .destructive) { if let deleting { store.delete(deleting) }; deleting = nil }
