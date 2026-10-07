@@ -29,6 +29,7 @@
 		68FEACE0724F5E238CDDF22D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = ACFAF2A2EAB11395E7003787 /* Assets.xcassets */; };
 		712A5CB7AE1D392CFE2C8B5E /* HistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A8D1F8B507869296D816F47 /* HistoryView.swift */; };
 		76CFCFE423FBE6807B75F01B /* PreviewSurface.swift in Sources */ = {isa = PBXBuildFile; fileRef = A69AC0915475CBC17874E71A /* PreviewSurface.swift */; };
+		862043436233074E69A6850D /* CropPositionPreview.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4616D12C7BBF4A7383BB0701 /* CropPositionPreview.swift */; };
 		8D16920595805C26FB763A82 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F4201FCA686FCFF0F180D7A /* Models.swift */; };
 		9384B9FB636A894E5C59DB26 /* Unlimited.storekit in Resources */ = {isa = PBXBuildFile; fileRef = 2BC9EE96736328AC1A0FB560 /* Unlimited.storekit */; };
 		93930505FB31C0352BF6DBC6 /* CoverFrameRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 162A240C7111F37689EE1952 /* CoverFrameRenderer.swift */; };
@@ -36,6 +37,7 @@
 		9CAF0EDDABDE813ECCCEB0F1 /* StudioFlowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A78144CB0D2A6734E514D19B /* StudioFlowTests.swift */; };
 		ADCEBA15435CC5AB5FF81D0D /* EditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A74CF6506976EC76D178416 /* EditorView.swift */; };
 		B6C576193B7087C225C271DB /* Demo.mov in Resources */ = {isa = PBXBuildFile; fileRef = 7AABEFC4FF4D647E6D85BEEE /* Demo.mov */; };
+		BD0747429BB72A1DAF9210B6 /* CropPositionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77565EB682030AD2DD564C2E /* CropPositionTests.swift */; };
 		BDEF5FC05902A5FBDA5E8272 /* PreviewCompositor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 164CF80884B18FDBB0790EA0 /* PreviewCompositor.swift */; };
 		D10F953DE4548DF7AABF8CC6 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2004620AB707B86C25E51F04 /* HomeView.swift */; };
 		D1B3DA361AFAF53C447D096F /* AudioFixture.mov in Resources */ = {isa = PBXBuildFile; fileRef = E61D0FE5A8B9D494C91643A7 /* AudioFixture.mov */; };
@@ -84,6 +86,7 @@
 		369967D8B65C6C3879219404 /* UnlimitedPurchaseView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UnlimitedPurchaseView.swift; sourceTree = "<group>"; };
 		41790A074019CA1042E93757 /* GIFExportTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GIFExportTests.swift; sourceTree = "<group>"; };
 		4550B527243C4938ED07CF04 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		4616D12C7BBF4A7383BB0701 /* CropPositionPreview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CropPositionPreview.swift; sourceTree = "<group>"; };
 		47E9E7B0A2ADC267F0B6E0DA /* FrameScrubTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrameScrubTests.swift; sourceTree = "<group>"; };
 		4A74CF6506976EC76D178416 /* EditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorView.swift; sourceTree = "<group>"; };
 		526AEC8B2AB81852BFBDA44D /* ProjectStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectStore.swift; sourceTree = "<group>"; };
@@ -93,6 +96,7 @@
 		6DF44DFEAB48AB616615A737 /* LibraryStorage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryStorage.swift; sourceTree = "<group>"; };
 		745A5B234A67FC388657143C /* DemoPoster.jpg */ = {isa = PBXFileReference; lastKnownFileType = image.jpeg; path = DemoPoster.jpg; sourceTree = "<group>"; };
 		75DE8ACD72CEFCFE332347E8 /* VimemoUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = VimemoUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		77565EB682030AD2DD564C2E /* CropPositionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CropPositionTests.swift; sourceTree = "<group>"; };
 		7AABEFC4FF4D647E6D85BEEE /* Demo.mov */ = {isa = PBXFileReference; lastKnownFileType = video.quicktime; path = Demo.mov; sourceTree = "<group>"; };
 		8C7EB6C4F034914E55CF7210 /* VimemoApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VimemoApp.swift; sourceTree = "<group>"; };
 		8F4201FCA686FCFF0F180D7A /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
@@ -124,6 +128,7 @@
 				162A240C7111F37689EE1952 /* CoverFrameRenderer.swift */,
 				F6709B8760847CC3D5E8176F /* CoverPickerView.swift */,
 				99A09C42B31EADE21A37BA7C /* CoverPreview.swift */,
+				4616D12C7BBF4A7383BB0701 /* CropPositionPreview.swift */,
 				4A74CF6506976EC76D178416 /* EditorView.swift */,
 				CC2DB2334232B072557A74AA /* ExportViews.swift */,
 				FD2BCE4ABE8C18F0B2B410D6 /* FrameAnalysis.swift */,
@@ -166,6 +171,7 @@
 			children = (
 				9334053069559BEC925B94C9 /* ConversionTests.swift */,
 				175B89EDFA7EBC3587FA81AE /* CoverPreviewTests.swift */,
+				77565EB682030AD2DD564C2E /* CropPositionTests.swift */,
 				074509D7A51E4F5CF3F199AD /* DraftStorageTests.swift */,
 				078BBD8DC83BDFD7C61D8962 /* DurationAndCoverTests.swift */,
 				47E9E7B0A2ADC267F0B6E0DA /* FrameScrubTests.swift */,
@@ -358,6 +364,7 @@
 			files = (
 				2FE82C9757C0B46913AAF5D3 /* ConversionTests.swift in Sources */,
 				2491011B4AF209784AFCFBFC /* CoverPreviewTests.swift in Sources */,
+				BD0747429BB72A1DAF9210B6 /* CropPositionTests.swift in Sources */,
 				06E182B08076624CEAD77B7E /* DraftStorageTests.swift in Sources */,
 				D253BDCA8F64331A652E2223 /* DurationAndCoverTests.swift in Sources */,
 				F46E513A9250AABCA887913D /* FrameScrubTests.swift in Sources */,
@@ -381,6 +388,7 @@
 				93930505FB31C0352BF6DBC6 /* CoverFrameRenderer.swift in Sources */,
 				3EC107ABF919E52568159E68 /* CoverPickerView.swift in Sources */,
 				E43F93FA322BEEB9FF80AFA9 /* CoverPreview.swift in Sources */,
+				862043436233074E69A6850D /* CropPositionPreview.swift in Sources */,
 				ADCEBA15435CC5AB5FF81D0D /* EditorView.swift in Sources */,
 				31816DE93B37777681CF58F1 /* ExportViews.swift in Sources */,
 				1412744612C019E08BA9051D /* FrameAnalysis.swift in Sources */,
@@ -471,7 +479,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 16;
+				CURRENT_PROJECT_VERSION = 17;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = U8U443D7ZL;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -538,7 +546,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 16;
+				CURRENT_PROJECT_VERSION = 17;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = U8U443D7ZL;
 				ENABLE_NS_ASSERTIONS = NO;

@@ -9,6 +9,8 @@ struct EditorView: View {
     @State private var activeClipID: UUID
     @State private var thumbnails: [UIImage] = []
     @StateObject private var framePreview = CoverPreview()
+    @StateObject private var cropPreview = CoverPreview()
+    @State private var cropDragging = false
     @State private var frameSettings: EditSettings?
     @State private var timelineSeeking = false
     @State private var player = AVPlayer()
@@ -45,6 +47,22 @@ struct EditorView: View {
     private var maxSourceClipDuration: Double { project.settings.maxOutputDuration.map { $0 * project.settings.speed } ?? project.duration }
     private var previewDimensions: CGSize {
         MediaProcessor.dimensions(CGSize(width: project.width, height: project.height), settings: project.settings)
+    }
+
+    private var croppingEnabled: Bool { tool == 1 && project.settings.ratio != .original }
+    private struct CropSource: Equatable {
+        let settings: EditSettings
+        let time: Double
+        let photo: String?
+    }
+    private var cropSource: CropSource? {
+        guard croppingEnabled else { return nil }
+        var settings = project.settings
+        settings.ratio = .original; settings.cropX = 0.5; settings.cropY = 0.5
+        return CropSource(settings: settings, time: clip.cover, photo: clip.coverPhotoFilename)
+    }
+    private var cropPositionDescription: String {
+        "水平 \(Int((project.settings.cropX * 100).rounded()))%，垂直 \(Int((project.settings.cropY * 100).rounded()))%"
     }
 
     private func previewSize(availableWidth: CGFloat, maxHeight: CGFloat) -> CGSize {
@@ -137,7 +155,22 @@ struct EditorView: View {
             .onChange(of: project.settings) { _, _ in
                 for index in project.clips.indices { project.clips[index].normalize(sourceDuration: project.duration, speed: project.settings.speed, maxOutputDuration: project.settings.maxOutputDuration) }
                 store.update(project)
-                refreshPreview()
+                if !cropDragging { refreshPreview() }
+            }
+            .task(id: cropSource) {
+                guard let selection = cropSource else { cropPreview.stop(); return }
+                var snapshot = project; snapshot.settings = selection.settings
+                let source = sourceURL, selectedClip = clip
+                cropPreview.configure { _, photo, _ in
+                    try await MediaProcessor.uncroppedCover(source: source, project: snapshot, clip: selectedClip, photo: photo)
+                }
+                cropPreview.request(time: selection.time, photo: selection.photo.map { store.url(for: $0) })
+            }
+            .onChange(of: tool) { _, _ in
+                if cropDragging { cropDragging = false; refreshPreview() }
+            }
+            .onChange(of: cropPreview.errorMessage) { _, message in
+                if let message { store.errorMessage = "构图预览失败：\(message)" }
             }
             .onChange(of: project.clips) { previous, _ in
                 store.update(project)
@@ -151,12 +184,13 @@ struct EditorView: View {
             }
             .onChange(of: previewHeld) { _, held in
                 accessiblePlayback = false
-                if held { startPlayback() } else { stopPlayback() }
+                if held && !cropDragging { startPlayback() } else { stopPlayback() }
             }
             .onChange(of: project.title) { _, _ in store.update(project) }
             .onChange(of: activeClipID) { _, _ in refreshPreview() }
             .onDisappear {
-                stopPlayback(); previewTask?.cancel(); framePreview.stop(); coverTask?.cancel()
+                stopPlayback(); previewTask?.cancel(); framePreview.stop(); cropPreview.stop(); coverTask?.cancel()
+                previewGeneration = UUID(); preparedPreview = nil
                 if let playerObserver { NotificationCenter.default.removeObserver(playerObserver) }
                 store.update(project); store.persist()
             }
@@ -183,8 +217,13 @@ struct EditorView: View {
                 Color.black
                 PreviewSurface(player: player, preview: preparedPreview, playing: playing) { ready in playerFrameReady = ready }
                 if !playing || !playerFrameReady {
-                    if let coverImage = framePreview.image {
-                    Image(uiImage: coverImage).resizable().scaledToFit().frame(maxWidth: .infinity, maxHeight: .infinity)
+                    if croppingEnabled, cropPreview.isSettled, let image = cropPreview.image {
+                        CropPositionPreview(image: image, x: $project.settings.cropX, y: $project.settings.cropY) { editing in
+                            cropDragging = editing
+                            if editing { stopPlayback() } else { refreshPreview() }
+                        }
+                    } else if let coverImage = framePreview.image {
+                        Image(uiImage: coverImage).resizable().scaledToFit().frame(maxWidth: .infinity, maxHeight: .infinity)
                     } else { ProgressView().tint(.white).frame(maxWidth: .infinity, maxHeight: .infinity) }
                 }
                 HStack {
@@ -193,15 +232,15 @@ struct EditorView: View {
                     Text(String(format: "%.2f s", clip.duration / project.settings.speed)).font(.system(size: 10, weight: .medium, design: .monospaced))
                 }.padding(13).foregroundStyle(.white).background(LinearGradient(colors: [.black.opacity(0.4), .clear], startPoint: .top, endPoint: .bottom))
             }.contentShape(Rectangle())
-                .gesture(LongPressGesture(minimumDuration: 0.15, maximumDistance: 32)
+                .simultaneousGesture(LongPressGesture(minimumDuration: croppingEnabled ? 0.35 : 0.15, maximumDistance: croppingEnabled ? 6 : 32)
                     .sequenced(before: DragGesture(minimumDistance: 0))
                     .updating($previewHeld) { value, held, _ in
                         if case .second(true, _) = value { held = true }
                     })
                 .accessibilityElement(children: .ignore).accessibilityAddTraits(.isButton)
-                .accessibilityLabel(playing ? "松手返回封面" : "按住预览实况")
-                .accessibilityValue(playing ? "正在播放" : "封面")
-                .accessibilityHint("按住播放，松手停止。使用旁白时双击切换播放。")
+                .accessibilityLabel(playing ? "松手返回封面" : (croppingEnabled ? "拖动调整裁剪位置" : "按住预览实况"))
+                .accessibilityValue(playing ? "正在播放" : (croppingEnabled ? (cropPreview.isSettled ? cropPositionDescription : "正在准备裁剪画面") : "封面"))
+                .accessibilityHint(croppingEnabled ? "拖动画面调整裁剪位置，按住预览。可用精确位置调整水平与垂直位置。" : "按住播放，松手停止。使用旁白时双击切换播放。")
                 .accessibilityAction {
                     if playing { stopPlayback() }
                     else { accessiblePlayback = true; startPlayback() }
@@ -401,8 +440,12 @@ struct EditorView: View {
                     PillButton(title: "水平翻转", selected: project.settings.mirrored) { project.settings.mirrored.toggle() }
                 }
                 if project.settings.ratio != .original {
-                    adjustment("水平位置", value: $project.settings.cropX, range: 0...1)
-                    adjustment("垂直位置", value: $project.settings.cropY, range: 0...1)
+                    Text("拖动画面调整裁剪位置 · 按住预览")
+                        .font(.caption).foregroundStyle(StudioTheme.secondary)
+                    DisclosureGroup("精确位置") {
+                        adjustment("水平位置", value: $project.settings.cropX, range: 0...1).padding(.top, 8)
+                        adjustment("垂直位置", value: $project.settings.cropY, range: 0...1)
+                    }.font(.caption)
                 }
             }
         }
@@ -495,12 +538,12 @@ struct EditorView: View {
                 player.replaceCurrentItem(with: item)
                 player.isMuted = previewMuted
                 preparedPreview = prepared
-                if previewHeld { startPlayback() }
+                if previewHeld && !cropDragging { startPlayback() }
                 if let playerObserver { NotificationCenter.default.removeObserver(playerObserver) }
                 playerObserver = NotificationCenter.default.addObserver(forName: .AVPlayerItemDidPlayToEndTime, object: item, queue: .main) { _ in
                     Task { @MainActor in
                         guard previewGeneration == generation else { return }
-                        if previewHeld { startPlayback() } else { stopPlayback() }
+                        if previewHeld && !cropDragging { startPlayback() } else { stopPlayback() }
                     }
                 }
             } catch is CancellationError {} catch { store.errorMessage = "动态预览失败：\(error.localizedDescription)" }

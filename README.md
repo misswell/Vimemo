@@ -2,9 +2,9 @@
 
 原生 iOS 视频转实况照片工作台。SwiftUI 界面、AVFoundation 编辑与转换、Photos 实况预览和相册保存。最低 iOS 18，支持 iPhone 和 iPad，全部处理在设备本地完成。
 
-## 最新更新（1.0.16）
+## 最新更新（1.0.17）
 
-封面选帧拖动时持续保留画面，复用视频解码器，并合并密集拖动请求，避免加载动画反复闪现和旧帧排队。拖动时使用轻量预览，松手后精确到所选帧；时间轴封面线可直接拖动，向下拉可慢速精调；上一帧、下一帧之间的帧数也可左右拖动。编辑预览改为按住播放、松手返回封面，右下角扬声器独立控制预览声音，默认静音。动态预览使用源文件原生播放与 GPU 实时构图、调色，避开 iOS 27 的视频合成播放失败；首帧显示前保留封面。沿用 iOS 27 Apple Music 风格和原生 Liquid Glass 导航。
+在「画面」中选择裁剪比例后，可直接拖动预览图片确定裁剪位置；拖动时显示参考网格，自动限制边界。画面跟随手指移动，松手后同步到封面、动态预览与导出，支持旋转、翻转和相册照片封面。原有位置滑杆保留在「精确位置」中；按住预览实况及独立声音开关继续可用。
 
 ## 现在可以做什么
 
@@ -139,7 +139,7 @@ swiftc -target arm64-apple-macos14.0 -parse-as-library \
 
 ## GitHub 发布
 
-源码仓库：[misswell/Vimemo](https://github.com/misswell/Vimemo)。当前源码发布版本为 1.0.16，GitHub tag 为 `v1.0.16`；随附 IPA 的 App 版本为 1.0.11（16），使用稳定版 Xcode 26.6 构建，界面在 iOS 27 验证。
+源码仓库：[misswell/Vimemo](https://github.com/misswell/Vimemo)。当前源码发布版本为 1.0.17，GitHub tag 为 `v1.0.17`；随附 IPA 的 App 版本为 1.0.11（17），使用稳定版 Xcode 26.6 构建，界面在 iOS 27 验证。
 Release 附带 Apple Distribution 签名的 App Store IPA，仅供 App Store Connect 上传；日常安装请使用下方 TestFlight 邀请。
 `build/`、参考录屏截图、个人 Xcode 配置和签名凭据均不纳入 Git。
 

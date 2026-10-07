@@ -69,6 +69,20 @@ enum MediaProcessor {
         return rendered
     }
 
+    /// Full edited image for interactive crop positioning, decoded only once.
+    static func uncroppedCover(source: URL, project: VideoProject, clip: Clip, photo: URL?) async throws -> CGImage {
+        var full = project
+        full.settings.ratio = .original
+        full.settings.cropX = 0.5; full.settings.cropY = 0.5
+        if let photo {
+            guard let image = CIImage(contentsOf: photo, options: [.applyOrientationProperty: true]) else {
+                throw StudioError.message("封面照片无法读取，请重新选择。")
+            }
+            full.width = Double(image.extent.width); full.height = Double(image.extent.height)
+        }
+        return try await cover(source: source, project: full, clip: clip, photo: photo)
+    }
+
     /// Composition handles geometry; the reader and preview apply the same color pipeline.
     static func composition(for asset: AVAsset, clip: Clip, settings: EditSettings) async throws -> (AVMutableComposition, AVMutableVideoComposition) {
         guard let sourceTrack = try await asset.loadTracks(withMediaType: .video).first else { throw StudioError.message("这个文件没有可用的视频轨道。") }

@@ -162,6 +162,46 @@ final class StudioFlowTests: XCTestCase {
         screenshot(app, name: "hold-live-preview-and-sound")
     }
 
+    @MainActor func testDragPreviewRepositionsCropAndPersists() throws {
+        let library = UUID().uuidString
+        let app = XCUIApplication()
+        app.launchArguments = ["--test-library", library, "--demo-editor"]
+        app.launch()
+        XCTAssertTrue(app.buttons["editorTool1"].waitForExistence(timeout: 10))
+        app.buttons["editorTool1"].tap()
+        app.buttons["1:1"].tap()
+        let preview = app.buttons["previewPlayback"]
+        func waitForCrop() {
+            let ready = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value CONTAINS %@", "水平"), object: preview)
+            XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 8), .completed)
+        }
+        waitForCrop()
+        XCTAssertEqual(preview.value as? String, "水平 50%，垂直 50%")
+        let verticalTravel = preview.frame.height * 0.4
+        let center = preview.coordinate(withNormalizedOffset: CGVector(dx: 0.45, dy: 0.45))
+        center.press(forDuration: 0.05, thenDragTo: center.withOffset(CGVector(dx: 0, dy: verticalTravel)))
+        XCTAssertEqual(preview.value as? String, "水平 50%，垂直 0%")
+        app.buttons["精确位置"].tap()
+        XCTAssertEqual(app.sliders["垂直位置"].value as? String, "0%")
+        let up = preview.coordinate(withNormalizedOffset: CGVector(dx: 0.45, dy: 0.65))
+        up.press(forDuration: 0.05, thenDragTo: up.withOffset(CGVector(dx: 0, dy: -verticalTravel)))
+        XCTAssertEqual(preview.value as? String, "水平 50%，垂直 100%")
+        app.buttons["旋转 90°"].tap()
+        waitForCrop()
+        let right = preview.coordinate(withNormalizedOffset: CGVector(dx: 0.45, dy: 0.45))
+        right.press(forDuration: 0.05, thenDragTo: right.withOffset(CGVector(dx: preview.frame.width * 0.4, dy: 0)))
+        XCTAssertEqual(preview.value as? String, "水平 0%，垂直 100%")
+        preview.press(forDuration: 0.7)
+        XCTAssertEqual(preview.value as? String, "水平 0%，垂直 100%", "Holding must preview without changing the crop")
+        screenshot(app, name: "drag-to-position-crop")
+        app.buttons["返回工作台"].tap()
+        app.terminate(); app.launch()
+        XCTAssertTrue(app.buttons["editorTool1"].waitForExistence(timeout: 10))
+        app.buttons["editorTool1"].tap()
+        waitForCrop()
+        XCTAssertEqual(preview.value as? String, "水平 0%，垂直 100%")
+    }
+
     @MainActor func testAppearanceSwitchingAndPersistence() throws {
         let app = XCUIApplication()
         app.launchArguments = ["--test-library", UUID().uuidString, "--test-purchase-unavailable"]
