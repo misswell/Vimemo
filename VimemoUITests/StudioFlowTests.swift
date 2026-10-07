@@ -205,6 +205,33 @@ final class StudioFlowTests: XCTestCase {
         XCTAssertEqual(app.buttons["gifFPS24"].value as? String, "已选择")
     }
 
+    @MainActor func testMuteToggleAppearsInVideoExportPrivacyOptions() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["--test-library", UUID().uuidString, "--demo-editor"]
+        app.launch()
+        XCTAssertTrue(app.buttons["makeLivePhotos"].waitForExistence(timeout: 10))
+        app.buttons["makeLivePhotos"].tap()
+
+        let privacy = app.buttons["拍摄信息与隐私"]
+        let exportButton = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "制作并保存")).firstMatch
+        XCTAssertTrue(exportButton.waitForExistence(timeout: 5))
+        XCTAssertGreaterThan(app.scrollViews.count, 0)
+        let scroll = app.scrollViews.element(boundBy: app.scrollViews.count - 1)
+        for _ in 0..<5 where privacy.frame.maxY > exportButton.frame.minY { scroll.swipeUp() }
+        XCTAssertTrue(privacy.waitForExistence(timeout: 5))
+        XCTAssertLessThan(privacy.frame.maxY, exportButton.frame.minY)
+        privacy.tap()
+        XCTAssertTrue(app.staticTexts["开启后，导出的视频不包含音轨；原始视频不受影响。"].waitForExistence(timeout: 5))
+
+        let mute = app.descendants(matching: .any).matching(identifier: "exportMute").firstMatch
+        XCTAssertTrue(mute.waitForExistence(timeout: 5))
+        for _ in 0..<3 where !mute.isHittable { scroll.swipeUp() }
+        XCTAssertTrue(mute.isHittable)
+        XCTAssertEqual(mute.value as? String, "0")
+        mute.tap()
+        XCTAssertEqual(mute.value as? String, "1")
+    }
+
     @MainActor func testPurchaseUnavailableKeepsVisibleRetryAndFreeExit() throws {
         let app = XCUIApplication()
         app.launchArguments = ["--test-library", UUID().uuidString, "--test-purchase-unavailable"]

@@ -214,11 +214,13 @@ struct HomeView: View {
     }
 
     private var tabBar: some View {
-        HStack(spacing: 4) {
-            tabButton("工作台", symbol: "viewfinder", index: 0)
-            tabButton("作品", symbol: "rectangle.stack", index: 1)
-            tabButton("设置", symbol: "slider.horizontal.3", index: 2)
-        }.padding(6).studioGlass(in: RoundedRectangle(cornerRadius: 24), interactive: false)
+        StudioGlassGroup(spacing: 4) {
+            HStack(spacing: 4) {
+                tabButton("工作台", symbol: "viewfinder", index: 0)
+                tabButton("作品", symbol: "rectangle.stack", index: 1)
+                tabButton("设置", symbol: "slider.horizontal.3", index: 2)
+            }.padding(6).studioGlass(in: RoundedRectangle(cornerRadius: 24), interactive: false)
+        }
             .padding(.horizontal, 24).padding(.top, 8).padding(.bottom, 8)
     }
     private func tabButton(_ title: String, symbol: String, index: Int) -> some View {
@@ -228,8 +230,10 @@ struct HomeView: View {
                 Text(title).font(.system(size: 12, weight: .semibold))
             }.frame(maxWidth: .infinity).frame(minHeight: 54)
                 .foregroundStyle(tab == index ? StudioTheme.accent : StudioTheme.secondary)
-                .background(tab == index ? StudioTheme.accent.opacity(0.1) : .clear, in: RoundedRectangle(cornerRadius: 18))
+                .contentShape(RoundedRectangle(cornerRadius: 18))
+                .studioGlass(in: RoundedRectangle(cornerRadius: 18), interactive: true, tint: tab == index ? StudioTheme.accent.opacity(0.16) : nil)
         }.buttonStyle(.plain).contentShape(RoundedRectangle(cornerRadius: 18))
+            .accessibilityLabel(title)
             .accessibilityValue(tab == index ? "已选择" : "未选择")
     }
 }

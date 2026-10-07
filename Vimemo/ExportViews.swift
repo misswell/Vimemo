@@ -15,6 +15,7 @@ struct ExportSheet: View {
     @State private var quality: ExportQuality
     @State private var preserveDate: Bool
     @State private var preserveLocation: Bool
+    @State private var muted: Bool
     @State private var saveToPhotos = true
     @State private var started = false
     @State private var sharing = false
@@ -29,6 +30,7 @@ struct ExportSheet: View {
         _gifFrameRate = State(initialValue: settings.effectiveGIFFrameRate)
         _preserveDate = State(initialValue: settings.preserveDate)
         _preserveLocation = State(initialValue: settings.preserveLocation)
+        _muted = State(initialValue: settings.muted)
     }
     private var count: Int { projects.reduce(0) { $0 + $1.clips.count } }
 
@@ -105,7 +107,7 @@ struct ExportSheet: View {
                             }
                         }
                     }
-                    Text(format == .livePhoto ? "保存到相册后长按播放。分享文件包含 JPG 与 MOV 配对原件。" : format == .gif ? "GIF 循环播放，不含声音。尺寸和帧率可自由选择。" : format == .photo ? "导出所选封面帧，保留裁剪与调色。" : "导出裁剪后的 MOV 视频，保留声音与编辑效果。")
+                    Text(format == .livePhoto ? "保存到相册后长按播放。分享文件包含 JPG 与 MOV 配对原件。" : format == .gif ? "GIF 循环播放，不含声音。尺寸和帧率可自由选择。" : format == .photo ? "导出所选封面帧，保留裁剪与调色。" : "导出裁剪后的 MOV 视频；可在拍摄信息与隐私中选择是否保留声音。")
                         .font(.system(size: 11)).foregroundStyle(StudioTheme.secondary)
                 }
             }
@@ -159,6 +161,14 @@ struct ExportSheet: View {
             StudioCard {
                 DisclosureGroup("拍摄信息与隐私") {
                     VStack(alignment: .leading, spacing: 15) {
+                        if format == .livePhoto || format == .video {
+                            Toggle("静音导出", isOn: $muted)
+                                .font(.system(size: 14))
+                                .accessibilityIdentifier("exportMute")
+                            Text("开启后，导出的视频不包含音轨；原始视频不受影响。")
+                                .font(.system(size: 11)).foregroundStyle(StudioTheme.secondary)
+                            Divider()
+                        }
                         Toggle("保留原始拍摄时间", isOn: $preserveDate).font(.system(size: 14))
                         Divider()
                         Toggle("保留原始位置", isOn: $preserveLocation).font(.system(size: 14))
@@ -223,6 +233,7 @@ struct ExportSheet: View {
             projects[index].settings.gifFrameRate = gifFrameRate
             projects[index].settings.preserveDate = preserveDate
             projects[index].settings.preserveLocation = preserveLocation
+            projects[index].settings.muted = muted
             store.update(projects[index])
         }
         store.persist()
