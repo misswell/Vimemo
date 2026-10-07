@@ -8,9 +8,17 @@ struct EditorView: View {
     @State var project: VideoProject
     @State private var activeClipID: UUID
     @State private var thumbnails: [UIImage] = []
-    @State private var coverImage: UIImage?
+    @StateObject private var framePreview = CoverPreview()
+    @State private var frameSettings: EditSettings?
+    @State private var timelineSeeking = false
     @State private var player = AVPlayer()
+    @State private var preparedPreview: VideoPreview?
+    @State private var playerFrameReady = false
     @State private var playing = false
+    @GestureState private var previewHeld = false
+    @State private var accessiblePlayback = false
+    @State private var previewMuted = true
+    @State private var playbackGeneration = UUID()
     @State private var tool = 0
     @State private var showExport = false
     @State private var showRename = false
@@ -18,10 +26,8 @@ struct EditorView: View {
     @State private var showCoverPicker = false
     @State private var titleDraft = ""
     @State private var previewTask: Task<Void, Never>?
-    @State private var frameTask: Task<Void, Never>?
     @State private var playerObserver: NSObjectProtocol?
     @State private var previewGeneration = UUID()
-    @State private var frameGeneration = UUID()
     @State private var findingCover = false
     @State private var coverTask: Task<Void, Never>?
 
@@ -100,7 +106,7 @@ struct EditorView: View {
                 VStack(spacing: 8) {
                     toolSelector
                     PrimaryButton(title: "导出 · \(project.clips.count) 个作品", symbol: "arrow.up.right") {
-                        playing = false; player.pause(); store.update(project); store.persist(); showExport = true
+                        stopPlayback(); store.update(project); store.persist(); showExport = true
                     }.disabled(exporter.running).accessibilityIdentifier("makeLivePhotos")
                 }.frame(maxWidth: 680).frame(maxWidth: .infinity).padding(.horizontal, 16).padding(.top, 8).padding(.bottom, 8)
                     .background(.bar)
@@ -133,11 +139,24 @@ struct EditorView: View {
                 store.update(project)
                 refreshPreview()
             }
-            .onChange(of: project.clips) { _, _ in store.update(project); refreshPreview() }
+            .onChange(of: project.clips) { previous, _ in
+                store.update(project)
+                let oldClip = previous.first { $0.id == activeClipID }
+                if oldClip?.start == clip.start, oldClip?.end == clip.end {
+                    if !timelineSeeking { seekFrame(clip.cover) }
+                } else { refreshPreview(seekCover: !timelineSeeking) }
+            }
+            .onChange(of: framePreview.errorMessage) { _, message in
+                if let message { store.errorMessage = "封面预览失败：\(message)" }
+            }
+            .onChange(of: previewHeld) { _, held in
+                accessiblePlayback = false
+                if held { startPlayback() } else { stopPlayback() }
+            }
             .onChange(of: project.title) { _, _ in store.update(project) }
             .onChange(of: activeClipID) { _, _ in refreshPreview() }
             .onDisappear {
-                player.pause(); previewTask?.cancel(); frameTask?.cancel(); coverTask?.cancel()
+                stopPlayback(); previewTask?.cancel(); framePreview.stop(); coverTask?.cancel()
                 if let playerObserver { NotificationCenter.default.removeObserver(playerObserver) }
                 store.update(project); store.persist()
             }
@@ -159,23 +178,48 @@ struct EditorView: View {
     }
 
     private var preview: some View {
-        ZStack(alignment: .topLeading) {
-            Color.black
-            if playing {
-                PlayerSurface(player: player)
-            } else if let coverImage {
-                Image(uiImage: coverImage).resizable().scaledToFit().frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else { ProgressView().tint(.white).frame(maxWidth: .infinity, maxHeight: .infinity) }
-            HStack {
-                Label("LIVE", systemImage: "livephoto").font(.system(size: 10, weight: .semibold, design: .monospaced)).tracking(1)
-                Spacer()
-                Text(String(format: "%.2f s", clip.duration / project.settings.speed)).font(.system(size: 10, weight: .medium, design: .monospaced))
-            }.padding(13).foregroundStyle(.white).background(LinearGradient(colors: [.black.opacity(0.4), .clear], startPoint: .top, endPoint: .bottom))
-            Button { togglePlayback() } label: {
-                Image(systemName: playing ? "pause.fill" : "play.fill").font(.system(size: 19)).foregroundStyle(.white)
-                    .frame(width: 48, height: 48).contentShape(Circle())
-            }.studioGlassButton(circular: true, overImage: true).contentShape(Circle()).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing).padding(13).accessibilityLabel(playing ? "暂停预览" : "播放编辑后片段").accessibilityIdentifier("previewPlayback")
-        }.accessibilityElement(children: .contain).accessibilityIdentifier("editorPreview").clipShape(RoundedRectangle(cornerRadius: 20))
+        ZStack(alignment: .bottomTrailing) {
+            ZStack(alignment: .topLeading) {
+                Color.black
+                PreviewSurface(player: player, preview: preparedPreview, playing: playing) { ready in playerFrameReady = ready }
+                if !playing || !playerFrameReady {
+                    if let coverImage = framePreview.image {
+                    Image(uiImage: coverImage).resizable().scaledToFit().frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else { ProgressView().tint(.white).frame(maxWidth: .infinity, maxHeight: .infinity) }
+                }
+                HStack {
+                    Label("LIVE", systemImage: playing ? "livephoto.play" : "livephoto").font(.system(size: 10, weight: .semibold, design: .monospaced)).tracking(1)
+                    Spacer()
+                    Text(String(format: "%.2f s", clip.duration / project.settings.speed)).font(.system(size: 10, weight: .medium, design: .monospaced))
+                }.padding(13).foregroundStyle(.white).background(LinearGradient(colors: [.black.opacity(0.4), .clear], startPoint: .top, endPoint: .bottom))
+            }.contentShape(Rectangle())
+                .gesture(LongPressGesture(minimumDuration: 0.15, maximumDistance: 32)
+                    .sequenced(before: DragGesture(minimumDistance: 0))
+                    .updating($previewHeld) { value, held, _ in
+                        if case .second(true, _) = value { held = true }
+                    })
+                .accessibilityElement(children: .ignore).accessibilityAddTraits(.isButton)
+                .accessibilityLabel(playing ? "松手返回封面" : "按住预览实况")
+                .accessibilityValue(playing ? "正在播放" : "封面")
+                .accessibilityHint("按住播放，松手停止。使用旁白时双击切换播放。")
+                .accessibilityAction {
+                    if playing { stopPlayback() }
+                    else { accessiblePlayback = true; startPlayback() }
+                }.accessibilityIdentifier("previewPlayback")
+            Button {
+                previewMuted.toggle()
+                player.isMuted = previewMuted
+            } label: {
+                Image(systemName: previewMuted || !project.hasAudio ? "speaker.slash.fill" : "speaker.wave.2.fill")
+                    .font(.system(size: 17)).foregroundStyle(.white)
+                    .frame(width: 44, height: 44).contentShape(Circle())
+            }.studioGlassButton(circular: true, overImage: true).padding(13)
+                .disabled(!project.hasAudio)
+                .accessibilityLabel(project.hasAudio ? (previewMuted ? "开启预览声音" : "关闭预览声音") : "原视频没有声音")
+                .accessibilityValue(previewMuted || !project.hasAudio ? "静音" : "有声")
+                .accessibilityIdentifier("previewSound")
+        }.accessibilityElement(children: .contain).accessibilityIdentifier("editorPreview")
+            .clipShape(RoundedRectangle(cornerRadius: 20))
             .overlay(RoundedRectangle(cornerRadius: 20).stroke(StudioTheme.line, lineWidth: 1))
     }
 
@@ -210,7 +254,11 @@ struct EditorView: View {
         StudioCard {
             VStack(spacing: 16) {
                 SectionLabel(title: "裁剪片段", detail: "原视频 \(project.duration.timeLabel)")
-                TimelineView(clip: clipBinding, duration: project.duration, speed: project.settings.speed, maxOutputDuration: project.settings.maxOutputDuration, thumbnails: thumbnails) { time in seekFrame(time) }
+                TimelineView(clip: clipBinding, duration: project.duration, speed: project.settings.speed, maxOutputDuration: project.settings.maxOutputDuration, thumbnails: thumbnails, frameRate: project.frameRate) { time, editing in
+                    timelineSeeking = editing
+                    coverTask?.cancel()
+                    seekFrame(time, scrubbing: editing)
+                }
                 if project.settings.maxOutputDuration == nil {
                     Button("使用整段视频") {
                         var value = clip; value.start = 0; value.end = project.duration
@@ -218,11 +266,13 @@ struct EditorView: View {
                         project.clips[clipIndex] = value
                     }.font(.system(size: 12, weight: .medium)).accessibilityIdentifier("useFullVideo")
                 }
-                HStack(spacing: 8) {
-                    frameButton("上一帧", symbol: "backward.end.fill", delta: -1)
-                    Text(clip.coverPhotoFilename == nil ? "第 \(Int((clip.cover * max(1, project.frameRate)).rounded())) 帧" : "照片封面")
-                        .font(.system(size: 10, design: .monospaced)).foregroundStyle(StudioTheme.secondary)
-                    frameButton("下一帧", symbol: "forward.end.fill", delta: 1)
+                FrameSelectionControl(time: Binding(get: { clip.cover }, set: { time in
+                    coverTask?.cancel()
+                    project.clips[clipIndex].coverPhotoFilename = nil
+                    project.clips[clipIndex].cover = time
+                }), range: clip.start...max(clip.start, clip.end - 1 / max(1, project.frameRate)), frameRate: project.frameRate, photoCover: clip.coverPhotoFilename != nil, identifierPrefix: "timeline") { time, editing in
+                    timelineSeeking = editing
+                    seekFrame(time, scrubbing: editing)
                 }
                 DisclosureGroup("精确裁剪") {
                     HStack {
@@ -251,15 +301,6 @@ struct EditorView: View {
                     .accessibilityLabel("\(isStart ? "入点" : "出点")\(direction == -1 ? "前移" : "后移")一帧")
             }
         }.buttonStyle(.plain)
-    }
-
-    private func frameButton(_ title: String, symbol: String, delta: Double) -> some View {
-        Button {
-            coverTask?.cancel()
-            project.clips[clipIndex].coverPhotoFilename = nil
-            project.clips[clipIndex].cover = min(clip.end - 1.0 / 600, max(clip.start, clip.cover + delta / max(1, project.frameRate)))
-        } label: { Label(title, systemImage: symbol).font(.system(size: 11, weight: .medium)).frame(maxWidth: .infinity).frame(minHeight: 44).contentShape(RoundedRectangle(cornerRadius: 12)) }
-            .studioGlass(in: RoundedRectangle(cornerRadius: 12), interactive: true, tint: StudioTheme.accent.opacity(0.08))
     }
 
     private var toolSelector: some View {
@@ -425,56 +466,67 @@ struct EditorView: View {
             } catch is CancellationError {} catch { store.errorMessage = "自动选帧失败：\(error.localizedDescription)" }
         }
     }
-    private func seekFrame(_ time: Double) {
-        playing = false; player.pause()
-        frameTask?.cancel()
-        let generation = UUID(); frameGeneration = generation
-        let source = sourceURL, currentProject = project
-        var currentClip = clip; currentClip.cover = time
-        let photo = currentClip.coverPhotoFilename.map { store.url(for: $0) }
-        frameTask = Task {
-            do {
-                try await Task.sleep(for: .milliseconds(50))
-                let image = try await MediaProcessor.cover(source: source, project: currentProject, clip: currentClip, photo: photo)
-                guard !Task.isCancelled, frameGeneration == generation else { return }
-                coverImage = UIImage(cgImage: image)
-            } catch is CancellationError {} catch { store.errorMessage = "封面预览失败：\(error.localizedDescription)" }
+    private func seekFrame(_ time: Double, scrubbing: Bool = false) {
+        stopPlayback()
+        if frameSettings != project.settings {
+            let renderer = CoverFrameRenderer(source: sourceURL, project: project)
+            framePreview.configure(cancel: { Task { await renderer.cancel() } }) { time, photo, exact in
+                try await renderer.frame(time: time, photo: photo, exact: exact)
+            }
+            frameSettings = project.settings
         }
+        framePreview.request(time: time, photo: clip.coverPhotoFilename.map { store.url(for: $0) }, exact: !scrubbing)
     }
-    private func refreshPreview() {
-        playing = false; player.pause()
-        seekFrame(clip.cover)
+    private func refreshPreview(seekCover: Bool = true) {
+        stopPlayback()
+        if seekCover { seekFrame(clip.cover) }
         previewTask?.cancel()
+        preparedPreview = nil
         let generation = UUID(); previewGeneration = generation
-        let source = sourceURL, currentClip = clip, settings = project.settings
+        let source = sourceURL, currentClip = clip
+        var settings = project.settings
+        settings.muted = false // Preview audio is controlled independently from export.
         previewTask = Task {
             do {
                 try await Task.sleep(for: .milliseconds(180))
-                let item = try await MediaProcessor.previewItem(source: source, clip: currentClip, settings: settings)
+                let prepared = try await MediaProcessor.previewItem(source: source, clip: currentClip, settings: settings)
+                let item = prepared.item
                 guard !Task.isCancelled, previewGeneration == generation else { return }
                 player.replaceCurrentItem(with: item)
+                player.isMuted = previewMuted
+                preparedPreview = prepared
+                if previewHeld { startPlayback() }
                 if let playerObserver { NotificationCenter.default.removeObserver(playerObserver) }
                 playerObserver = NotificationCenter.default.addObserver(forName: .AVPlayerItemDidPlayToEndTime, object: item, queue: .main) { _ in
-                    Task { @MainActor in playing = false; player.seek(to: .zero) }
+                    Task { @MainActor in
+                        guard previewGeneration == generation else { return }
+                        if previewHeld { startPlayback() } else { stopPlayback() }
+                    }
                 }
             } catch is CancellationError {} catch { store.errorMessage = "动态预览失败：\(error.localizedDescription)" }
         }
     }
-    private func togglePlayback() {
-        if playing { player.pause(); playing = false }
-        else {
-            guard player.currentItem != nil else { return }
-            player.seek(to: .zero); playing = true; player.play()
+    private func startPlayback() {
+        guard let prepared = preparedPreview, player.currentItem === prepared.item else { return }
+        let generation = UUID(); playbackGeneration = generation
+        player.isMuted = previewMuted
+        playing = true
+        player.seek(to: prepared.start, toleranceBefore: .zero, toleranceAfter: .zero) { finished in
+            Task { @MainActor in
+                guard playbackGeneration == generation, playing, previewHeld || accessiblePlayback else { return }
+                guard finished, player.currentItem?.status != .failed else {
+                    stopPlayback()
+                    if let error = player.currentItem?.error { store.errorMessage = "预览播放失败：\(error.localizedDescription)" }
+                    return
+                }
+                player.playImmediately(atRate: prepared.rate)
+            }
         }
     }
-}
-
-struct PlayerSurface: UIViewRepresentable {
-    let player: AVPlayer
-    final class Surface: UIView {
-        override class var layerClass: AnyClass { AVPlayerLayer.self }
-        var playerLayer: AVPlayerLayer { layer as! AVPlayerLayer }
+    private func stopPlayback() {
+        playbackGeneration = UUID()
+        accessiblePlayback = false
+        playing = false
+        player.pause()
     }
-    func makeUIView(context: Context) -> Surface { let view = Surface(); view.playerLayer.videoGravity = .resizeAspect; view.playerLayer.player = player; return view }
-    func updateUIView(_ uiView: Surface, context: Context) { uiView.playerLayer.player = player }
 }

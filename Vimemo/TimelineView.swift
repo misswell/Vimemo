@@ -6,8 +6,11 @@ struct TimelineView: View {
     var speed: Double
     var maxOutputDuration: Double? = 3
     var thumbnails: [UIImage]
-    var onSeek: (Double) -> Void
+    var frameRate: Double = 30
+    var onSeek: (Double, Bool) -> Void
     @State private var dragStart: Clip?
+    @State private var coverDrag: FrameScrubSession?
+    @State private var fineScrubbing = false
 
     var body: some View {
         VStack(spacing: 12) {
@@ -17,7 +20,7 @@ struct TimelineView: View {
                 let left = width * clip.start / total
                 let right = width * clip.end / total
                 let cover = width * clip.cover / total
-                ZStack(alignment: .leading) {
+                ZStack(alignment: .topLeading) {
                     HStack(spacing: 1) {
                         ForEach(Array(thumbnails.enumerated()), id: \.offset) { _, image in
                             Image(uiImage: image).resizable().scaledToFill().frame(width: max(1, width / CGFloat(max(1, thumbnails.count)) - 1), height: 58).clipped()
@@ -35,8 +38,9 @@ struct TimelineView: View {
                             let newStart = min(max(0, original.start + delta), max(0, total - original.duration))
                             let shift = newStart - original.start
                             clip.start = newStart; clip.end = original.end + shift; clip.cover = original.cover + shift
-                            onSeek(clip.cover)
-                        }.onEnded { _ in dragStart = nil })
+                            onSeek(clip.cover, true)
+                        }.onEnded { _ in dragStart = nil; onSeek(clip.cover, false) })
+                    coverHandle(width: width, duration: total).offset(x: cover - 22)
                     handle.offset(x: left - 22).simultaneousGesture(DragGesture(minimumDistance: 0).onChanged { value in
                         guard abs(value.translation.width) >= abs(value.translation.height) else { return }
                         if dragStart == nil { dragStart = clip }
@@ -44,19 +48,18 @@ struct TimelineView: View {
                         clip.start = min(max(0, start), clip.end - min(0.1, total))
                         if let maximum = maxOutputDuration { clip.start = max(clip.start, clip.end - maximum * speed) }
                         clip.normalize(sourceDuration: duration, speed: speed, maxOutputDuration: maxOutputDuration)
-                        onSeek(clip.start)
-                    }.onEnded { _ in dragStart = nil; onSeek(clip.cover) })
+                        onSeek(clip.start, true)
+                    }.onEnded { _ in dragStart = nil; onSeek(clip.cover, false) })
                     handle.offset(x: right - 22).simultaneousGesture(DragGesture(minimumDistance: 0).onChanged { value in
                         guard abs(value.translation.width) >= abs(value.translation.height) else { return }
                         if dragStart == nil { dragStart = clip }
                         let end = (dragStart?.end ?? clip.end) + value.translation.width / width * total
                         clip.end = min(total, max(clip.start + min(0.1, total), end))
                         clip.normalize(sourceDuration: duration, speed: speed, maxOutputDuration: maxOutputDuration)
-                        onSeek(clip.end - 1 / 30)
-                    }.onEnded { _ in dragStart = nil; onSeek(clip.cover) })
-                    Rectangle().fill(StudioTheme.peach).frame(width: 2, height: 70).offset(x: cover - 1).allowsHitTesting(false)
+                        onSeek(max(clip.start, clip.end - 1 / max(1, frameRate)), true)
+                    }.onEnded { _ in dragStart = nil; onSeek(clip.cover, false) })
                 }
-            }.frame(height: 70)
+            }.frame(height: 96)
             HStack {
                 Text(clip.start.timeLabel)
                 Spacer()
@@ -64,8 +67,40 @@ struct TimelineView: View {
                 Spacer()
                 Text(clip.end.timeLabel)
             }.font(.system(size: 10, weight: .medium, design: .monospaced)).foregroundStyle(StudioTheme.secondary)
-            Text("拖动两端裁剪 · 拖动中间移动片段").font(.system(size: 11)).foregroundStyle(StudioTheme.secondary)
+            Text(fineScrubbing ? "慢速选帧 · 松手锁定封面" : "拖动封面线选帧，向下拉精调 · 两端裁剪")
+                .font(.system(size: 11)).foregroundStyle(StudioTheme.secondary)
         }.accessibilityElement(children: .contain).accessibilityLabel("片段裁剪时间轴")
+    }
+
+    private func coverHandle(width: CGFloat, duration: Double) -> some View {
+        VStack(spacing: -2) {
+            Capsule().fill(StudioTheme.peach).frame(width: coverDrag == nil ? 2 : 3, height: 70)
+            Image(systemName: "arrow.left.and.right").font(.system(size: 10, weight: .bold))
+                .foregroundStyle(StudioTheme.onAccent).frame(width: 30, height: 22)
+                .background(StudioTheme.peach, in: Capsule())
+        }.frame(width: 44, height: 96).contentShape(Rectangle())
+            .gesture(DragGesture(minimumDistance: 0).onChanged { value in
+                if coverDrag == nil {
+                    let end = max(clip.start, clip.end - 1 / max(1, frameRate))
+                    coverDrag = FrameScrubSession(time: clip.cover, range: clip.start...end, frameRate: frameRate)
+                }
+                guard var session = coverDrag else { return }
+                fineScrubbing = FrameScrubSession.gain(for: value.translation.height) < 1
+                clip.cover = session.move(translation: value.translation, secondsPerPoint: duration / max(1, width))
+                clip.coverPhotoFilename = nil
+                coverDrag = session
+                onSeek(clip.cover, true)
+            }.onEnded { _ in coverDrag = nil; fineScrubbing = false; onSeek(clip.cover, false) })
+            .accessibilityElement(children: .ignore).accessibilityLabel("拖动选择封面帧")
+            .accessibilityValue("第 \(Int((clip.cover * max(1, frameRate)).rounded())) 帧")
+            .accessibilityHint("左右拖动，向下拉可降低选帧速度")
+            .accessibilityAdjustableAction { direction in
+                let delta: Double
+                switch direction { case .increment: delta = 1; case .decrement: delta = -1; @unknown default: return }
+                clip.cover = min(max(clip.start, clip.end - 1 / max(1, frameRate)), max(clip.start, clip.cover + delta / max(1, frameRate)))
+                clip.coverPhotoFilename = nil
+                onSeek(clip.cover, false)
+            }.accessibilityIdentifier("coverFrameHandle")
     }
     private var handle: some View {
         RoundedRectangle(cornerRadius: 5).fill(StudioTheme.accent).frame(width: 20, height: 61)

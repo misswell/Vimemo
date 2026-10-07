@@ -18,8 +18,11 @@ final class StudioFlowTests: XCTestCase {
     }
     private func scrollEditor(_ app: XCUIApplication) {
         let scroll = app.scrollViews["editorScroll"]
-        let start = scroll.coordinate(withNormalizedOffset: CGVector(dx: 0.97, dy: 0.72))
-        let end = scroll.coordinate(withNormalizedOffset: CGVector(dx: 0.97, dy: 0.20))
+        // The scroll view's accessibility frame extends behind the fixed tools.
+        let visibleBottom = min(scroll.frame.maxY, app.buttons["editorTool0"].frame.minY - 10)
+        let origin = app.coordinate(withNormalizedOffset: .zero)
+        let start = origin.withOffset(CGVector(dx: scroll.frame.maxX - 12, dy: visibleBottom - 18))
+        let end = origin.withOffset(CGVector(dx: scroll.frame.maxX - 12, dy: scroll.frame.minY + 25))
         start.press(forDuration: 0.05, thenDragTo: end)
     }
 
@@ -69,6 +72,96 @@ final class StudioFlowTests: XCTestCase {
                        "Portrait video preview should use the source aspect ratio instead of a landscape frame.")
     }
 
+    @MainActor func testCoverScrubbingKeepsPreviewAndSettlesBeforeSaving() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["--test-library", UUID().uuidString, "--demo-editor"]
+        app.launch()
+        XCTAssertTrue(app.buttons["chooseCover"].waitForExistence(timeout: 10))
+        app.buttons["chooseCover"].tap()
+        let preview = app.images["coverPreviewImage"]
+        XCTAssertTrue(preview.waitForExistence(timeout: 10))
+        let slider = app.sliders["手动封面时间"]
+        for position in [0.1, 0.9, 0.2, 0.8] {
+            slider.adjust(toNormalizedSliderPosition: position)
+            XCTAssertTrue(preview.exists, "Scrubbing must keep the displayed frame")
+            XCTAssertFalse(app.activityIndicators["coverPreviewLoading"].exists)
+        }
+        let confirm = app.buttons["confirmCover"]
+        let settled = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true"), object: confirm)
+        XCTAssertEqual(XCTWaiter.wait(for: [settled], timeout: 5), .completed)
+        app.buttons["coverNextFrame"].tap()
+        XCTAssertTrue(preview.exists)
+        let stepped = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true"), object: confirm)
+        XCTAssertEqual(XCTWaiter.wait(for: [stepped], timeout: 5), .completed)
+        screenshot(app, name: "continuous-cover-scrubbing")
+        confirm.tap()
+        XCTAssertTrue(app.buttons["chooseCover"].waitForExistence(timeout: 5))
+    }
+
+    @MainActor func testTimelineCoverHandleAndCenterFrameScrubber() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["--test-library", UUID().uuidString, "--demo-editor"]
+        app.launch()
+        let handle = app.descendants(matching: .any)["coverFrameHandle"]
+        XCTAssertTrue(handle.waitForExistence(timeout: 10))
+        for _ in 0..<3 {
+            if handle.isHittable && handle.frame.maxY < app.buttons["editorTool0"].frame.minY - 8 { break }
+            scrollEditor(app)
+        }
+        screenshot(app, name: "timeline-before-drag")
+        func frame(_ element: XCUIElement) -> Int {
+            Int((element.value as? String ?? "").filter(\.isNumber)) ?? -1
+        }
+        let original = frame(handle)
+        XCTAssertGreaterThanOrEqual(original, 0)
+        let grip = handle.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.85))
+        grip.press(forDuration: 0.05, thenDragTo: grip.withOffset(CGVector(dx: 40, dy: 0)))
+        let dragged = frame(handle)
+        XCTAssertGreaterThan(dragged, original)
+        XCTAssertLessThan(dragged, 90, "Cover must remain inside the original three-second clip")
+        let fine = app.descendants(matching: .any)["timelineFineScrubber"]
+        for _ in 0..<3 {
+            if fine.isHittable && fine.frame.maxY < app.buttons["editorTool0"].frame.minY - 8 { break }
+            scrollEditor(app)
+        }
+        let fineStart = fine.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        fineStart.press(forDuration: 0.05, thenDragTo: fineStart.withOffset(CGVector(dx: -36, dy: 0)))
+        let refined = frame(handle)
+        XCTAssertEqual(Double(dragged - refined), 3, accuracy: 1)
+        app.buttons["timelineNextFrame"].tap()
+        XCTAssertEqual(frame(handle), refined + 1)
+        app.buttons["chooseCover"].tap()
+        let pickerFrame = app.descendants(matching: .any)["coverFineScrubber"]
+        XCTAssertTrue(pickerFrame.waitForExistence(timeout: 5))
+        XCTAssertEqual(frame(pickerFrame), refined + 1, "Picker and timeline must share the selected cover")
+        screenshot(app, name: "draggable-timeline-cover")
+    }
+
+    @MainActor func testHoldPreviewReleasesAndSoundIsIndependent() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["--test-library", UUID().uuidString, "--demo-editor"]
+        app.launch()
+        let preview = app.buttons["previewPlayback"]
+        XCTAssertTrue(preview.waitForExistence(timeout: 10))
+        preview.press(forDuration: 2.5)
+        XCTAssertEqual(preview.value as? String, "封面", "Releasing a hold must return to the cover")
+        preview.press(forDuration: 0.5)
+        XCTAssertEqual(preview.label, "按住预览实况")
+        let sound = app.buttons["previewSound"]
+        XCTAssertTrue(sound.isHittable)
+        XCTAssertEqual(sound.value as? String, "静音")
+        if sound.isEnabled {
+            sound.tap()
+            XCTAssertEqual(sound.value as? String, "有声")
+            XCTAssertEqual(preview.value as? String, "封面", "Sound control must not start playback")
+            preview.press(forDuration: 0.8)
+            XCTAssertEqual(sound.value as? String, "有声")
+            sound.tap()
+            XCTAssertEqual(sound.value as? String, "静音")
+        } else { XCTAssertEqual(sound.label, "原视频没有声音") }
+        screenshot(app, name: "hold-live-preview-and-sound")
+    }
+
     @MainActor func testAppearanceSwitchingAndPersistence() throws {
         let app = XCUIApplication()
         app.launchArguments = ["--test-library", UUID().uuidString, "--test-purchase-unavailable"]
@@ -86,10 +179,10 @@ final class StudioFlowTests: XCTestCase {
         screenshot(app, name: "26-dark-editor")
         let playback = app.buttons["previewPlayback"]
         XCTAssertTrue(playback.isHittable)
-        playback.tap()
-        XCTAssertEqual(playback.label, "暂停预览")
-        playback.tap()
-        XCTAssertEqual(playback.label, "播放编辑后片段")
+        playback.press(forDuration: 0.7)
+        XCTAssertEqual(playback.label, "按住预览实况")
+        XCTAssertEqual(playback.value as? String, "封面")
+        XCTAssertTrue(app.buttons["previewSound"].exists)
         app.buttons["chooseCover"].tap()
         XCTAssertTrue(app.buttons["confirmCover"].waitForExistence(timeout: 5))
         app.buttons["confirmCover"].tap()

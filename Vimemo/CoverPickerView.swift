@@ -11,12 +11,13 @@ struct CoverPickerView: View {
     @State private var photoFilename: String?
     @State private var importedFilename: String?
     @State private var photoItem: PhotosPickerItem?
-    @State private var preview: UIImage?
+    @StateObject private var preview = CoverPreview()
     @State private var loadingPhoto = false
     @State private var committed = false
     @State private var errorMessage: String?
     @State private var photoTask: Task<Void, Never>?
     @State private var photoGeneration = UUID()
+    @State private var scrubbing = false
 
     init(project: VideoProject, clip: Clip, onSave: @escaping (Double, String?) -> Void) {
         self.project = project; self.clip = clip; self.onSave = onSave
@@ -25,15 +26,21 @@ struct CoverPickerView: View {
     }
 
     private var lastFrame: Double { max(clip.start, clip.end - 1 / max(1, project.frameRate)) }
-    private var previewKey: String { "\(time)|\(photoFilename ?? "video")" }
+    private struct Selection: Equatable {
+        let time: Double
+        let photoFilename: String?
+        let scrubbing: Bool
+    }
+    private var selection: Selection { Selection(time: time, photoFilename: photoFilename, scrubbing: scrubbing) }
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 20) {
                     ZStack {
                         Color.black
-                        if let preview { Image(uiImage: preview).resizable().scaledToFit() }
-                        else { ProgressView().tint(.white) }
+                        if let image = preview.image {
+                            Image(uiImage: image).resizable().scaledToFit().accessibilityIdentifier("coverPreviewImage")
+                        } else { ProgressView().tint(.white).accessibilityIdentifier("coverPreviewLoading") }
                     }.foregroundStyle(.white).frame(height: 290).clipShape(RoundedRectangle(cornerRadius: 20))
                     StudioGlassGroup(spacing: 12) {
                         HStack(spacing: 12) {
@@ -54,15 +61,14 @@ struct CoverPickerView: View {
                         StudioCard {
                             VStack(spacing: 16) {
                                 SectionLabel(title: "挑选视频中的一帧", detail: time.timeLabel)
-                                Slider(value: $time, in: clip.start...max(clip.start + 0.001, lastFrame), step: 1 / max(1, project.frameRate))
+                                Slider(value: $time, in: clip.start...max(clip.start + 0.001, lastFrame), step: 1 / max(1, project.frameRate)) { editing in
+                                    scrubbing = editing
+                                }
                                     .tint(StudioTheme.peach).accessibilityLabel("手动封面时间")
-                                HStack {
-                                    Button { time = max(clip.start, time - 1 / max(1, project.frameRate)) } label: { Label("上一帧", systemImage: "backward.end.fill").frame(minHeight: 44).contentShape(Capsule()) }
-                                    Spacer()
-                                    Button { time = min(lastFrame, time + 1 / max(1, project.frameRate)) } label: { Label("下一帧", systemImage: "forward.end.fill").frame(minHeight: 44).contentShape(Capsule()) }
-                                }.font(.system(size: 13)).foregroundStyle(StudioTheme.accent)
-                                    .studioGlassButton(tint: StudioTheme.accent.opacity(0.08))
-                                Text("第 \(Int((time * project.frameRate).rounded())) 帧 · 从当前片段内选择")
+                                FrameSelectionControl(time: $time, range: clip.start...lastFrame, frameRate: project.frameRate) { _, editing in
+                                    scrubbing = editing
+                                }
+                                Text("左右拖动帧数微调 · 从当前片段内选择")
                                     .font(.caption).foregroundStyle(StudioTheme.secondary)
                             }
                         }
@@ -77,30 +83,34 @@ struct CoverPickerView: View {
                     ToolbarItem(placement: .cancellationAction) { Button("取消") { dismiss() } }
                     ToolbarItem(placement: .confirmationAction) {
                         Button("使用此封面") { onSave(time, photoFilename); committed = true; dismiss() }
-                            .disabled(loadingPhoto || preview == nil).accessibilityIdentifier("confirmCover")
+                            .disabled(loadingPhoto || !preview.isSettled).accessibilityIdentifier("confirmCover")
                     }
                 }
-                .task(id: previewKey) {
-                    preview = nil
-                    do {
-                        var selected = clip; selected.cover = time
-                        let photo = photoFilename.map { store.url(for: $0) }
-                        let image = try await MediaProcessor.cover(source: store.url(for: project.filename), project: project, clip: selected, photo: photo)
-                        guard !Task.isCancelled else { return }
-                        preview = UIImage(cgImage: image)
-                    } catch is CancellationError {} catch { if !Task.isCancelled { errorMessage = error.localizedDescription } }
+                .task {
+                    let renderer = CoverFrameRenderer(source: store.url(for: project.filename), project: project)
+                    preview.configure(cancel: { Task { await renderer.cancel() } }) { time, photo, exact in
+                        try await renderer.frame(time: time, photo: photo, exact: exact)
+                    }
+                    requestPreview(selection)
                 }
+                .onChange(of: selection) { _, selected in requestPreview(selected) }
+                .onChange(of: preview.errorMessage) { _, message in errorMessage = message }
                 .onChange(of: photoItem) { _, item in loadPhoto(item) }
                 .alert("封面选择失败", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
                     Button("好") { errorMessage = nil }
                 } message: { Text(errorMessage ?? "") }
                 .onDisappear {
+                    preview.stop()
                     photoTask?.cancel()
                     if let importedFilename, !committed || importedFilename != photoFilename {
                         try? FileManager.default.removeItem(at: store.url(for: importedFilename))
                     }
                 }
         }
+    }
+
+    private func requestPreview(_ selected: Selection) {
+        preview.request(time: selected.time, photo: selected.photoFilename.map { store.url(for: $0) }, exact: !selected.scrubbing)
     }
 
     private func loadPhoto(_ item: PhotosPickerItem?) {

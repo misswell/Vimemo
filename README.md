@@ -2,9 +2,9 @@
 
 原生 iOS 视频转实况照片工作台。SwiftUI 界面、AVFoundation 编辑与转换、Photos 实况预览和相册保存。最低 iOS 18，支持 iPhone 和 iPad，全部处理在设备本地完成。
 
-## 最新更新（1.0.14）
+## 最新更新（1.0.16）
 
-整体界面向 iOS 27 Apple Music 看齐：系统黑白背景、红粉强调色、SF 系统字体、大标题、封面网格和系统分组设置。底部导航改为原生 TabView，统一浮动 Liquid Glass、选中态与滚动收起；iPad 使用系统顶部标签栏。编辑、导出与购买页共享样式。使用 Xcode 27 SDK 构建，最低仍为 iOS 18。
+封面选帧拖动时持续保留画面，复用视频解码器，并合并密集拖动请求，避免加载动画反复闪现和旧帧排队。拖动时使用轻量预览，松手后精确到所选帧；时间轴封面线可直接拖动，向下拉可慢速精调；上一帧、下一帧之间的帧数也可左右拖动。编辑预览改为按住播放、松手返回封面，右下角扬声器独立控制预览声音，默认静音。动态预览使用源文件原生播放与 GPU 实时构图、调色，避开 iOS 27 的视频合成播放失败；首帧显示前保留封面。沿用 iOS 27 Apple Music 风格和原生 Liquid Glass 导航。
 
 ## 现在可以做什么
 
@@ -139,7 +139,7 @@ swiftc -target arm64-apple-macos14.0 -parse-as-library \
 
 ## GitHub 发布
 
-源码仓库：[misswell/Vimemo](https://github.com/misswell/Vimemo)。当前源码发布版本为 1.0.14，GitHub tag 为 `v1.0.14`；随附 IPA 的 App 版本为 1.0.11（15），使用本机 Xcode 27（27A5209h）与 iOS 27 SDK 构建。此次 GitHub 发布不重复上传 TestFlight。
+源码仓库：[misswell/Vimemo](https://github.com/misswell/Vimemo)。当前源码发布版本为 1.0.16，GitHub tag 为 `v1.0.16`；随附 IPA 的 App 版本为 1.0.11（16），使用稳定版 Xcode 26.6 构建，界面在 iOS 27 验证。
 Release 附带 Apple Distribution 签名的 App Store IPA，仅供 App Store Connect 上传；日常安装请使用下方 TestFlight 邀请。
 `build/`、参考录屏截图、个人 Xcode 配置和签名凭据均不纳入 Git。
 
@@ -148,6 +148,6 @@ Release 附带 Apple Distribution 签名的 App Store IPA，仅供 App Store Con
 1.0.0（1）正式签名包已生成并验证：`build/TestFlight/Export/Vimemo.ipa`。
 归档：`build/TestFlight/Vimemo-1.0.0-1.xcarchive`。中文测试说明：`build/TestFlight/WhatToTest.zh-Hans.txt`。
 2026-10-06 已上传并处理通过，内部测试状态为 `IN_BETA_TESTING`。测试邀请已发送到 `misswell@foxmail.com`，可通过邀请邮件在 iPhone / iPad 的 TestFlight 安装。
-最新内部测试版本为 1.0.11（13），构建 ID `8c26c811-d7ee-485e-b6c7-c7a9c6e4084e`，状态 `VALID`，已加入现有内部测试组。底部导航、草稿快速导出、预览播放和封面操作使用原生液态玻璃；保留深蓝/浅蓝、照片封面及圆角草稿网格，以及跟随系统（默认）/深色/浅色外观。iOS 18–25 使用系统材质兼容，降低透明度时使用实色底。保留固定预览与工具、草稿快速导出/重命名、iPad 双栏、保存草稿开关及 GIF 导出。通过现有邀请在 TestFlight 中覆盖安装，不必先删除应用。TestFlight 内购使用 Apple 沙盒，不实际扣款；商品价格加载失败时可在固定按钮处查看错误并重试。
+最新内部测试版本为 1.0.11（15），构建 ID `aa78729d-70d0-422d-9dc2-1cdea6d58049`，状态 `VALID` / `IN_BETA_TESTING`，已加入现有内部测试组。整体界面对齐 iOS 27 Apple Music，包含原生浮动 TabView、系统黑白背景和红粉强调色。通过现有邀请在 TestFlight 中覆盖安装，不必先删除应用。TestFlight 内购使用 Apple 沙盒，不实际扣款；商品价格加载失败时可在固定按钮处查看错误并重试。
 App Store Connect：[Vimemo 实刻 TestFlight](https://appstoreconnect.apple.com/apps/6819492441/testflight/ios)。
 应用 ID：`6819492441`；构建 ID：`54e012e6-b4cc-4c50-a763-8058c9640432`；内部测试组：`58d7d5de-0316-4bf2-a7a5-5acf1387b9d5`。

@@ -140,7 +140,11 @@ enum MediaProcessor {
         }
         let result = try await generator.image(at: CMTime(seconds: max(0, time), preferredTimescale: 600))
         guard let settings else { return result.image }
-        var image = filtered(CIImage(cgImage: result.image), settings: settings)
+        return try renderFrame(result.image, settings: settings)
+    }
+
+    static func renderFrame(_ source: CGImage, settings: EditSettings) throws -> CGImage {
+        var image = filtered(CIImage(cgImage: source), settings: settings)
         // AVAssetImageGenerator may round one scaled edge down; keep the chosen aspect ratio exact.
         let rawSize = image.extent.size
         var target = rawSize

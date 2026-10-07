@@ -113,12 +113,13 @@ final class ConversionTests: XCTestCase {
         settings.rotation = 1; settings.mirrored = true; settings.ratio = .landscape
         settings.cropY = 0.8; settings.look = .warm; settings.exposure = 0.3
         let project = project(settings: settings)
-        let item = try await MediaProcessor.previewItem(source: source, clip: project.clips[0], settings: settings)
-        let previewGenerator = AVAssetImageGenerator(asset: item.asset)
-        previewGenerator.videoComposition = item.videoComposition
+        let prepared = try await MediaProcessor.previewItem(source: source, clip: project.clips[0], settings: settings)
+        let previewGenerator = AVAssetImageGenerator(asset: prepared.item.asset)
         previewGenerator.requestedTimeToleranceBefore = .zero
         previewGenerator.requestedTimeToleranceAfter = .zero
-        let preview = try await previewGenerator.image(at: CMTime(seconds: 1.25, preferredTimescale: 600)).image
+        let rawPreview = try await previewGenerator.image(at: CMTime(seconds: 2.25, preferredTimescale: 600)).image
+        let rendered = prepared.render(CIImage(cgImage: rawPreview))
+        let preview = try XCTUnwrap(MediaProcessor.context.createCGImage(rendered, from: rendered.extent))
         let cover = try await MediaProcessor.frame(url: source, time: 2.25, settings: settings, maxSize: CGSize(width: 4096, height: 4096))
         XCTAssertEqual(preview.width, cover.width)
         XCTAssertEqual(preview.height, cover.height)
@@ -138,6 +139,56 @@ final class ConversionTests: XCTestCase {
                 for channel in 0..<3 { XCTAssertEqual(Double(a[channel]), Double(b[channel]), accuracy: 6) }
             }
         }
+    }
+
+    @MainActor func testVideoPreviewCanActuallyPlay() async throws {
+        let prepared = try await MediaProcessor.previewItem(source: source, clip: project().clips[0], settings: EditSettings())
+        let item = prepared.item
+        let player = AVPlayer(playerItem: item)
+        let layer = AVPlayerLayer(player: player)
+        layer.frame = CGRect(x: 0, y: 0, width: 240, height: 320)
+        player.isMuted = true
+        await player.seek(to: prepared.start, toleranceBefore: .zero, toleranceAfter: .zero)
+        player.playImmediately(atRate: prepared.rate)
+        defer { player.pause(); layer.player = nil }
+        for _ in 0..<100 {
+            if item.status != .unknown { break }
+            try await Task.sleep(for: .milliseconds(50))
+        }
+        XCTAssertEqual(item.status, .readyToPlay, "\(String(describing: item.error))")
+        try await Task.sleep(for: .milliseconds(700))
+        XCTAssertGreaterThan(player.currentTime().seconds, prepared.start.seconds + 0.1)
+    }
+
+    @MainActor func testPreviewStopsAtClipEndWithSelectedSpeed() async throws {
+        var settings = EditSettings(); settings.speed = 2
+        let prepared = try await MediaProcessor.previewItem(source: source, clip: Clip(start: 1, end: 2.5, cover: 1.5), settings: settings)
+        let player = AVPlayer(playerItem: prepared.item)
+        player.isMuted = true
+        defer { player.pause() }
+        let ended = expectation(forNotification: .AVPlayerItemDidPlayToEndTime, object: prepared.item)
+        let seeked = await player.seek(to: prepared.start, toleranceBefore: .zero, toleranceAfter: .zero)
+        XCTAssertTrue(seeked)
+        player.playImmediately(atRate: prepared.rate)
+        XCTAssertEqual(player.rate, 2)
+        await fulfillment(of: [ended], timeout: 3)
+        XCTAssertEqual(player.currentTime().seconds, 2.5, accuracy: 0.06, "Preview must stop at the clip boundary")
+    }
+
+    @MainActor func testPreviewSoundCanToggleWithoutChangingExportMute() async throws {
+        let source = try XCTUnwrap(Bundle(for: ConversionTests.self).url(forResource: "AudioFixture", withExtension: "mov"))
+        var exportSettings = EditSettings(); exportSettings.muted = true
+        var previewSettings = exportSettings; previewSettings.muted = false
+        let item = try await MediaProcessor.previewItem(source: source, clip: Clip(start: 0, end: 3, cover: 1), settings: previewSettings).item
+        let tracks = try await item.asset.loadTracks(withMediaType: .audio)
+        XCTAssertFalse(tracks.isEmpty, "Preview must retain the source audio for the speaker control")
+        let player = AVPlayer(playerItem: item)
+        player.isMuted = true
+        player.isMuted = false
+        XCTAssertFalse(player.isMuted)
+        XCTAssertTrue(exportSettings.muted, "Preview sound must leave export muted")
+        player.isMuted = true
+        XCTAssertTrue(player.isMuted)
     }
 
     func testAudioPreservedAndMuted() async throws {
