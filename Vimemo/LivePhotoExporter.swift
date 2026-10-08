@@ -86,6 +86,11 @@ actor LivePhotoExporter {
         let videoInput = AVAssetWriterInput(mediaType: .video, outputSettings: [
             AVVideoCodecKey: AVVideoCodecType.h264,
             AVVideoWidthKey: Int(size.width), AVVideoHeightKey: Int(size.height),
+            AVVideoColorPropertiesKey: [
+                AVVideoColorPrimariesKey: AVVideoColorPrimaries_ITU_R_709_2,
+                AVVideoTransferFunctionKey: AVVideoTransferFunction_IEC_sRGB,
+                AVVideoYCbCrMatrixKey: AVVideoYCbCrMatrix_ITU_R_709_2
+            ],
             AVVideoCompressionPropertiesKey: [AVVideoAverageBitRateKey: max(2_000_000, Int(size.width * size.height * 5)), AVVideoExpectedSourceFrameRateKey: 30, AVVideoMaxKeyFrameIntervalKey: 30]
         ])
         videoInput.expectsMediaDataInRealTime = false
@@ -167,7 +172,8 @@ actor LivePhotoExporter {
                     var buffer: CVPixelBuffer?
                     guard CVPixelBufferPoolCreatePixelBuffer(kCFAllocatorDefault, pool, &buffer) == kCVReturnSuccess, let buffer else { throw StudioError.message("可用内存不足，请降低导出尺寸。") }
                     let image = MediaProcessor.filtered(CIImage(cvPixelBuffer: sourceBuffer), settings: settings)
-                    MediaProcessor.context.render(image, to: buffer, bounds: CGRect(origin: .zero, size: size), colorSpace: CGColorSpaceCreateDeviceRGB())
+                    // Render into the transfer function declared by the H.264 stream.
+                    MediaProcessor.context.render(image, to: buffer, bounds: CGRect(origin: .zero, size: size), colorSpace: MediaProcessor.videoColorSpace)
                     let time = CMSampleBufferGetPresentationTimeStamp(sample)
                     guard adaptor.append(buffer, withPresentationTime: time) else { throw writer.error ?? StudioError.message("视频帧写入失败。") }
                     progress(0.05 + 0.8 * min(1, time.seconds / duration))

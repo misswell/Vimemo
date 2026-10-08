@@ -300,30 +300,98 @@ final class StudioFlowTests: XCTestCase {
             XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 8), .completed)
         }
         waitForCrop()
-        XCTAssertEqual(preview.value as? String, "水平 50%，垂直 50%")
+        XCTAssertEqual(preview.value as? String, "水平 50%，垂直 50%，缩放 1.00倍")
         let verticalTravel = preview.frame.height * 0.4
         let center = preview.coordinate(withNormalizedOffset: CGVector(dx: 0.45, dy: 0.45))
         center.press(forDuration: 0.05, thenDragTo: center.withOffset(CGVector(dx: 0, dy: verticalTravel)))
-        XCTAssertEqual(preview.value as? String, "水平 50%，垂直 0%")
+        XCTAssertEqual(preview.value as? String, "水平 50%，垂直 0%，缩放 1.00倍")
         app.buttons["精确位置"].tap()
         XCTAssertEqual(app.sliders["垂直位置"].value as? String, "0%")
         let up = preview.coordinate(withNormalizedOffset: CGVector(dx: 0.45, dy: 0.65))
         up.press(forDuration: 0.05, thenDragTo: up.withOffset(CGVector(dx: 0, dy: -verticalTravel)))
-        XCTAssertEqual(preview.value as? String, "水平 50%，垂直 100%")
+        XCTAssertEqual(preview.value as? String, "水平 50%，垂直 100%，缩放 1.00倍")
         app.buttons["旋转 90°"].tap()
         waitForCrop()
         let right = preview.coordinate(withNormalizedOffset: CGVector(dx: 0.45, dy: 0.45))
         right.press(forDuration: 0.05, thenDragTo: right.withOffset(CGVector(dx: preview.frame.width * 0.4, dy: 0)))
-        XCTAssertEqual(preview.value as? String, "水平 0%，垂直 100%")
+        XCTAssertEqual(preview.value as? String, "水平 0%，垂直 100%，缩放 1.00倍")
         preview.press(forDuration: 0.7)
-        XCTAssertEqual(preview.value as? String, "水平 0%，垂直 100%", "Holding must preview without changing the crop")
+        XCTAssertEqual(preview.value as? String, "水平 0%，垂直 100%，缩放 1.00倍", "Holding must preview without changing the crop")
         screenshot(app, name: "drag-to-position-crop")
         app.buttons["返回工作台"].tap()
         app.terminate(); app.launch()
         XCTAssertTrue(app.buttons["editorTool1"].waitForExistence(timeout: 10))
         app.buttons["editorTool1"].tap()
         waitForCrop()
-        XCTAssertEqual(preview.value as? String, "水平 0%，垂直 100%")
+        XCTAssertEqual(preview.value as? String, "水平 0%，垂直 100%，缩放 1.00倍")
+    }
+
+    @MainActor func testPinchZoomPersistsAndDoubleTapRecentersWithLandscapeFullWidth() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["--test-library", UUID().uuidString, "--demo-editor", "--test-preview-gestures"]
+        app.launch()
+        XCTAssertTrue(app.buttons["editorTool1"].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.buttons["自动选清晰封面"].exists)
+        app.buttons["editorTool1"].tap()
+        let preview = app.buttons["previewPlayback"]
+        let ready = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value CONTAINS %@", "水平"), object: preview)
+        XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 10), .completed)
+        preview.pinch(withScale: 1.8, velocity: 1)
+        func zoom() -> Double {
+            let value = preview.value as? String ?? ""
+            return Double(value.components(separatedBy: "缩放 ").last?.replacingOccurrences(of: "倍", with: "") ?? "") ?? 0
+        }
+        XCTAssertGreaterThan(zoom(), 1.2)
+        XCTAssertEqual(app.staticTexts["holdPreviewReport"].value as? String, "0", "Pinch must not trigger playback")
+        let center = preview.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        center.press(forDuration: 0.05, thenDragTo: center.withOffset(CGVector(dx: -20, dy: 15)))
+        let saved = preview.value as? String
+        app.buttons["返回工作台"].tap(); app.terminate(); app.launch()
+        XCTAssertTrue(app.buttons["editorTool1"].waitForExistence(timeout: 10))
+        app.buttons["editorTool1"].tap()
+        let restored = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == %@", saved ?? ""), object: preview)
+        XCTAssertEqual(XCTWaiter.wait(for: [restored], timeout: 10), .completed)
+        preview.doubleTap()
+        XCTAssertEqual(preview.value as? String, "水平 50%，垂直 50%，缩放 1.00倍")
+        app.buttons["16:9"].tap()
+        XCTAssertEqual(preview.frame.width / preview.frame.height, 16.0 / 9, accuracy: 0.02)
+        let canvas = app.descendants(matching: .any)["editorPreview"].firstMatch
+        XCTAssertEqual(preview.frame.width, canvas.frame.width, accuracy: 1)
+        screenshot(app, name: "landscape-full-width-after-recenter")
+        app.buttons["editorTool2"].tap()
+        app.buttons["胶片"].tap()
+        app.buttons["editorTool1"].tap()
+        preview.pinch(withScale: 1.5, velocity: 1)
+        preview.doubleTap()
+        app.buttons["makeLivePhotos"].tap()
+        let export = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "exportClipPreview-")).firstMatch
+        XCTAssertTrue(export.waitForExistence(timeout: 10))
+        XCTAssertTrue((export.value as? String ?? "").contains("胶片"), "Recenter must preserve color settings")
+        XCTAssertEqual(export.frame.width / export.frame.height, 16.0 / 9, accuracy: 0.02)
+    }
+
+    @MainActor func testHoldPlaybackAcrossCanvasAndSoundButtonDoesNotToggleMute() throws {
+        let fixture = try XCTUnwrap(Bundle(for: StudioFlowTests.self).url(forResource: "AudioFixture", withExtension: "mov"))
+        let app = XCUIApplication()
+        app.launchArguments = ["--test-library", UUID().uuidString, "--test-editor-video", fixture.path, "--test-preview-gestures"]
+        app.launch()
+        let preview = app.buttons["previewPlayback"], sound = app.buttons["previewSound"]
+        XCTAssertTrue(sound.waitForExistence(timeout: 10))
+        let report = app.staticTexts["holdPreviewReport"]
+        let live = app.descendants(matching: .any)["previewLiveBadge"].firstMatch
+        func hold(_ point: XCUICoordinate) {
+            let before = Int(report.value as? String ?? "0") ?? 0
+            point.press(forDuration: 1.2)
+            XCTAssertGreaterThan(Int(report.value as? String ?? "0") ?? 0, before, "Hold must produce actual playing frames")
+            XCTAssertEqual(preview.value as? String, "封面", "Release must return to the cover")
+        }
+        hold(live.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)))
+        hold(sound.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)))
+        XCTAssertEqual(sound.value as? String, "有声", "Holding the sound region must not toggle mute")
+        sound.tap(); XCTAssertEqual(sound.value as? String, "静音")
+        hold(preview.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)))
+        XCTAssertEqual(sound.value as? String, "静音")
+        screenshot(app, name: "whole-canvas-hold-preview")
     }
 
     @MainActor func testAppearanceSwitchingAndPersistence() throws {

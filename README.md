@@ -2,7 +2,13 @@
 
 原生 iOS 视频转实况照片工作台。SwiftUI 界面、AVFoundation 编辑与转换、Photos 实况预览和相册保存。最低 iOS 18，支持 iPhone 和 iPad，全部处理在设备本地完成。
 
-## 最新更新（1.0.20）
+## 最新更新（1.0.21）
+
+移除自动选帧，封面由手动逐帧或相册照片选择。编辑预览支持双指 1–4 倍缩放，双击恢复居中与 1 倍，保留比例、旋转和调色；放大后可拖动定位，缩放随草稿保存，并同步到封面、动态预览和所有导出格式。预览区增高，16:9 画面可铺满可用宽度。
+
+按住播放扩展到整个上部预览区，包括 LIVE、留白和右下角声音图标的位置；松手回封面。轻点声音图标仍切换作品声音，长按不切换静音。
+
+视频编码使用与渲染一致的 sRGB 色彩定义，减少实际 MOV 输出与封面、预览的亮度差异。
 
 裁剪片段两端拖柄与选区边框按缩略图条垂直居中；精确裁剪加减按钮缩小为 28 点的普通样式，保留 44 点触控范围。移除「发现更多片段」，使用片段栏加号添加片段。
 
@@ -21,7 +27,7 @@
 ## 现在可以做什么
 
 - 从系统照片选择器一次导入最多 20 个视频，也可从文件 App 多选导入；单个视频导入后直接进入编辑器。
-- 拖动时间轴裁剪和移动片段；逐帧调整入点、出点和封面；通过实际帧的清晰度比较自动选择封面。
+- 拖动时间轴裁剪和移动片段；逐帧调整入点、出点和封面，支持相册照片封面。
 - 独立封面选择界面：从片段内任意一帧挑选，或选择相册照片，封面随草稿保存。
 - 一次性购买后，设置中可开启“不限制时长”，选择整段视频；默认仍为 3 秒，关闭开关时自动缩短已有片段。
 - 每个视频最多保存 20 个片段，使用片段栏的加号添加。
@@ -65,7 +71,7 @@ App Store Connect 商品与价格已配置；首次内购须随应用版本提�
 | 图片和 GIF 独立导出 | JPG、MOV、GIF、Live Photo 独立输出 |
 | — | 六种滤镜、调色、倍速、静音、离线处理、无水印 |
 
-候选片段按时间取样，不声称识别人脸、场景或精彩内容。自动选封面使用拉普拉斯方差和曝光裁切惩罚比较帧清晰度。
+封面由用户手动逐帧选择或从相册选取照片，不自动选帧。
 
 ## 运行
 
@@ -142,7 +148,7 @@ swiftc -target arm64-apple-macos14.0 -parse-as-library \
 - `ProjectStore.swift`：本机库、导入、自动保存、批量队列。
 - `MediaProcessor.swift` / `PreviewCompositor.swift`：构图、色彩、预览。
 - `LivePhotoExporter.swift`：配对照片/视频、音频、GIF、相册保存。
-- `FrameAnalysis.swift`：清晰度封面选择。
+- `CropPositionPreview.swift`：构图拖动、双指缩放与双击回正。
 - `HomeView.swift` / `EditorView.swift` / `TimelineView.swift`：工作台和编辑。
 - `CoverPickerView.swift`：视频逐帧与相册照片封面选择。
 - `PurchaseStore.swift` / `UnlimitedPurchaseView.swift`：StoreKit 2 购买、恢复、权益验证与长导出权限。
@@ -154,7 +160,7 @@ swiftc -target arm64-apple-macos14.0 -parse-as-library \
 
 ## GitHub 发布
 
-源码仓库：[misswell/Vimemo](https://github.com/misswell/Vimemo)。当前源码发布版本为 1.0.20，GitHub tag 为 `v1.0.20`；随附 IPA 的 App 版本为 1.0.11（20），使用 Xcode 27（27A266a）及 iOS 27 SDK 构建。本轮 iPhone / iPad 回归使用本机可用的 iOS 26.3 模拟器运行时；尚未进行 iOS 27 运行时验证。
+源码仓库：[misswell/Vimemo](https://github.com/misswell/Vimemo)。当前源码发布版本为 1.0.21，GitHub tag 为 `v1.0.21`；随附 IPA 的 App 版本为 1.0.11（21），使用 Xcode 27（27A266a）及 iOS 27 SDK 构建。本轮 iPhone / iPad 回归使用本机可用的 iOS 26.3.1 模拟器运行时；尚未进行 iOS 27 运行时验证。
 Release 附带 Apple Distribution 签名的 App Store IPA，仅供 App Store Connect 上传；日常安装请使用下方 TestFlight 邀请。
 `build/`、参考录屏截图、个人 Xcode 配置和签名凭据均不纳入 Git。
 
@@ -167,4 +173,4 @@ Release 附带 Apple Distribution 签名的 App Store IPA，仅供 App Store Con
 App Store Connect：[Vimemo 实刻 TestFlight](https://appstoreconnect.apple.com/apps/6819492441/testflight/ios)。
 应用 ID：`6819492441`；构建 ID：`54e012e6-b4cc-4c50-a763-8058c9640432`；内部测试组：`58d7d5de-0316-4bf2-a7a5-5acf1387b9d5`。
 
-2026-10-08 已提交 App Store 1.0.11（18）与不限制时长内购审核；提交时状态为 `WAITING_FOR_REVIEW`。同日按用户要求将构建 20 上传并分发到 TestFlight 内部组，未替换已提交审核的构建 18。
+2026-10-08 已提交 App Store 1.0.11（18）与不限制时长内购审核；提交时状态为 `WAITING_FOR_REVIEW`。同日按用户要求将构建 20 上传并分发到 TestFlight 内部组，未替换已提交审核的构建 18。本次 GitHub 构建 21 不自动重复上传 TestFlight。

@@ -36,7 +36,7 @@ final class ConversionTests: XCTestCase {
 
     func testLivePhotoPairIsRecognizedAndMetadataMatches() async throws {
         var settings = EditSettings()
-        settings.preserveLocation = true
+        settings.preserveLocation = true; settings.cropZoom = 1.8; settings.cropX = 0.35
         let project = project(settings: settings)
         let output = try await LivePhotoExporter().export(source: source, project: project, clip: project.clips[0], directory: folder.appendingPathComponent("Live")) { _ in }
         XCTAssertEqual(output.urls.count, 2)
@@ -112,6 +112,7 @@ final class ConversionTests: XCTestCase {
         var settings = EditSettings()
         settings.rotation = 1; settings.mirrored = true; settings.ratio = .landscape
         settings.cropY = 0.8; settings.look = .warm; settings.exposure = 0.3
+        settings.cropZoom = 2.25; settings.cropX = 0.3
         let project = project(settings: settings)
         let prepared = try await MediaProcessor.previewItem(source: source, clip: project.clips[0], settings: settings)
         let previewGenerator = AVAssetImageGenerator(asset: prepared.item.asset)
@@ -137,6 +138,17 @@ final class ConversionTests: XCTestCase {
                 let region = CGRect(x: x * preview.width / 2, y: y * preview.height / 2, width: preview.width / 2, height: preview.height / 2)
                 let a = average(preview.cropping(to: region)!), b = average(cover.cropping(to: region)!)
                 for channel in 0..<3 { XCTAssertEqual(Double(a[channel]), Double(b[channel]), accuracy: 6) }
+            }
+        }
+        let output = try await LivePhotoExporter().export(source: source, project: project, clip: project.clips[0], directory: folder.appendingPathComponent("ZoomedPreview")) { _ in }
+        let movie = try XCTUnwrap(output.urls.first { $0.pathExtension.lowercased() == "mov" })
+        let exported = try await MediaProcessor.frame(url: movie, time: 2.25 - project.clips[0].start, maxSize: CGSize(width: 4096, height: 4096))
+        XCTAssertEqual(exported.width, preview.width); XCTAssertEqual(exported.height, preview.height)
+        for x in 0..<2 {
+            for y in 0..<2 {
+                let region = CGRect(x: x * preview.width / 2, y: y * preview.height / 2, width: preview.width / 2, height: preview.height / 2)
+                let a = average(preview.cropping(to: region)!), b = average(exported.cropping(to: region)!)
+                for channel in 0..<3 { XCTAssertEqual(Double(a[channel]), Double(b[channel]), accuracy: 8, "Zoomed exported video must match preview") }
             }
         }
     }
@@ -258,17 +270,6 @@ final class ConversionTests: XCTestCase {
         do { _ = try await task.value; XCTFail("Cancelled export must not succeed") }
         catch is CancellationError {}
         XCTAssertFalse(FileManager.default.fileExists(atPath: directory.path))
-    }
-
-    func testClearCoverSelectionStaysInsideTrimAndDetectsDetail() async throws {
-        let clip = Clip(start: 2, end: 4, cover: 3)
-        let time = try await FrameAnalysis.bestCover(source: source, clip: clip, settings: EditSettings())
-        XCTAssertGreaterThanOrEqual(time, clip.start)
-        XCTAssertLessThan(time, clip.end)
-        let frame = try await MediaProcessor.frame(url: source, time: time)
-        let flat = CGContext(data: nil, width: 192, height: 192, bitsPerComponent: 8, bytesPerRow: 192 * 4, space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
-        flat.setFillColor(CGColor(gray: 0.5, alpha: 1)); flat.fill(CGRect(x: 0, y: 0, width: 192, height: 192))
-        XCTAssertGreaterThan(FrameAnalysis.score(frame), FrameAnalysis.score(flat.makeImage()!))
     }
 
     func testSourceWithRotationMetadataExportsUpright() async throws {

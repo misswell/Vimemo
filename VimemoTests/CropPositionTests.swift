@@ -18,6 +18,32 @@ final class CropPositionTests: XCTestCase {
         XCTAssertEqual(position.x, 0)
         XCTAssertEqual(position.y, 0.7)
     }
+    func testPinchKeepsImagePointUnderMovingFingersAndAllowsBothAxesToPan() {
+        let start = CropPositionGeometry(imageSize: CGSize(width: 800, height: 400), viewport: CGSize(width: 200, height: 200))
+        let point = start.imagePoint(at: CGPoint(x: 80, y: 100), position: CGPoint(x: 0.5, y: 0.5))
+        let zoomed = CropPositionGeometry(imageSize: start.imageSize, viewport: start.viewport, zoom: 2)
+        let anchor = CGPoint(x: 100, y: 120)
+        let position = zoomed.position(keeping: point, at: anchor)
+        let actual = zoomed.imagePoint(at: anchor, position: position)
+        XCTAssertEqual(actual.x, point.x, accuracy: 0.0001)
+        XCTAssertEqual(actual.y, point.y, accuracy: 0.0001)
+        let moved = zoomed.position(from: position, translation: CGSize(width: 30, height: 20))
+        XCTAssertLessThan(moved.x, position.x); XCTAssertLessThan(moved.y, position.y)
+        XCTAssertEqual(zoomed.position(from: moved, translation: CGSize(width: 9999, height: -9999)), CGPoint(x: 0, y: 1))
+    }
+    func testOldSettingsDefaultToOneAndZoomRoundTripsWithoutChangingOutputSize() throws {
+        let decoder = JSONDecoder(), encoder = JSONEncoder()
+        var settings = try decoder.decode(EditSettings.self, from: encoder.encode(EditSettings()))
+        XCTAssertEqual(settings.effectiveCropZoom, 1)
+        let base = MediaProcessor.dimensions(CGSize(width: 960, height: 1280), settings: settings)
+        settings.cropZoom = 2.25; settings.cropX = 0.25
+        let restored = try decoder.decode(EditSettings.self, from: encoder.encode(settings))
+        XCTAssertEqual(restored.effectiveCropZoom, 2.25); XCTAssertEqual(restored.cropX, 0.25)
+        XCTAssertEqual(MediaProcessor.dimensions(CGSize(width: 960, height: 1280), settings: restored), base)
+        settings.cropZoom = 0.1; XCTAssertEqual(settings.effectiveCropZoom, 1)
+        settings.cropZoom = 99; XCTAssertEqual(settings.effectiveCropZoom, 4)
+        settings.cropZoom = .nan; XCTAssertEqual(settings.effectiveCropZoom, 1)
+    }
     func testUncroppedCanvasRegionMatchesVideoAndPhotoCoverPipeline() async throws {
         let source = try XCTUnwrap(Bundle(for: ProjectStore.self).url(forResource: "Demo", withExtension: "mov"))
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
@@ -35,7 +61,9 @@ final class CropPositionTests: XCTestCase {
                 project.settings.ratio = .square; project.settings.rotation = rotation
                 project.settings.mirrored = true; project.settings.look = .warm
                 let full = try await MediaProcessor.uncroppedCover(source: source, project: project, clip: project.clips[0], photo: input)
-                let layout = CropPositionGeometry(imageSize: CGSize(width: full.width, height: full.height), viewport: CGSize(width: 200, height: 200))
+                for zoom in [1.0, 2.25] {
+                project.settings.cropZoom = zoom
+                let layout = CropPositionGeometry(imageSize: CGSize(width: full.width, height: full.height), viewport: CGSize(width: 200, height: 200), zoom: zoom)
                 for position in [0.0, 0.25, 1.0] {
                     project.settings.cropX = position; project.settings.cropY = position
                     let rect = CGRect(x: layout.overflow.width * position / layout.scale, y: layout.overflow.height * position / layout.scale,
@@ -44,6 +72,7 @@ final class CropPositionTests: XCTestCase {
                     let expected = try await MediaProcessor.cover(source: source, project: project, clip: project.clips[0], photo: input)
                     let lhs = sample(canvas), rhs = sample(expected)
                     for channel in 0..<3 { XCTAssertEqual(Double(lhs[channel]), Double(rhs[channel]), accuracy: 3, "Dragged canvas must agree with the saved cover, including photo rotation and mirroring") }
+                }
                 }
             }
         }

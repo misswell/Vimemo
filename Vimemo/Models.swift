@@ -73,6 +73,9 @@ struct EditSettings: Codable, Equatable {
     var format: OutputFormat = .livePhoto
     var cropX: Double = 0.5
     var cropY: Double = 0.5
+    var cropZoom: Double? = nil
+    var effectiveCropZoom: Double { Self.clampedCropZoom(cropZoom ?? 1) }
+    static func clampedCropZoom(_ value: Double) -> Double { value.isFinite ? min(4, max(1, value)) : 1 }
     var gifSize: GIFSize? = nil
     var gifFrameRate: GIFFrameRate? = nil
     var effectiveGIFSize: GIFSize { gifSize ?? .standard }

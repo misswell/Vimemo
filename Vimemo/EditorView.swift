@@ -29,8 +29,16 @@ struct EditorView: View {
     @State private var previewTask: Task<Void, Never>?
     @State private var playerObserver: NSObjectProtocol?
     @State private var previewGeneration = UUID()
-    @State private var findingCover = false
-    @State private var coverTask: Task<Void, Never>?
+    #if DEBUG
+    @State private var holdPlaybackCount = 0
+    @State private var countedHoldGeneration: UUID?
+    @State private var gestureObserver: Any?
+    private var testsPreviewGestures: Bool {
+        let args = ProcessInfo.processInfo.arguments
+        guard args.contains("--test-preview-gestures"), let index = args.firstIndex(of: "--test-library"), index + 1 < args.count else { return false }
+        return UUID(uuidString: args[index + 1]) != nil
+    }
+    #endif
 
     init(project: VideoProject) {
         _project = State(initialValue: project)
@@ -48,20 +56,20 @@ struct EditorView: View {
         MediaProcessor.dimensions(CGSize(width: project.width, height: project.height), settings: project.settings)
     }
 
-    private var croppingEnabled: Bool { tool == 1 && project.settings.ratio != .original }
+    private var croppingEnabled: Bool { tool == 1 || project.settings.effectiveCropZoom > 1 }
     private struct CropSource: Equatable {
         let settings: EditSettings
         let time: Double
         let photo: String?
+        let seeking: Bool
     }
-    private var cropSource: CropSource? {
-        guard croppingEnabled else { return nil }
+    private var cropSource: CropSource {
         var settings = project.settings
-        settings.ratio = .original; settings.cropX = 0.5; settings.cropY = 0.5
-        return CropSource(settings: settings, time: clip.cover, photo: clip.coverPhotoFilename)
+        settings.ratio = .original; settings.cropX = 0.5; settings.cropY = 0.5; settings.cropZoom = nil
+        return CropSource(settings: settings, time: timelineSeeking ? 0 : clip.cover, photo: clip.coverPhotoFilename, seeking: timelineSeeking)
     }
     private var cropPositionDescription: String {
-        "水平 \(Int((project.settings.cropX * 100).rounded()))%，垂直 \(Int((project.settings.cropY * 100).rounded()))%"
+        "水平 \(Int((project.settings.cropX * 100).rounded()))%，垂直 \(Int((project.settings.cropY * 100).rounded()))%，缩放 \(String(format: "%.2f", project.settings.effectiveCropZoom))倍"
     }
 
     private func previewSize(availableWidth: CGFloat, maxHeight: CGFloat) -> CGSize {
@@ -77,8 +85,9 @@ struct EditorView: View {
                 StudioTheme.background.ignoresSafeArea()
                 GeometryReader { geometry in
                     if geometry.size.width > 700 {
-                        let canvasSize = CGSize(width: geometry.size.width * 0.46,
-                                                height: min(520, max(260, geometry.size.height - 92)))
+                        let canvasWidth = geometry.size.width * 0.46
+                        let canvasSize = CGSize(width: canvasWidth,
+                                                height: max(canvasWidth * 9 / 16, min(520, max(260, geometry.size.height - 92))))
                         let previewSize = previewSize(availableWidth: canvasSize.width, maxHeight: canvasSize.height)
                         HStack(alignment: .top, spacing: 24) {
                             VStack(spacing: 12) {
@@ -88,8 +97,9 @@ struct EditorView: View {
                             editorPanels
                         }.padding(.horizontal, 24).padding(.vertical, 12)
                     } else {
-                        let canvasSize = CGSize(width: geometry.size.width - 32,
-                                                height: min(280, max(136, geometry.size.height * 0.34)))
+                        let canvasWidth = geometry.size.width - 32
+                        let canvasSize = CGSize(width: canvasWidth,
+                                                height: max(canvasWidth * 9 / 16, min(320, max(160, geometry.size.height * 0.38))))
                         let previewSize = previewSize(availableWidth: canvasSize.width, maxHeight: canvasSize.height)
                         VStack(spacing: 0) {
                             preview(imageSize: previewSize, canvasSize: canvasSize)
@@ -99,6 +109,12 @@ struct EditorView: View {
                         }
                     }
                 }
+                #if DEBUG
+                if testsPreviewGestures {
+                    Text("预览播放检测").font(.system(size: 1)).frame(width: 1, height: 1).opacity(0.01)
+                        .accessibilityIdentifier("holdPreviewReport").accessibilityValue(String(holdPlaybackCount)).allowsHitTesting(false)
+                }
+                #endif
             }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -146,6 +162,18 @@ struct EditorView: View {
                 Button("保存") { let title = titleDraft.trimmingCharacters(in: .whitespacesAndNewlines); if !title.isEmpty { project.title = title } }
             }
             .task {
+                #if DEBUG
+                if testsPreviewGestures, gestureObserver == nil {
+                    gestureObserver = player.addPeriodicTimeObserver(forInterval: CMTime(seconds: 0.05, preferredTimescale: 600), queue: .main) { time in
+                        Task { @MainActor in
+                            if previewHeld && playing && playerFrameReady && player.rate > 0,
+                               time.seconds > clip.start + 0.1, countedHoldGeneration != playbackGeneration {
+                                countedHoldGeneration = playbackGeneration; holdPlaybackCount += 1
+                            }
+                        }
+                    }
+                }
+                #endif
                 await loadThumbnails()
                 refreshPreview()
             }
@@ -158,7 +186,8 @@ struct EditorView: View {
                 if previousPicture != current && !cropDragging { refreshPreview() }
             }
             .task(id: cropSource) {
-                guard let selection = cropSource else { cropPreview.stop(); return }
+                let selection = cropSource
+                if selection.seeking { cropPreview.stop(); return }
                 var snapshot = project; snapshot.settings = selection.settings
                 let source = sourceURL, selectedClip = clip
                 cropPreview.configure { _, photo, _ in
@@ -189,7 +218,10 @@ struct EditorView: View {
             .onChange(of: project.title) { _, _ in store.update(project) }
             .onChange(of: activeClipID) { _, _ in refreshPreview() }
             .onDisappear {
-                stopPlayback(); previewTask?.cancel(); framePreview.stop(); cropPreview.stop(); coverTask?.cancel()
+                #if DEBUG
+                if let gestureObserver { player.removeTimeObserver(gestureObserver); self.gestureObserver = nil }
+                #endif
+                stopPlayback(); previewTask?.cancel(); framePreview.stop(); cropPreview.stop()
                 previewGeneration = UUID(); preparedPreview = nil
                 if let playerObserver { NotificationCenter.default.removeObserver(playerObserver) }
                 store.update(project); store.persist()
@@ -218,11 +250,9 @@ struct EditorView: View {
                 Color.black
                 PreviewSurface(player: player, preview: preparedPreview, playing: playing) { ready in playerFrameReady = ready }
                 if !playing || !playerFrameReady {
-                    if croppingEnabled, cropPreview.isSettled, let image = cropPreview.image {
-                        CropPositionPreview(image: image, x: $project.settings.cropX, y: $project.settings.cropY) { editing in
-                            cropDragging = editing
-                            if editing { stopPlayback() } else { refreshPreview() }
-                        }
+                    if cropPreview.isSettled, let image = cropPreview.image {
+                        CropPositionPreview(image: image, x: project.settings.cropX, y: project.settings.cropY,
+                                            zoom: project.settings.effectiveCropZoom, editing: cropDragging)
                     } else if let coverImage = framePreview.image {
                         Image(uiImage: coverImage).resizable().scaledToFit().frame(maxWidth: .infinity, maxHeight: .infinity)
                     } else { ProgressView().tint(.white).frame(maxWidth: .infinity, maxHeight: .infinity) }
@@ -231,15 +261,20 @@ struct EditorView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 20))
                 .overlay(RoundedRectangle(cornerRadius: 20).stroke(StudioTheme.line, lineWidth: 1))
                 .contentShape(Rectangle())
-                .simultaneousGesture(LongPressGesture(minimumDuration: croppingEnabled ? 0.35 : 0.15, maximumDistance: croppingEnabled ? 6 : 32)
-                    .sequenced(before: DragGesture(minimumDistance: 0))
-                    .updating($previewHeld) { value, held, _ in
-                        if case .second(true, _) = value { held = true }
-                    })
+                .overlay {
+                    CropGestureSurface(imageSize: cropPreview.image?.size ?? previewDimensions,
+                                       x: $project.settings.cropX, y: $project.settings.cropY, zoom: $project.settings.cropZoom,
+                                       canPan: croppingEnabled, ready: cropPreview.isSettled,
+                                       onEditing: { editing in
+                                           cropDragging = editing
+                                           if editing { stopPlayback() } else { refreshPreview() }
+                                       })
+                }
                 .accessibilityElement(children: .ignore).accessibilityAddTraits(.isButton)
                 .accessibilityLabel(playing ? "松手返回封面" : (croppingEnabled ? "拖动调整裁剪位置" : "按住预览实况"))
                 .accessibilityValue(playing ? "正在播放" : (croppingEnabled ? (cropPreview.isSettled ? cropPositionDescription : "正在准备裁剪画面") : "封面"))
-                .accessibilityHint(croppingEnabled ? "拖动画面调整裁剪位置，按住预览。可用精确位置调整水平与垂直位置。" : "按住播放，松手停止。使用旁白时双击切换播放。")
+                .accessibilityHint("双指缩放，双击居中并恢复1倍；构图时可拖动，按住播放，松手停止。使用旁白时双击切换播放。")
+                .accessibilityAction(named: Text("回正画面")) { recenterPicture() }
                 .accessibilityAction {
                     if playing { stopPlayback() }
                     else { accessiblePlayback = true; startPlayback() }
@@ -263,13 +298,20 @@ struct EditorView: View {
                     .shadow(color: badgesOverImage ? .black.opacity(0.65) : .clear, radius: 3, y: 1)
                     .frame(width: 44, height: 44).contentShape(Circle())
             }.buttonStyle(.plain).padding(13)
+                .highPriorityGesture(LongPressGesture(minimumDuration: 0.35).onEnded { _ in })
                 .disabled(!project.hasAudio)
                 .accessibilityLabel(project.hasAudio ? (project.settings.muted ? "开启作品声音" : "静音作品") : "原视频没有声音")
                 .accessibilityValue(project.settings.muted || !project.hasAudio ? "静音" : "有声")
-                .accessibilityHint("同时控制预览和导出声音")
+                .accessibilityHint("轻点切换作品声音，按住预览实况")
                 .accessibilityIdentifier("previewSound")
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
         }.frame(width: canvasSize.width, height: canvasSize.height)
+            .contentShape(Rectangle())
+            .simultaneousGesture(LongPressGesture(minimumDuration: 0.35, maximumDistance: 6)
+                .sequenced(before: DragGesture(minimumDistance: 0))
+                .updating($previewHeld) { value, held, _ in
+                    if case .second(true, _) = value { held = true }
+                })
             .accessibilityElement(children: .contain).accessibilityIdentifier("editorPreview")
     }
 
@@ -306,7 +348,6 @@ struct EditorView: View {
                 SectionLabel(title: "裁剪片段", detail: "原视频 \(project.duration.timeLabel)")
                 TimelineView(clip: clipBinding, duration: project.duration, speed: project.settings.speed, maxOutputDuration: project.settings.maxOutputDuration, thumbnails: thumbnails, frameRate: project.frameRate) { time, editing in
                     timelineSeeking = editing
-                    coverTask?.cancel()
                     seekFrame(time, scrubbing: editing)
                 }
                 if project.settings.maxOutputDuration == nil {
@@ -317,7 +358,6 @@ struct EditorView: View {
                     }.font(.system(size: 12, weight: .medium)).accessibilityIdentifier("useFullVideo")
                 }
                 FrameSelectionControl(time: Binding(get: { clip.cover }, set: { time in
-                    coverTask?.cancel()
                     project.clips[clipIndex].coverPhotoFilename = nil
                     project.clips[clipIndex].cover = time
                 }), range: clip.start...max(clip.start, clip.end - 1 / max(1, project.frameRate)), frameRate: project.frameRate, photoCover: clip.coverPhotoFilename != nil, identifierPrefix: "timeline") { time, editing in
@@ -378,7 +418,7 @@ struct EditorView: View {
         StudioGlassGroup {
             HStack(spacing: 12) {
                 Button {
-                    coverTask?.cancel(); findingCover = false; playing = false; player.pause(); showCoverPicker = true
+                    stopPlayback(); showCoverPicker = true
                 } label: {
                     Label("选择封面", systemImage: "photo.on.rectangle").font(.system(size: 13, weight: .semibold))
                         .padding(.horizontal, 16).frame(minHeight: 44).contentShape(Capsule())
@@ -386,13 +426,6 @@ struct EditorView: View {
                 Spacer(minLength: 0)
                 if clip.coverPhotoFilename != nil {
                     Text("已使用相册照片作为封面").font(.system(size: 10)).foregroundStyle(StudioTheme.secondary).lineLimit(2)
-                } else {
-                    Button { findClearCover() } label: {
-                        Group {
-                            if findingCover { ProgressView().controlSize(.small) }
-                            else { Label("自动选帧", systemImage: "sparkle").font(.system(size: 12)) }
-                        }.padding(.horizontal, 16).frame(minHeight: 44).contentShape(Capsule())
-                    }.studioGlassButton().disabled(findingCover).accessibilityLabel("自动选清晰封面")
                 }
             }.buttonStyle(.plain)
         }
@@ -400,7 +433,10 @@ struct EditorView: View {
     private func resetPicture() {
         project.settings.ratio = .original; project.settings.rotation = 0; project.settings.mirrored = false
         project.settings.look = .original; project.settings.exposure = 0; project.settings.contrast = 1; project.settings.saturation = 1
-        project.settings.cropX = 0.5; project.settings.cropY = 0.5
+        recenterPicture()
+    }
+    private func recenterPicture() {
+        stopPlayback(); project.settings.cropX = 0.5; project.settings.cropY = 0.5; project.settings.cropZoom = nil
     }
     @ViewBuilder private var toolPanel: some View {
         switch tool {
@@ -420,14 +456,12 @@ struct EditorView: View {
                     PillButton(title: "旋转 90°") { project.settings.rotation = (project.settings.rotation + 1) % 4 }
                     PillButton(title: "水平翻转", selected: project.settings.mirrored) { project.settings.mirrored.toggle() }
                 }
-                if project.settings.ratio != .original {
-                    Text("拖动画面调整裁剪位置 · 按住预览")
+                Text("双指缩放 · 双击回正 · 拖动构图 · 按住预览")
                         .font(.caption).foregroundStyle(StudioTheme.secondary)
                     DisclosureGroup("精确位置") {
                         adjustment("水平位置", value: $project.settings.cropX, range: 0...1).padding(.top, 8)
                         adjustment("垂直位置", value: $project.settings.cropY, range: 0...1)
                     }.font(.caption)
-                }
             }
         }
     }
@@ -474,20 +508,6 @@ struct EditorView: View {
             if let frame = try? await generator.image(at: CMTime(seconds: time, preferredTimescale: 600)) { frames.append(UIImage(cgImage: frame.image)) }
         }
         thumbnails = frames
-    }
-    private func findClearCover() {
-        guard !findingCover else { return }
-        findingCover = true
-        let selectedClip = clip, settings = project.settings, source = sourceURL
-        coverTask = Task {
-            defer { findingCover = false }
-            do {
-                let time = try await FrameAnalysis.bestCover(source: source, clip: selectedClip, settings: settings)
-                guard !Task.isCancelled, activeClipID == selectedClip.id, project.settings == settings, clip == selectedClip else { return }
-                project.clips[clipIndex].coverPhotoFilename = nil
-                project.clips[clipIndex].cover = time
-            } catch is CancellationError {} catch { store.errorMessage = "自动选帧失败：\(error.localizedDescription)" }
-        }
     }
     private func seekFrame(_ time: Double, scrubbing: Bool = false) {
         stopPlayback()

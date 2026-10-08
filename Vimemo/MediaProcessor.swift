@@ -5,6 +5,7 @@ import UniformTypeIdentifiers
 
 enum MediaProcessor {
     static let context = CIContext(options: [.cacheIntermediates: false])
+    static let videoColorSpace = CGColorSpace(name: CGColorSpace.sRGB)!
 
     static func filtered(_ source: CIImage, settings: EditSettings) -> CIImage {
         var image = source
@@ -30,6 +31,19 @@ enum MediaProcessor {
         return CGSize(width: max(2, floor(width * scale / 2) * 2), height: max(2, floor(height * scale / 2) * 2))
     }
 
+    /// Position is measured from the left/top; Core Image uses a bottom-left origin.
+    static func cropRect(_ extent: CGRect, settings: EditSettings, ratio: Double? = nil, topOrigin: Bool = false) -> CGRect {
+        var size = extent.size
+        if let ratio = ratio ?? settings.ratio.value {
+            if size.width / size.height > ratio { size.width = size.height * ratio }
+            else { size.height = size.width / ratio }
+        }
+        size.width /= settings.effectiveCropZoom; size.height /= settings.effectiveCropZoom
+        return CGRect(x: extent.minX + (extent.width - size.width) * min(1, max(0, settings.cropX)),
+                      y: extent.minY + (extent.height - size.height) * min(1, max(0, topOrigin ? settings.cropY : 1 - settings.cropY)),
+                      width: size.width, height: size.height)
+    }
+
     static func transformed(_ source: CIImage, settings: EditSettings, outputSize: CGSize? = nil, cropRatio: Double? = nil) -> CIImage {
         var image = source.transformed(by: CGAffineTransform(translationX: -source.extent.minX, y: -source.extent.minY))
         if settings.rotation != 0 {
@@ -38,16 +52,7 @@ enum MediaProcessor {
         }
         if settings.mirrored { image = image.transformed(by: CGAffineTransform(a: -1, b: 0, c: 0, d: 1, tx: image.extent.width, ty: 0)) }
         let extent = image.extent
-        var crop = extent
-        if let ratio = cropRatio ?? settings.ratio.value {
-            if extent.width / extent.height > ratio {
-                crop.size.width = extent.height * ratio
-                crop.origin.x = (extent.width - crop.width) * settings.cropX
-            } else {
-                crop.size.height = extent.width / ratio
-                crop.origin.y = (extent.height - crop.height) * (1 - settings.cropY)
-            }
-        }
+        let crop = cropRect(extent, settings: settings, ratio: cropRatio)
         image = image.cropped(to: crop).transformed(by: CGAffineTransform(translationX: -crop.minX, y: -crop.minY))
         let target = outputSize ?? dimensions(source.extent.size, settings: settings)
         image = image.transformed(by: CGAffineTransform(scaleX: target.width / crop.width, y: target.height / crop.height))
@@ -74,6 +79,7 @@ enum MediaProcessor {
         var full = project
         full.settings.ratio = .original
         full.settings.cropX = 0.5; full.settings.cropY = 0.5
+        full.settings.cropZoom = nil
         if let photo {
             guard let image = CIImage(contentsOf: photo, options: [.applyOrientationProperty: true]) else {
                 throw StudioError.message("封面照片无法读取，请重新选择。")
@@ -111,16 +117,7 @@ enum MediaProcessor {
             rect = CGRect(origin: .zero, size: rotated.size)
         }
         if settings.mirrored { transform = transform.concatenating(CGAffineTransform(a: -1, b: 0, c: 0, d: 1, tx: rect.width, ty: 0)) }
-        var crop = rect
-        if let ratio = settings.ratio.value {
-            if rect.width / rect.height > ratio {
-                crop.size.width = rect.height * ratio
-                crop.origin.x = (rect.width - crop.width) * settings.cropX
-            } else {
-                crop.size.height = rect.width / ratio
-                crop.origin.y = (rect.height - crop.height) * settings.cropY
-            }
-        }
+        let crop = cropRect(rect, settings: settings, topOrigin: true)
         let oriented = CGRect(origin: .zero, size: sourceSize).applying(sourceTransform).size
         let outputSize = dimensions(oriented, settings: settings)
         transform = transform.concatenating(CGAffineTransform(translationX: -crop.minX, y: -crop.minY))
