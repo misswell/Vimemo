@@ -169,8 +169,8 @@ Release 附带 Apple Distribution 签名的 App Store IPA，仅供 App Store Con
 1.0.0（1）正式签名包已生成并验证：`build/TestFlight/Export/Vimemo.ipa`。
 归档：`build/TestFlight/Vimemo-1.0.0-1.xcarchive`。中文测试说明：`build/TestFlight/WhatToTest.zh-Hans.txt`。
 2026-10-06 已上传并处理通过，内部测试状态为 `IN_BETA_TESTING`。测试邀请已发送到 `misswell@foxmail.com`，可通过邀请邮件在 iPhone / iPad 的 TestFlight 安装。
-最新内部测试版本为 1.0.11（20），构建 ID `dcfe0b2c-5547-42d0-ad3e-459db34b29f3`，状态 `VALID` / `IN_BETA_TESTING`，已加入现有内部测试组并开启自动通知。包含制作与导出页真实片段预览及长按放大、统一作品声音、短片段裁剪触控修复、固定预览角落标记、小尺寸精确裁剪按钮及简化的最近添加列表；整体界面对齐 iOS 27 Apple Music。通过现有邀请在 TestFlight 中覆盖安装，不必先删除应用。TestFlight 内购使用 Apple 沙盒，不实际扣款；商品价格加载失败时可在固定按钮处查看错误并重试。
+最新内部测试版本为 1.0.11（21），构建 ID `a1e96fd5-1463-409e-bdc8-c88cbc0a1aa2`，状态 `VALID` / `IN_BETA_TESTING`，已加入现有内部测试组并开启自动通知。移除自动选帧，新增双指缩放与双击回正、整个预览区按住播放、16:9 满宽预览，并保持缩放与颜色在封面、动态预览及输出中一致；包含制作与导出页真实片段预览及长按放大、统一作品声音及短片段裁剪触控修复。通过现有邀请在 TestFlight 中覆盖安装，不必先删除应用。TestFlight 内购使用 Apple 沙盒，不实际扣款；商品价格加载失败时可在固定按钮处查看错误并重试。
 App Store Connect：[Vimemo 实刻 TestFlight](https://appstoreconnect.apple.com/apps/6819492441/testflight/ios)。
 应用 ID：`6819492441`；构建 ID：`54e012e6-b4cc-4c50-a763-8058c9640432`；内部测试组：`58d7d5de-0316-4bf2-a7a5-5acf1387b9d5`。
 
-2026-10-08 已提交 App Store 1.0.11（18）与不限制时长内购审核；提交时状态为 `WAITING_FOR_REVIEW`。同日按用户要求将构建 20 上传并分发到 TestFlight 内部组，未替换已提交审核的构建 18。本次 GitHub 构建 21 不自动重复上传 TestFlight。
+2026-10-08 已提交 App Store 1.0.11（18）与不限制时长内购审核；提交时状态为 `WAITING_FOR_REVIEW`。同日按用户要求将构建 20、21 分别上传并分发到 TestFlight 内部组，未替换已提交审核的构建 18。
