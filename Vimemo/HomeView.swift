@@ -30,6 +30,11 @@ struct HomeView: View {
                 }.padding(48)
             }
         }
+        .background {
+            #if DEBUG
+            if usesScrollFixture { ScrollPerformanceProbe().frame(width: 1, height: 1) }
+            #endif
+        }
         .fileImporter(isPresented: $fileImporter, allowedContentTypes: [.movie, .video], allowsMultipleSelection: true) { result in
             switch result {
             case .success(let urls): Task {
@@ -71,9 +76,23 @@ struct HomeView: View {
             Button("删除草稿", role: .destructive) { if let deleting { store.delete(deleting) }; deleting = nil }
         }
         .task {
+            #if DEBUG
+            if usesScrollFixture, let demo = await store.importDemo() {
+                store.projects = (0..<24).map { i in var item = demo; item.id = UUID(); item.title = "滚动示例 \(i)"; return item }
+            }
+            #endif
             if ProcessInfo.processInfo.arguments.contains("--demo-editor"), let demo = await store.importDemo() { editing = demo }
         }
     }
+
+    #if DEBUG
+    private var usesScrollFixture: Bool {
+        let args = ProcessInfo.processInfo.arguments
+        guard args.contains("--scroll-fixture"), let index = args.firstIndex(of: "--test-library"),
+              args.count > index + 1, UUID(uuidString: args[index + 1]) != nil else { return false }
+        return true
+    }
+    #endif
 
     private var workspace: some View {
         ScrollView {
@@ -103,23 +122,25 @@ struct HomeView: View {
                         }.frame(maxWidth: .infinity, alignment: .leading).padding(.vertical, 24)
                             .overlay(alignment: .top) { Rectangle().fill(StudioTheme.line).frame(height: 1) }
                     } else {
-                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 16)], spacing: 22) {
-                            ForEach(store.projects) { project in
-                                ZStack(alignment: .topTrailing) {
-                                    Button {
-                                        if batchMode {
-                                            if batchIDs.contains(project.id) { batchIDs.remove(project.id) } else { batchIDs.insert(project.id) }
-                                        } else { editing = project }
-                                    } label: { projectCard(project) }.buttonStyle(.plain)
-                                        .accessibilityIdentifier("draft-\(project.id.uuidString)")
-                                        .contextMenu {
-                                            Button("重命名", systemImage: "pencil") { renameText = project.title; renaming = project }
-                                            Button("删除草稿", systemImage: "trash", role: .destructive) { deleting = project }
+                        StudioGlassGroup(spacing: 16) {
+                            LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 16)], spacing: 22) {
+                                ForEach(store.projects) { project in
+                                    ZStack(alignment: .topTrailing) {
+                                        Button {
+                                            if batchMode {
+                                                if batchIDs.contains(project.id) { batchIDs.remove(project.id) } else { batchIDs.insert(project.id) }
+                                            } else { editing = project }
+                                        } label: { projectCard(project) }.buttonStyle(.plain)
+                                            .accessibilityIdentifier("draft-\(project.id.uuidString)")
+                                            .contextMenu {
+                                                Button("重命名", systemImage: "pencil") { renameText = project.title; renaming = project }
+                                                Button("删除草稿", systemImage: "trash", role: .destructive) { deleting = project }
+                                            }
+                                        if !batchMode {
+                                            Button { exportProjects = [project]; exportSelection = ExportSelection(projects: [project]) } label: {
+                                                Image(systemName: "square.and.arrow.up").font(.system(size: 16, weight: .semibold)).frame(width: 44, height: 44).foregroundStyle(.white).contentShape(Circle())
+                                            }.studioGlassButton(circular: true, overImage: true).contentShape(Circle()).padding(8).zIndex(1).accessibilityLabel("导出\(project.title)")
                                         }
-                                    if !batchMode {
-                                        Button { exportProjects = [project]; exportSelection = ExportSelection(projects: [project]) } label: {
-                                            Image(systemName: "square.and.arrow.up").font(.system(size: 16, weight: .semibold)).frame(width: 44, height: 44).foregroundStyle(.white).contentShape(Circle())
-                                        }.studioGlassButton(circular: true, overImage: true).contentShape(Circle()).padding(8).zIndex(1).accessibilityLabel("导出\(project.title)")
                                     }
                                 }
                             }
@@ -145,11 +166,8 @@ struct HomeView: View {
             Text("视频转实况").font(.subheadline.weight(.semibold)).foregroundStyle(StudioTheme.accent)
             PhotosPicker(selection: $selection, maxSelectionCount: 20, matching: .videos, preferredItemEncoding: .current) {
                 ZStack(alignment: .bottomLeading) {
-                    if let url = Bundle.main.url(forResource: "DemoPoster", withExtension: "jpg"), let image = UIImage(contentsOfFile: url.path) {
-                        GeometryReader { geometry in
-                            Image(uiImage: image).resizable().scaledToFill()
-                                .frame(width: geometry.size.width, height: geometry.size.height).clipped()
-                        }
+                    if let url = Bundle.main.url(forResource: "DemoPoster", withExtension: "jpg") {
+                        ThumbnailImage(url: url, maxPixelSize: 1280)
                     }
                     LinearGradient(colors: [.clear, .black.opacity(0.75)], startPoint: .center, endPoint: .bottom)
                     VStack(alignment: .leading, spacing: 8) {
@@ -217,19 +235,4 @@ struct HomeView: View {
         }
     }
 
-}
-
-struct ThumbnailImage: View {
-    var url: URL
-    @State private var image: UIImage?
-    var body: some View {
-        GeometryReader { geometry in
-            Group {
-                if let image { Image(uiImage: image).resizable().scaledToFill() }
-                else { StudioTheme.raised.overlay { Image(systemName: "photo").foregroundStyle(StudioTheme.secondary) } }
-            }.frame(width: geometry.size.width, height: geometry.size.height).clipped()
-        }.task(id: url) {
-            image = await Task.detached(priority: .utility) { UIImage(contentsOfFile: url.path) }.value
-        }
-    }
 }

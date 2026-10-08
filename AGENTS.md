@@ -45,3 +45,7 @@
 - 2026-10-08 已更新 TestFlight 内部测试至 1.0.11（17），构建 ID `aed8c0c7-31f4-4768-b93d-2bca3db4c31e`，状态 `VALID` / `IN_BETA_TESTING`；使用 `build/Release/Vimemo-1.0.11-17.ipa`，复用现有内部组，中文测试说明已写入，自动通知已开启。
 - 封面线的拖动手势必须使用固定时间轴命名坐标空间，不能使用会随竖线移动的局部坐标；局部坐标反馈会使竖线在新旧位置之间来回跳动。`Scripts/verify-cover-line.swift` 可对模拟器拖动录制逐帧检测反向跳动；连续拖动 UI 测试同时校验竖线实际位移与手指位移一致。
 - 2026-10-08 GitHub patch 1.0.18：修复封面选帧竖线拖动闪烁，保留帧对齐、边界限制与下拉慢速选帧。同一段连续左右拖动的逐帧检测从修复前 285 次短暂反向跳动降至 0；3 项选帧单元测试、iPhone 与 iPad 各 2 项相关界面测试通过。App 版本保持 1.0.11，构建号 18，正式签名包为 `build/Release/Vimemo-1.0.11-18.ipa`；稳定版 Xcode 26.6 签名，Xcode 27 / iOS 27 验证。本次不自动上传 TestFlight。
+
+- 工作台与作品缩略图、示例封面使用共享 ThumbnailLoader：后台预解码、请求合并、最大边长限制、32 MiB 成本缓存；按最新文件修改时间与大小失效，不在 SwiftUI body 中同步读取图片。草稿网格中的原生玻璃快捷导出按钮放入统一 GlassEffectContainer，避免滚动与底栏动画同时触发多个独立玻璃渲染。原生底栏继续收缩/展开。DEBUG 的 --scroll-fixture 必须同时提供有效 UUID 的 --test-library，只创建隔离测试数据；滚动帧间隔测量不更新 SwiftUI 状态，不打包进 Release。
+- 2026-10-08 已更新 TestFlight 至 1.0.11（18），构建 ID `c807ec7b-0775-4bca-9cdf-89f92d82bfe3`，状态 `VALID` / `IN_BETA_TESTING`，现有内部组自动通知已开启。08:53 已提交 App Store 1.0.11（18）与不限制时长内购审核，submission ID `0faa36bc-fede-402b-93f9-0712016dc768`，提交时 `WAITING_FOR_REVIEW`；网页确认隐私声明已发布且不收集数据。后续 GitHub 构建不自动替换送审版本。
+- 2026-10-08 GitHub patch 1.0.19：优化底栏收缩/展开时的滚动卡顿，统一草稿玻璃容器并共享后台预解码缩略图缓存。24 草稿、8 次上下连续滚动的模拟器采样中，旧实现移动帧最大间隔 108.54 ms，优化后 46.19 ms；新增 UI 回归校验真实移动帧且不出现 100 ms 停顿。3 项单元测试、iPhone 3 项相关 UI 与 iPad 原生导航 UI 通过；既有编辑工具 UI 首跑点击未切换，原样重跑通过。App 版本 1.0.11，构建号 19；正式 IPA 为 `build/Release/Vimemo-1.0.11-19.ipa`，稳定版 Xcode 26.6 签名、Xcode 27 / iOS 27 验证。此次不自动上传 TestFlight，也不替换已提交审核的构建 18。

@@ -26,6 +26,31 @@ final class StudioFlowTests: XCTestCase {
         start.press(forDuration: 0.05, thenDragTo: end)
     }
 
+    @MainActor func testNativeTabBarContinuousScrolling() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["--test-library", UUID().uuidString, "--scroll-fixture"]
+        app.launch()
+        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "draft-")).firstMatch.waitForExistence(timeout: 15))
+        let scroll = app.scrollViews.firstMatch
+        for i in 0..<8 {
+            scroll.swipeUp(velocity: .slow)
+            if i == 0 { screenshot(app, name: "native-tab-minimized") }
+            scroll.swipeDown(velocity: .slow)
+        }
+        screenshot(app, name: "native-tab-scroll")
+        XCTAssertTrue(app.tabBars.firstMatch.exists)
+        let report = app.descendants(matching: .any)["scrollPerformanceReport"].firstMatch
+        XCTAssertTrue(report.exists)
+        let values = (report.value as? String ?? "").split(separator: ",").compactMap { Double($0) }
+        XCTAssertEqual(values.count, 2)
+        guard values.count == 2 else { return }
+        XCTAssertGreaterThan(values[0], 100, "Must sample actual moving frames")
+        XCTAssertLessThan(values[1], 100, "Tab transitions must not stall scrolling for 100 ms")
+        selectTab(app, title: "作品")
+        selectTab(app, title: "工作台")
+        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "draft-")).firstMatch.exists)
+    }
+
     @MainActor func testNativeMusicStyleNavigation() throws {
         let app = XCUIApplication()
         app.launchArguments = ["--test-library", UUID().uuidString]

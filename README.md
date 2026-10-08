@@ -2,7 +2,9 @@
 
 原生 iOS 视频转实况照片工作台。SwiftUI 界面、AVFoundation 编辑与转换、Photos 实况预览和相册保存。最低 iOS 18，支持 iPhone 和 iPad，全部处理在设备本地完成。
 
-## 最新更新（1.0.18）
+## 最新更新（1.0.19）
+
+优化底栏收缩与展开时的滚动卡顿：草稿快捷导出按钮由统一的系统玻璃容器渲染；示例封面与作品/草稿缩略图共享后台预解码、请求合并及有内存上限的缓存，滚动时复用图片。保留原生 TabView 的液态玻璃及自动收缩、展开。
 
 修复拖动时间轴封面帧时竖线闪烁：封面线使用固定时间轴坐标读取手势，避免自身移动影响拖动距离，连续左右拖动稳定跟随手指；向下拉慢速选帧继续可用。
 
@@ -143,7 +145,7 @@ swiftc -target arm64-apple-macos14.0 -parse-as-library \
 
 ## GitHub 发布
 
-源码仓库：[misswell/Vimemo](https://github.com/misswell/Vimemo)。当前源码发布版本为 1.0.18，GitHub tag 为 `v1.0.18`；随附 IPA 的 App 版本为 1.0.11（18），使用稳定版 Xcode 26.6 构建，界面在 iOS 27 验证。
+源码仓库：[misswell/Vimemo](https://github.com/misswell/Vimemo)。当前源码发布版本为 1.0.19，GitHub tag 为 `v1.0.19`；随附 IPA 的 App 版本为 1.0.11（19），使用稳定版 Xcode 26.6 构建，界面在 iOS 27 验证。
 Release 附带 Apple Distribution 签名的 App Store IPA，仅供 App Store Connect 上传；日常安装请使用下方 TestFlight 邀请。
 `build/`、参考录屏截图、个人 Xcode 配置和签名凭据均不纳入 Git。
 
@@ -152,6 +154,8 @@ Release 附带 Apple Distribution 签名的 App Store IPA，仅供 App Store Con
 1.0.0（1）正式签名包已生成并验证：`build/TestFlight/Export/Vimemo.ipa`。
 归档：`build/TestFlight/Vimemo-1.0.0-1.xcarchive`。中文测试说明：`build/TestFlight/WhatToTest.zh-Hans.txt`。
 2026-10-06 已上传并处理通过，内部测试状态为 `IN_BETA_TESTING`。测试邀请已发送到 `misswell@foxmail.com`，可通过邀请邮件在 iPhone / iPad 的 TestFlight 安装。
-最新内部测试版本为 1.0.11（17），构建 ID `aed8c0c7-31f4-4768-b93d-2bca3db4c31e`，状态 `VALID` / `IN_BETA_TESTING`，已加入现有内部测试组并开启自动通知。包含裁剪预览拖动、连续封面选帧、按住预览与独立声音开关；整体界面对齐 iOS 27 Apple Music。通过现有邀请在 TestFlight 中覆盖安装，不必先删除应用。TestFlight 内购使用 Apple 沙盒，不实际扣款；商品价格加载失败时可在固定按钮处查看错误并重试。
+最新内部测试版本为 1.0.11（18），构建 ID `c807ec7b-0775-4bca-9cdf-89f92d82bfe3`，状态 `VALID` / `IN_BETA_TESTING`，已加入现有内部测试组并开启自动通知。包含封面线拖动闪烁修复、裁剪预览拖动、连续封面选帧、按住预览与独立声音开关；整体界面对齐 iOS 27 Apple Music。通过现有邀请在 TestFlight 中覆盖安装，不必先删除应用。TestFlight 内购使用 Apple 沙盒，不实际扣款；商品价格加载失败时可在固定按钮处查看错误并重试。
 App Store Connect：[Vimemo 实刻 TestFlight](https://appstoreconnect.apple.com/apps/6819492441/testflight/ios)。
 应用 ID：`6819492441`；构建 ID：`54e012e6-b4cc-4c50-a763-8058c9640432`；内部测试组：`58d7d5de-0316-4bf2-a7a5-5acf1387b9d5`。
+
+2026-10-08 已提交 App Store 1.0.11（18）与不限制时长内购审核；提交时状态为 `WAITING_FOR_REVIEW`。本次 GitHub 构建 19 不自动上传 TestFlight，也不替换已提交审核的版本。

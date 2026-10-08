@@ -24,11 +24,13 @@
 		44EFF5FC515DF978D890C728 /* Unlimited.storekit in Resources */ = {isa = PBXBuildFile; fileRef = 2BC9EE96736328AC1A0FB560 /* Unlimited.storekit */; };
 		5553779077BDC843B410E9CD /* Paywall-2.jpg in Resources */ = {isa = PBXBuildFile; fileRef = FC63619BFAEA882D7D7307EC /* Paywall-2.jpg */; };
 		5B85764F979AA71017AC2C85 /* LivePhotoExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD671452152F7FFF1BE8F4F1 /* LivePhotoExporter.swift */; };
+		5D92F7C855426EEBEF936026 /* ThumbnailLoaderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7CB5A6A46F18441B45DD7F7 /* ThumbnailLoaderTests.swift */; };
 		66869A973CAF56B3AA493D1F /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = D35BC4007A3663455B2FE7F8 /* Theme.swift */; };
 		685A7562A5F2A8EAEC2CC1D1 /* GIFExportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41790A074019CA1042E93757 /* GIFExportTests.swift */; };
 		68FEACE0724F5E238CDDF22D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = ACFAF2A2EAB11395E7003787 /* Assets.xcassets */; };
 		712A5CB7AE1D392CFE2C8B5E /* HistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A8D1F8B507869296D816F47 /* HistoryView.swift */; };
 		76CFCFE423FBE6807B75F01B /* PreviewSurface.swift in Sources */ = {isa = PBXBuildFile; fileRef = A69AC0915475CBC17874E71A /* PreviewSurface.swift */; };
+		780FF47BBF17EC6B5AB1FD1A /* ScrollPerformanceProbe.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34AF774276100118FF948C23 /* ScrollPerformanceProbe.swift */; };
 		862043436233074E69A6850D /* CropPositionPreview.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4616D12C7BBF4A7383BB0701 /* CropPositionPreview.swift */; };
 		8D16920595805C26FB763A82 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F4201FCA686FCFF0F180D7A /* Models.swift */; };
 		9384B9FB636A894E5C59DB26 /* Unlimited.storekit in Resources */ = {isa = PBXBuildFile; fileRef = 2BC9EE96736328AC1A0FB560 /* Unlimited.storekit */; };
@@ -42,7 +44,9 @@
 		D10F953DE4548DF7AABF8CC6 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2004620AB707B86C25E51F04 /* HomeView.swift */; };
 		D1B3DA361AFAF53C447D096F /* AudioFixture.mov in Resources */ = {isa = PBXBuildFile; fileRef = E61D0FE5A8B9D494C91643A7 /* AudioFixture.mov */; };
 		D253BDCA8F64331A652E2223 /* DurationAndCoverTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 078BBD8DC83BDFD7C61D8962 /* DurationAndCoverTests.swift */; };
+		D484F6EFC317F268E5D31B56 /* ThumbnailLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33B0839D33DF7EF490619010 /* ThumbnailLoader.swift */; };
 		E43F93FA322BEEB9FF80AFA9 /* CoverPreview.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99A09C42B31EADE21A37BA7C /* CoverPreview.swift */; };
+		EBC665434B7FB80602DAD3A1 /* ThumbnailImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2F97789DC3CCD74BDCF5030 /* ThumbnailImage.swift */; };
 		F46E513A9250AABCA887913D /* FrameScrubTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47E9E7B0A2ADC267F0B6E0DA /* FrameScrubTests.swift */; };
 		F518BD71D4124FA7AA8C4459 /* PurchaseStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56AF31788AE3F5373000CF2C /* PurchaseStore.swift */; };
 		F53E4A804E86F9BCAE0FC326 /* VimemoApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C7EB6C4F034914E55CF7210 /* VimemoApp.swift */; };
@@ -83,6 +87,8 @@
 		1CEB44D62EB5D262FF2E5974 /* VimemoTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = VimemoTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		2004620AB707B86C25E51F04 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
 		2BC9EE96736328AC1A0FB560 /* Unlimited.storekit */ = {isa = PBXFileReference; path = Unlimited.storekit; sourceTree = "<group>"; };
+		33B0839D33DF7EF490619010 /* ThumbnailLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThumbnailLoader.swift; sourceTree = "<group>"; };
+		34AF774276100118FF948C23 /* ScrollPerformanceProbe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScrollPerformanceProbe.swift; sourceTree = "<group>"; };
 		369967D8B65C6C3879219404 /* UnlimitedPurchaseView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UnlimitedPurchaseView.swift; sourceTree = "<group>"; };
 		41790A074019CA1042E93757 /* GIFExportTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GIFExportTests.swift; sourceTree = "<group>"; };
 		4550B527243C4938ED07CF04 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
@@ -106,6 +112,8 @@
 		A69AC0915475CBC17874E71A /* PreviewSurface.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewSurface.swift; sourceTree = "<group>"; };
 		A78144CB0D2A6734E514D19B /* StudioFlowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudioFlowTests.swift; sourceTree = "<group>"; };
 		ACFAF2A2EAB11395E7003787 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		B7CB5A6A46F18441B45DD7F7 /* ThumbnailLoaderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThumbnailLoaderTests.swift; sourceTree = "<group>"; };
+		C2F97789DC3CCD74BDCF5030 /* ThumbnailImage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThumbnailImage.swift; sourceTree = "<group>"; };
 		C3C1E5F2CD456963D32BD9D7 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		C8E4F9EA53521DD2BFC30BD3 /* Paywall-3.jpg */ = {isa = PBXFileReference; lastKnownFileType = image.jpeg; path = "Paywall-3.jpg"; sourceTree = "<group>"; };
 		CC2DB2334232B072557A74AA /* ExportViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportViews.swift; sourceTree = "<group>"; };
@@ -147,8 +155,11 @@
 				4550B527243C4938ED07CF04 /* PrivacyInfo.xcprivacy */,
 				526AEC8B2AB81852BFBDA44D /* ProjectStore.swift */,
 				56AF31788AE3F5373000CF2C /* PurchaseStore.swift */,
+				34AF774276100118FF948C23 /* ScrollPerformanceProbe.swift */,
 				C3C1E5F2CD456963D32BD9D7 /* SettingsView.swift */,
 				D35BC4007A3663455B2FE7F8 /* Theme.swift */,
+				C2F97789DC3CCD74BDCF5030 /* ThumbnailImage.swift */,
+				33B0839D33DF7EF490619010 /* ThumbnailLoader.swift */,
 				54A8AA74B56AE08436D70E5C /* TimelineView.swift */,
 				369967D8B65C6C3879219404 /* UnlimitedPurchaseView.swift */,
 				8C7EB6C4F034914E55CF7210 /* VimemoApp.swift */,
@@ -177,6 +188,7 @@
 				47E9E7B0A2ADC267F0B6E0DA /* FrameScrubTests.swift */,
 				41790A074019CA1042E93757 /* GIFExportTests.swift */,
 				1B4D9F0B7B088B69F6FC6162 /* PurchaseTests.swift */,
+				B7CB5A6A46F18441B45DD7F7 /* ThumbnailLoaderTests.swift */,
 				1D7170AD21A29EA37D33AE77 /* Fixtures */,
 			);
 			path = VimemoTests;
@@ -370,6 +382,7 @@
 				F46E513A9250AABCA887913D /* FrameScrubTests.swift in Sources */,
 				685A7562A5F2A8EAEC2CC1D1 /* GIFExportTests.swift in Sources */,
 				FFDDD76A479820C327CFBEE0 /* PurchaseTests.swift in Sources */,
+				5D92F7C855426EEBEF936026 /* ThumbnailLoaderTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -405,8 +418,11 @@
 				76CFCFE423FBE6807B75F01B /* PreviewSurface.swift in Sources */,
 				2CD3B11E236A7DE64B548E37 /* ProjectStore.swift in Sources */,
 				F518BD71D4124FA7AA8C4459 /* PurchaseStore.swift in Sources */,
+				780FF47BBF17EC6B5AB1FD1A /* ScrollPerformanceProbe.swift in Sources */,
 				05F848268836991683CF3424 /* SettingsView.swift in Sources */,
 				66869A973CAF56B3AA493D1F /* Theme.swift in Sources */,
+				EBC665434B7FB80602DAD3A1 /* ThumbnailImage.swift in Sources */,
+				D484F6EFC317F268E5D31B56 /* ThumbnailLoader.swift in Sources */,
 				2757C32D1517DEC963CA80D2 /* TimelineView.swift in Sources */,
 				FA37992923DE8151F84E24FE /* UnlimitedPurchaseView.swift in Sources */,
 				F53E4A804E86F9BCAE0FC326 /* VimemoApp.swift in Sources */,
@@ -479,7 +495,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 18;
+				CURRENT_PROJECT_VERSION = 19;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = U8U443D7ZL;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -546,7 +562,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 18;
+				CURRENT_PROJECT_VERSION = 19;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = U8U443D7ZL;
 				ENABLE_NS_ASSERTIONS = NO;
