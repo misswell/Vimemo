@@ -20,6 +20,7 @@ struct TimelineView: View {
                 let left = width * clip.start / total
                 let right = width * clip.end / total
                 let cover = width * clip.cover / total
+                // The marker moves; its gesture must measure against the stationary timeline.
                 ZStack(alignment: .topLeading) {
                     HStack(spacing: 1) {
                         ForEach(Array(thumbnails.enumerated()), id: \.offset) { _, image in
@@ -58,7 +59,7 @@ struct TimelineView: View {
                         clip.normalize(sourceDuration: duration, speed: speed, maxOutputDuration: maxOutputDuration)
                         onSeek(max(clip.start, clip.end - 1 / max(1, frameRate)), true)
                     }.onEnded { _ in dragStart = nil; onSeek(clip.cover, false) })
-                }
+                }.coordinateSpace(name: "coverTimeline")
             }.frame(height: 96)
             HStack {
                 Text(clip.start.timeLabel)
@@ -79,7 +80,7 @@ struct TimelineView: View {
                 .foregroundStyle(StudioTheme.onAccent).frame(width: 30, height: 22)
                 .background(StudioTheme.peach, in: Capsule())
         }.frame(width: 44, height: 96).contentShape(Rectangle())
-            .gesture(DragGesture(minimumDistance: 0).onChanged { value in
+            .gesture(DragGesture(minimumDistance: 0, coordinateSpace: .named("coverTimeline")).onChanged { value in
                 if coverDrag == nil {
                     let end = max(clip.start, clip.end - 1 / max(1, frameRate))
                     coverDrag = FrameScrubSession(time: clip.cover, range: clip.start...end, frameRate: frameRate)

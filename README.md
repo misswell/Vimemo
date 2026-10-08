@@ -2,7 +2,9 @@
 
 原生 iOS 视频转实况照片工作台。SwiftUI 界面、AVFoundation 编辑与转换、Photos 实况预览和相册保存。最低 iOS 18，支持 iPhone 和 iPad，全部处理在设备本地完成。
 
-## 最新更新（1.0.17）
+## 最新更新（1.0.18）
+
+修复拖动时间轴封面帧时竖线闪烁：封面线使用固定时间轴坐标读取手势，避免自身移动影响拖动距离，连续左右拖动稳定跟随手指；向下拉慢速选帧继续可用。
 
 在「画面」中选择裁剪比例后，可直接拖动预览图片确定裁剪位置；拖动时显示参考网格，自动限制边界。画面跟随手指移动，松手后同步到封面、动态预览与导出，支持旋转、翻转和相册照片封面。原有位置滑杆保留在「精确位置」中；按住预览实况及独立声音开关继续可用。
 
@@ -100,6 +102,8 @@ xcodebuild -project Vimemo.xcodeproj -scheme Vimemo \
 
 `Scripts/verify-audio.swift` 可以在 macOS 上直接编译与运行同一份转换核心，验证四种倍速与静音组合。音频 fixture 来自本项目生成的画面与 440Hz 合成音。
 
+`Scripts/verify-cover-line.swift` 检查模拟器连续左右拖动封面线的录制，逐帧检测短时间反向跳动。运行 `swift Scripts/verify-cover-line.swift recording.mov y0 y1 x0 x1`，坐标为录制中的像素范围，选择覆盖竖线主干且避开文字的区域；修复前相同拖动检测到 285 次反向跳动，修复后为 0 次。
+
 ```sh
 swiftc -target arm64-apple-macos14.0 -parse-as-library \
   Vimemo/Models.swift Vimemo/MediaProcessor.swift Vimemo/LivePhotoExporter.swift \
@@ -139,7 +143,7 @@ swiftc -target arm64-apple-macos14.0 -parse-as-library \
 
 ## GitHub 发布
 
-源码仓库：[misswell/Vimemo](https://github.com/misswell/Vimemo)。当前源码发布版本为 1.0.17，GitHub tag 为 `v1.0.17`；随附 IPA 的 App 版本为 1.0.11（17），使用稳定版 Xcode 26.6 构建，界面在 iOS 27 验证。
+源码仓库：[misswell/Vimemo](https://github.com/misswell/Vimemo)。当前源码发布版本为 1.0.18，GitHub tag 为 `v1.0.18`；随附 IPA 的 App 版本为 1.0.11（18），使用稳定版 Xcode 26.6 构建，界面在 iOS 27 验证。
 Release 附带 Apple Distribution 签名的 App Store IPA，仅供 App Store Connect 上传；日常安装请使用下方 TestFlight 邀请。
 `build/`、参考录屏截图、个人 Xcode 配置和签名凭据均不纳入 Git。
 
@@ -148,6 +152,6 @@ Release 附带 Apple Distribution 签名的 App Store IPA，仅供 App Store Con
 1.0.0（1）正式签名包已生成并验证：`build/TestFlight/Export/Vimemo.ipa`。
 归档：`build/TestFlight/Vimemo-1.0.0-1.xcarchive`。中文测试说明：`build/TestFlight/WhatToTest.zh-Hans.txt`。
 2026-10-06 已上传并处理通过，内部测试状态为 `IN_BETA_TESTING`。测试邀请已发送到 `misswell@foxmail.com`，可通过邀请邮件在 iPhone / iPad 的 TestFlight 安装。
-最新内部测试版本为 1.0.11（15），构建 ID `aa78729d-70d0-422d-9dc2-1cdea6d58049`，状态 `VALID` / `IN_BETA_TESTING`，已加入现有内部测试组。整体界面对齐 iOS 27 Apple Music，包含原生浮动 TabView、系统黑白背景和红粉强调色。通过现有邀请在 TestFlight 中覆盖安装，不必先删除应用。TestFlight 内购使用 Apple 沙盒，不实际扣款；商品价格加载失败时可在固定按钮处查看错误并重试。
+最新内部测试版本为 1.0.11（17），构建 ID `aed8c0c7-31f4-4768-b93d-2bca3db4c31e`，状态 `VALID` / `IN_BETA_TESTING`，已加入现有内部测试组并开启自动通知。包含裁剪预览拖动、连续封面选帧、按住预览与独立声音开关；整体界面对齐 iOS 27 Apple Music。通过现有邀请在 TestFlight 中覆盖安装，不必先删除应用。TestFlight 内购使用 Apple 沙盒，不实际扣款；商品价格加载失败时可在固定按钮处查看错误并重试。
 App Store Connect：[Vimemo 实刻 TestFlight](https://appstoreconnect.apple.com/apps/6819492441/testflight/ios)。
 应用 ID：`6819492441`；构建 ID：`54e012e6-b4cc-4c50-a763-8058c9640432`；内部测试组：`58d7d5de-0316-4bf2-a7a5-5acf1387b9d5`。

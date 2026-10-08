@@ -137,6 +137,35 @@ final class StudioFlowTests: XCTestCase {
         screenshot(app, name: "draggable-timeline-cover")
     }
 
+    @MainActor func testCoverLineRemainsVisibleDuringContinuousDragging() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["--test-library", UUID().uuidString, "--demo-editor"]
+        app.launch()
+        let handle = app.descendants(matching: .any)["coverFrameHandle"]
+        XCTAssertTrue(handle.waitForExistence(timeout: 10))
+        for _ in 0..<3 {
+            if handle.isHittable && handle.frame.maxY < app.buttons["editorTool0"].frame.minY - 8 { break }
+            scrollEditor(app)
+        }
+        screenshot(app, name: "cover-line-before-continuous-drag")
+        for direction in [CGFloat(1), -1, 1, -1] {
+            let startX = handle.frame.midX
+            let grip = handle.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.85))
+            grip.press(forDuration: 0.05, thenDragTo: grip.withOffset(CGVector(dx: 40 * direction, dy: 0)),
+                       withVelocity: XCUIGestureVelocity(rawValue: 24), thenHoldForDuration: 0.4)
+            XCTAssertTrue(handle.exists)
+            XCTAssertEqual(handle.frame.midX, startX + 40 * direction, accuracy: 3,
+                           "The cover line must follow the finger, without feedback from its own movement")
+        }
+        let beforeFine = handle.frame.midX
+        let fineGrip = handle.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.85))
+        fineGrip.press(forDuration: 0.05, thenDragTo: fineGrip.withOffset(CGVector(dx: 40, dy: 60)),
+                       withVelocity: XCUIGestureVelocity(rawValue: 24), thenHoldForDuration: 0.4)
+        XCTAssertGreaterThan(handle.frame.midX, beforeFine)
+        XCTAssertLessThan(handle.frame.midX, beforeFine + 40, "Pulling down must retain slow frame selection")
+        screenshot(app, name: "cover-line-after-continuous-drag")
+    }
+
     @MainActor func testHoldPreviewReleasesAndSoundIsIndependent() throws {
         let app = XCUIApplication()
         app.launchArguments = ["--test-library", UUID().uuidString, "--demo-editor"]
