@@ -114,12 +114,17 @@ final class StudioFlowTests: XCTestCase {
         let live = app.descendants(matching: .any).matching(identifier: "previewLiveBadge").firstMatch
         let duration = app.descendants(matching: .any).matching(identifier: "previewDurationBadge").firstMatch
         let sound = app.buttons["previewSound"]
-        let originalCorners = [live.frame, duration.frame, sound.frame]
+        let cover = app.buttons["chooseCover"]
+        XCTAssertTrue(cover.isHittable)
+        XCTAssertLessThan(cover.frame.midX, sound.frame.midX)
+        XCTAssertGreaterThan(cover.frame.midY, live.frame.midY)
+        XCTAssertEqual(cover.frame.midY, sound.frame.midY, accuracy: 1)
+        let originalCorners = [live.frame, duration.frame, sound.frame, cover.frame]
         for ratio in ["9:16", "1:1", "16:9"] {
             app.buttons[ratio].tap()
             // A containing AX element reports the union of its visible children,
             // including the video. Measure the corner badges themselves.
-            for (element, frame) in zip([live, duration, sound], originalCorners) {
+            for (element, frame) in zip([live, duration, sound, cover], originalCorners) {
                 XCTAssertEqual(element.frame.midX, frame.midX, accuracy: 1)
                 XCTAssertEqual(element.frame.midY, frame.midY, accuracy: 1)
             }
@@ -388,6 +393,8 @@ final class StudioFlowTests: XCTestCase {
         hold(live.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)))
         hold(sound.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)))
         XCTAssertEqual(sound.value as? String, "有声", "Holding the sound region must not toggle mute")
+        hold(app.buttons["chooseCover"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)))
+        XCTAssertFalse(app.buttons["confirmCover"].exists, "Holding the cover icon must not open the picker")
         sound.tap(); XCTAssertEqual(sound.value as? String, "静音")
         hold(preview.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)))
         XCTAssertEqual(sound.value as? String, "静音")
@@ -800,7 +807,7 @@ final class StudioFlowTests: XCTestCase {
         XCTAssertEqual(XCTWaiter.wait(for: [photoReady], timeout: 15), .completed)
         screenshot(app, name: "09-album-cover")
         confirm.tap()
-        XCTAssertTrue(app.staticTexts["已使用相册照片作为封面"].waitForExistence(timeout: 5))
+        XCTAssertEqual(app.buttons["chooseCover"].value as? String, "相册照片")
         app.buttons["makeLivePhotos"].tap()
         app.buttons["制作并保存 · 1 个作品"].tap()
         XCTAssertTrue(app.staticTexts["已制作 1 个作品"].waitForExistence(timeout: 30))

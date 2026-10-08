@@ -90,10 +90,8 @@ struct EditorView: View {
                                                 height: max(canvasWidth * 9 / 16, min(520, max(260, geometry.size.height - 92))))
                         let previewSize = previewSize(availableWidth: canvasSize.width, maxHeight: canvasSize.height)
                         HStack(alignment: .top, spacing: 24) {
-                            VStack(spacing: 12) {
-                                preview(imageSize: previewSize, canvasSize: canvasSize)
-                                coverControls
-                            }.frame(width: geometry.size.width * 0.46)
+                            preview(imageSize: previewSize, canvasSize: canvasSize)
+                                .frame(width: geometry.size.width * 0.46)
                             editorPanels
                         }.padding(.horizontal, 24).padding(.vertical, 12)
                     } else {
@@ -104,7 +102,6 @@ struct EditorView: View {
                         VStack(spacing: 0) {
                             preview(imageSize: previewSize, canvasSize: canvasSize)
                                 .padding(.top, 6)
-                            coverControls.padding(.horizontal, 20).padding(.vertical, 8)
                             editorPanels
                         }
                     }
@@ -290,6 +287,20 @@ struct EditorView: View {
                 .padding(13).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
                 .allowsHitTesting(false).accessibilityIdentifier("previewDurationBadge")
             Button {
+                stopPlayback(); showCoverPicker = true
+            } label: {
+                Image(systemName: "photo.on.rectangle")
+                    .font(.system(size: 17)).foregroundStyle(badgeColor)
+                    .shadow(color: badgesOverImage ? .black.opacity(0.65) : .clear, radius: 3, y: 1)
+                    .frame(width: 44, height: 44).contentShape(Circle())
+            }.buttonStyle(.plain).padding(13)
+                .highPriorityGesture(LongPressGesture(minimumDuration: 0.35).onEnded { _ in })
+                .accessibilityLabel("选择封面")
+                .accessibilityValue(clip.coverPhotoFilename != nil ? "相册照片" : "视频帧")
+                .accessibilityHint(clip.coverPhotoFilename != nil ? "当前使用相册照片封面。轻点选择封面，按住预览实况" : "轻点选择封面，按住预览实况")
+                .accessibilityIdentifier("chooseCover")
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+            Button {
                 project.settings.muted.toggle()
                 player.isMuted = project.settings.muted
             } label: {
@@ -412,22 +423,6 @@ struct EditorView: View {
                         .accessibilityValue(tool == index ? "已选择" : "未选择")
                 }
             }.padding(5).studioGlass(in: Capsule(), interactive: false)
-        }
-    }
-    private var coverControls: some View {
-        StudioGlassGroup {
-            HStack(spacing: 12) {
-                Button {
-                    stopPlayback(); showCoverPicker = true
-                } label: {
-                    Label("选择封面", systemImage: "photo.on.rectangle").font(.system(size: 13, weight: .semibold))
-                        .padding(.horizontal, 16).frame(minHeight: 44).contentShape(Capsule())
-                }.studioGlassButton().accessibilityIdentifier("chooseCover")
-                Spacer(minLength: 0)
-                if clip.coverPhotoFilename != nil {
-                    Text("已使用相册照片作为封面").font(.system(size: 10)).foregroundStyle(StudioTheme.secondary).lineLimit(2)
-                }
-            }.buttonStyle(.plain)
         }
     }
     private func resetPicture() {
