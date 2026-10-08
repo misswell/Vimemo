@@ -8,7 +8,6 @@ struct SettingsView: View {
     @AppStorage("defaultQuality") private var quality = ExportQuality.high.rawValue
     @AppStorage("defaultPreserveDate") private var preserveDate = true
     @AppStorage("defaultPreserveLocation") private var preserveLocation = false
-    @AppStorage("defaultMuted") private var muted = false
     @AppStorage("unlimitedDuration") private var unlimitedDuration = false
     @State private var usage = "计算中…"
     @State private var storageDetail = ""
@@ -55,7 +54,6 @@ struct SettingsView: View {
                 }
                 Toggle("保留拍摄时间", isOn: $preserveDate)
                 Toggle("保留位置", isOn: $preserveLocation)
-                Toggle("静音导出", isOn: $muted)
             }
             Section {
                 Toggle("保存草稿", isOn: Binding(get: { store.savesDrafts }, set: { store.setSavesDrafts($0); refreshStorage() }))

@@ -16,9 +16,11 @@
 		2491011B4AF209784AFCFBFC /* CoverPreviewTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 175B89EDFA7EBC3587FA81AE /* CoverPreviewTests.swift */; };
 		2757C32D1517DEC963CA80D2 /* TimelineView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54A8AA74B56AE08436D70E5C /* TimelineView.swift */; };
 		2CD3B11E236A7DE64B548E37 /* ProjectStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 526AEC8B2AB81852BFBDA44D /* ProjectStore.swift */; };
+		2FCF8A9C0AF4E3D82F9B93E7 /* ClipPlaybackPreview.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9DA4C5E5126BE5F137FBD722 /* ClipPlaybackPreview.swift */; };
 		2FE82C9757C0B46913AAF5D3 /* ConversionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9334053069559BEC925B94C9 /* ConversionTests.swift */; };
 		31816DE93B37777681CF58F1 /* ExportViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC2DB2334232B072557A74AA /* ExportViews.swift */; };
 		34A1CF55C68943B699552686 /* GIFPlaybackView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFBF479CF60E6EF28CDFB1FD /* GIFPlaybackView.swift */; };
+		39F059F02DF042E508929E91 /* AudioFixture.mov in Resources */ = {isa = PBXBuildFile; fileRef = E61D0FE5A8B9D494C91643A7 /* AudioFixture.mov */; };
 		3C8B9A0E64B246333F9093A9 /* FrameScrubSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5A96681FB1778EF4C70CDA0 /* FrameScrubSession.swift */; };
 		3EC107ABF919E52568159E68 /* CoverPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6709B8760847CC3D5E8176F /* CoverPickerView.swift */; };
 		44EFF5FC515DF978D890C728 /* Unlimited.storekit in Resources */ = {isa = PBXBuildFile; fileRef = 2BC9EE96736328AC1A0FB560 /* Unlimited.storekit */; };
@@ -108,6 +110,7 @@
 		8F4201FCA686FCFF0F180D7A /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
 		9334053069559BEC925B94C9 /* ConversionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversionTests.swift; sourceTree = "<group>"; };
 		99A09C42B31EADE21A37BA7C /* CoverPreview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoverPreview.swift; sourceTree = "<group>"; };
+		9DA4C5E5126BE5F137FBD722 /* ClipPlaybackPreview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipPlaybackPreview.swift; sourceTree = "<group>"; };
 		9F53DC6D5DBB0C08976B5A2A /* FrameSelectionControl.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrameSelectionControl.swift; sourceTree = "<group>"; };
 		A69AC0915475CBC17874E71A /* PreviewSurface.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewSurface.swift; sourceTree = "<group>"; };
 		A78144CB0D2A6734E514D19B /* StudioFlowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudioFlowTests.swift; sourceTree = "<group>"; };
@@ -133,6 +136,7 @@
 			isa = PBXGroup;
 			children = (
 				ACFAF2A2EAB11395E7003787 /* Assets.xcassets */,
+				9DA4C5E5126BE5F137FBD722 /* ClipPlaybackPreview.swift */,
 				162A240C7111F37689EE1952 /* CoverFrameRenderer.swift */,
 				F6709B8760847CC3D5E8176F /* CoverPickerView.swift */,
 				99A09C42B31EADE21A37BA7C /* CoverPreview.swift */,
@@ -363,6 +367,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				39F059F02DF042E508929E91 /* AudioFixture.mov in Resources */,
 				9384B9FB636A894E5C59DB26 /* Unlimited.storekit in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -398,6 +403,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				2FCF8A9C0AF4E3D82F9B93E7 /* ClipPlaybackPreview.swift in Sources */,
 				93930505FB31C0352BF6DBC6 /* CoverFrameRenderer.swift in Sources */,
 				3EC107ABF919E52568159E68 /* CoverPickerView.swift in Sources */,
 				E43F93FA322BEEB9FF80AFA9 /* CoverPreview.swift in Sources */,
@@ -495,7 +501,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 19;
+				CURRENT_PROJECT_VERSION = 20;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = U8U443D7ZL;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -562,7 +568,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 19;
+				CURRENT_PROJECT_VERSION = 20;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = U8U443D7ZL;
 				ENABLE_NS_ASSERTIONS = NO;

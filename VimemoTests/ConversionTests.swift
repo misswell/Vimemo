@@ -175,20 +175,28 @@ final class ConversionTests: XCTestCase {
         XCTAssertEqual(player.currentTime().seconds, 2.5, accuracy: 0.06, "Preview must stop at the clip boundary")
     }
 
-    @MainActor func testPreviewSoundCanToggleWithoutChangingExportMute() async throws {
+    @MainActor func testProjectSoundSettingPersistsAndPreviewRetainsAudio() async throws {
         let source = try XCTUnwrap(Bundle(for: ConversionTests.self).url(forResource: "AudioFixture", withExtension: "mov"))
-        var exportSettings = EditSettings(); exportSettings.muted = true
-        var previewSettings = exportSettings; previewSettings.muted = false
-        let item = try await MediaProcessor.previewItem(source: source, clip: Clip(start: 0, end: 3, cover: 1), settings: previewSettings).item
-        let tracks = try await item.asset.loadTracks(withMediaType: .audio)
-        XCTAssertFalse(tracks.isEmpty, "Preview must retain the source audio for the speaker control")
-        let player = AVPlayer(playerItem: item)
-        player.isMuted = true
-        player.isMuted = false
-        XCTAssertFalse(player.isMuted)
-        XCTAssertTrue(exportSettings.muted, "Preview sound must leave export muted")
-        player.isMuted = true
-        XCTAssertTrue(player.isMuted)
+        let root = folder.appendingPathComponent("SoundLibrary")
+        let store = ProjectStore(root: root)
+        var project = try await store.importVideo(source, title: "Sound")
+        XCTAssertTrue(project.hasAudio)
+        XCTAssertFalse(project.settings.muted)
+        for muted in [true, false] {
+            project.settings.muted = muted
+            store.update(project)
+            XCTAssertTrue(store.persist())
+            let restored = try XCTUnwrap(ProjectStore(root: root).projects.first)
+            XCTAssertEqual(restored.settings.muted, muted)
+            var previewSettings = restored.settings
+            previewSettings.muted = false
+            let item = try await MediaProcessor.previewItem(source: source, clip: restored.clips[0], settings: previewSettings).item
+            let tracks = try await item.asset.loadTracks(withMediaType: .audio)
+            XCTAssertFalse(tracks.isEmpty, "Retain audio so the project speaker can toggle without rebuilding")
+            let player = AVPlayer(playerItem: item)
+            player.isMuted = restored.settings.muted
+            XCTAssertEqual(player.isMuted, muted)
+        }
     }
 
     func testAudioPreservedAndMuted() async throws {

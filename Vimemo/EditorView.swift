@@ -19,7 +19,6 @@ struct EditorView: View {
     @State private var playing = false
     @GestureState private var previewHeld = false
     @State private var accessiblePlayback = false
-    @State private var previewMuted = true
     @State private var playbackGeneration = UUID()
     @State private var tool = 0
     @State private var showExport = false
@@ -78,24 +77,22 @@ struct EditorView: View {
                 StudioTheme.background.ignoresSafeArea()
                 GeometryReader { geometry in
                     if geometry.size.width > 700 {
-                        let previewSize = previewSize(
-                            availableWidth: geometry.size.width * 0.46,
-                            maxHeight: min(520, max(260, geometry.size.height - 92))
-                        )
+                        let canvasSize = CGSize(width: geometry.size.width * 0.46,
+                                                height: min(520, max(260, geometry.size.height - 92)))
+                        let previewSize = previewSize(availableWidth: canvasSize.width, maxHeight: canvasSize.height)
                         HStack(alignment: .top, spacing: 24) {
                             VStack(spacing: 12) {
-                                preview.frame(width: previewSize.width, height: previewSize.height)
+                                preview(imageSize: previewSize, canvasSize: canvasSize)
                                 coverControls
                             }.frame(width: geometry.size.width * 0.46)
                             editorPanels
                         }.padding(.horizontal, 24).padding(.vertical, 12)
                     } else {
-                        let previewSize = previewSize(
-                            availableWidth: geometry.size.width - 32,
-                            maxHeight: min(280, max(136, geometry.size.height * 0.34))
-                        )
+                        let canvasSize = CGSize(width: geometry.size.width - 32,
+                                                height: min(280, max(136, geometry.size.height * 0.34)))
+                        let previewSize = previewSize(availableWidth: canvasSize.width, maxHeight: canvasSize.height)
                         VStack(spacing: 0) {
-                            preview.frame(width: previewSize.width, height: previewSize.height)
+                            preview(imageSize: previewSize, canvasSize: canvasSize)
                                 .padding(.top, 6)
                             coverControls.padding(.horizontal, 20).padding(.vertical, 8)
                             editorPanels
@@ -152,10 +149,13 @@ struct EditorView: View {
                 await loadThumbnails()
                 refreshPreview()
             }
-            .onChange(of: project.settings) { _, _ in
+            .onChange(of: project.settings) { previous, current in
                 for index in project.clips.indices { project.clips[index].normalize(sourceDuration: project.duration, speed: project.settings.speed, maxOutputDuration: project.settings.maxOutputDuration) }
                 store.update(project)
-                if !cropDragging { refreshPreview() }
+                player.isMuted = current.muted
+                var previousPicture = previous
+                previousPicture.muted = current.muted
+                if previousPicture != current && !cropDragging { refreshPreview() }
             }
             .task(id: cropSource) {
                 guard let selection = cropSource else { cropPreview.stop(); return }
@@ -203,16 +203,17 @@ struct EditorView: View {
                 if tool == 0 {
                     clipSelector
                     timelineCard
-                    DisclosureGroup("发现更多片段") { momentsPanel.padding(.top, 12) }
-                        .font(.subheadline).padding(.horizontal, 4)
                 } else { toolPanel }
             }.frame(maxWidth: 680).frame(maxWidth: .infinity)
                 .padding(.horizontal, 16).padding(.vertical, 12)
         }.scrollIndicators(.hidden).accessibilityIdentifier("editorScroll")
     }
 
-    private var preview: some View {
-        ZStack(alignment: .bottomTrailing) {
+    private func preview(imageSize: CGSize, canvasSize: CGSize) -> some View {
+        let badgesOverImage = imageSize.width >= canvasSize.width - 1 && imageSize.height >= canvasSize.height - 26
+        let badgeColor: Color = badgesOverImage ? .white : StudioTheme.ink
+        return ZStack {
+
             ZStack(alignment: .topLeading) {
                 Color.black
                 PreviewSurface(player: player, preview: preparedPreview, playing: playing) { ready in playerFrameReady = ready }
@@ -226,12 +227,10 @@ struct EditorView: View {
                         Image(uiImage: coverImage).resizable().scaledToFit().frame(maxWidth: .infinity, maxHeight: .infinity)
                     } else { ProgressView().tint(.white).frame(maxWidth: .infinity, maxHeight: .infinity) }
                 }
-                HStack {
-                    Label("LIVE", systemImage: playing ? "livephoto.play" : "livephoto").font(.system(size: 10, weight: .semibold, design: .monospaced)).tracking(1)
-                    Spacer()
-                    Text(String(format: "%.2f s", clip.duration / project.settings.speed)).font(.system(size: 10, weight: .medium, design: .monospaced))
-                }.padding(13).foregroundStyle(.white).background(LinearGradient(colors: [.black.opacity(0.4), .clear], startPoint: .top, endPoint: .bottom))
-            }.contentShape(Rectangle())
+            }.frame(width: imageSize.width, height: imageSize.height)
+                .clipShape(RoundedRectangle(cornerRadius: 20))
+                .overlay(RoundedRectangle(cornerRadius: 20).stroke(StudioTheme.line, lineWidth: 1))
+                .contentShape(Rectangle())
                 .simultaneousGesture(LongPressGesture(minimumDuration: croppingEnabled ? 0.35 : 0.15, maximumDistance: croppingEnabled ? 6 : 32)
                     .sequenced(before: DragGesture(minimumDistance: 0))
                     .updating($previewHeld) { value, held, _ in
@@ -245,21 +244,33 @@ struct EditorView: View {
                     if playing { stopPlayback() }
                     else { accessiblePlayback = true; startPlayback() }
                 }.accessibilityIdentifier("previewPlayback")
+            Label("LIVE", systemImage: playing ? "livephoto.play" : "livephoto")
+                .font(.system(size: 10, weight: .semibold, design: .monospaced)).tracking(1)
+                .foregroundStyle(badgeColor).shadow(color: badgesOverImage ? .black.opacity(0.65) : .clear, radius: 3, y: 1)
+                .padding(13).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .allowsHitTesting(false).accessibilityIdentifier("previewLiveBadge")
+            Text(String(format: "%.2f s", clip.duration / project.settings.speed))
+                .font(.system(size: 10, weight: .medium, design: .monospaced))
+                .foregroundStyle(badgeColor).shadow(color: badgesOverImage ? .black.opacity(0.65) : .clear, radius: 3, y: 1)
+                .padding(13).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                .allowsHitTesting(false).accessibilityIdentifier("previewDurationBadge")
             Button {
-                previewMuted.toggle()
-                player.isMuted = previewMuted
+                project.settings.muted.toggle()
+                player.isMuted = project.settings.muted
             } label: {
-                Image(systemName: previewMuted || !project.hasAudio ? "speaker.slash.fill" : "speaker.wave.2.fill")
-                    .font(.system(size: 17)).foregroundStyle(.white)
+                Image(systemName: project.settings.muted || !project.hasAudio ? "speaker.slash.fill" : "speaker.wave.2.fill")
+                    .font(.system(size: 17)).foregroundStyle(badgeColor)
+                    .shadow(color: badgesOverImage ? .black.opacity(0.65) : .clear, radius: 3, y: 1)
                     .frame(width: 44, height: 44).contentShape(Circle())
-            }.studioGlassButton(circular: true, overImage: true).padding(13)
+            }.buttonStyle(.plain).padding(13)
                 .disabled(!project.hasAudio)
-                .accessibilityLabel(project.hasAudio ? (previewMuted ? "开启预览声音" : "关闭预览声音") : "原视频没有声音")
-                .accessibilityValue(previewMuted || !project.hasAudio ? "静音" : "有声")
+                .accessibilityLabel(project.hasAudio ? (project.settings.muted ? "开启作品声音" : "静音作品") : "原视频没有声音")
+                .accessibilityValue(project.settings.muted || !project.hasAudio ? "静音" : "有声")
+                .accessibilityHint("同时控制预览和导出声音")
                 .accessibilityIdentifier("previewSound")
-        }.accessibilityElement(children: .contain).accessibilityIdentifier("editorPreview")
-            .clipShape(RoundedRectangle(cornerRadius: 20))
-            .overlay(RoundedRectangle(cornerRadius: 20).stroke(StudioTheme.line, lineWidth: 1))
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+        }.frame(width: canvasSize.width, height: canvasSize.height)
+            .accessibilityElement(children: .contain).accessibilityIdentifier("editorPreview")
     }
 
     private var clipSelector: some View {
@@ -335,8 +346,13 @@ struct EditorView: View {
                     } else { value.end += Double(direction) / max(1, project.frameRate) }
                     value.normalize(sourceDuration: project.duration, speed: project.settings.speed, maxOutputDuration: project.settings.maxOutputDuration)
                     project.clips[clipIndex] = value
-                } label: { Image(systemName: direction == -1 ? "minus" : "plus").font(.system(size: 10)).frame(width: 44, height: 44).contentShape(Circle()) }
-                    .studioGlassButton(circular: true, tint: StudioTheme.accent.opacity(0.12))
+                } label: {
+                    Image(systemName: direction == -1 ? "minus" : "plus")
+                        .font(.system(size: 11, weight: .semibold)).foregroundStyle(StudioTheme.accent)
+                        .frame(width: 28, height: 28)
+                        .background(StudioTheme.accent.opacity(0.08), in: RoundedRectangle(cornerRadius: 6))
+                        .frame(width: 44, height: 44).contentShape(Rectangle())
+                }.buttonStyle(.plain)
                     .accessibilityLabel("\(isStart ? "入点" : "出点")\(direction == -1 ? "前移" : "后移")一帧")
             }
         }.buttonStyle(.plain)
@@ -388,45 +404,10 @@ struct EditorView: View {
     }
     @ViewBuilder private var toolPanel: some View {
         switch tool {
-        case 0: momentsPanel
         case 1: cropPanel
         case 2: colorPanel
         default: playbackPanel
         }
-    }
-    private var momentsPanel: some View {
-        StudioCard {
-            VStack(alignment: .leading, spacing: 15) {
-                SectionLabel(title: "沿时间发现片段", detail: "\(min(6, max(1, Int(ceil(project.duration / 3))))) 个候选")
-                Text("按时间均匀选取，点选切换，长按加入制作队列。").font(.system(size: 11)).foregroundStyle(StudioTheme.secondary)
-                ScrollView(.horizontal) {
-                    HStack(spacing: 10) {
-                        ForEach(0..<min(6, max(1, Int(ceil(project.duration / 3)))), id: \.self) { index in
-                            let count = min(6, max(1, Int(ceil(project.duration / 3))))
-                            let start = count > 1 ? Double(index) / Double(count - 1) * max(0, project.duration - min(3 * project.settings.speed, maxSourceClipDuration)) : 0
-                            VStack(alignment: .leading, spacing: 8) {
-                                if !thumbnails.isEmpty {
-                                    let thumbnailIndex = min(thumbnails.count - 1, Int(start / project.duration * Double(thumbnails.count)))
-                                    Image(uiImage: thumbnails[thumbnailIndex]).resizable().scaledToFill().frame(width: 90, height: 62).clipped().clipShape(RoundedRectangle(cornerRadius: 10))
-                                }
-                                Text(start.timeLabel).font(.system(size: 10, design: .monospaced)).foregroundStyle(StudioTheme.secondary)
-                            }.contentShape(Rectangle())
-                                .onTapGesture { project.clips[clipIndex] = suggestedClip(start: start, id: activeClipID) }
-                                .onLongPressGesture {
-                                    guard project.clips.count < 20 else { return }
-                                    let suggested = suggestedClip(start: start, id: UUID())
-                                    project.clips.append(suggested); activeClipID = suggested.id
-                                }
-                                .accessibilityAddTraits(.isButton).accessibilityLabel("选择 \(start.timeLabel) 的片段")
-                        }
-                    }
-                }.scrollIndicators(.hidden)
-            }
-        }
-    }
-    private func suggestedClip(start: Double, id: UUID) -> Clip {
-        let end = min(project.duration, start + maxSourceClipDuration)
-        return Clip(id: id, start: start, end: end, cover: (start + end) / 2)
     }
     private var cropPanel: some View {
         StudioCard {
@@ -476,7 +457,6 @@ struct EditorView: View {
                 HStack(spacing: 7) {
                     ForEach([0.5, 1, 1.5, 2], id: \.self) { speed in PillButton(title: "\(speed.formatted())×", selected: project.settings.speed == speed) { project.settings.speed = speed } }
                 }
-                Toggle("静音", isOn: $project.settings.muted).font(.system(size: 14)).disabled(!project.hasAudio)
                 Text(project.settings.maxOutputDuration == nil ? "当前不限制时长。调整倍速会改变输出长度。" : "输出最长 3 秒。可在设置中开启「不限制时长」。")
                     .font(.system(size: 11)).foregroundStyle(StudioTheme.secondary)
             }
@@ -528,7 +508,7 @@ struct EditorView: View {
         let generation = UUID(); previewGeneration = generation
         let source = sourceURL, currentClip = clip
         var settings = project.settings
-        settings.muted = false // Preview audio is controlled independently from export.
+        settings.muted = false // Keep the source track; the project's speaker control mutes the player.
         previewTask = Task {
             do {
                 try await Task.sleep(for: .milliseconds(180))
@@ -536,7 +516,7 @@ struct EditorView: View {
                 let item = prepared.item
                 guard !Task.isCancelled, previewGeneration == generation else { return }
                 player.replaceCurrentItem(with: item)
-                player.isMuted = previewMuted
+                player.isMuted = project.settings.muted
                 preparedPreview = prepared
                 if previewHeld && !cropDragging { startPlayback() }
                 if let playerObserver { NotificationCenter.default.removeObserver(playerObserver) }
@@ -552,7 +532,7 @@ struct EditorView: View {
     private func startPlayback() {
         guard let prepared = preparedPreview, player.currentItem === prepared.item else { return }
         let generation = UUID(); playbackGeneration = generation
-        player.isMuted = previewMuted
+        player.isMuted = project.settings.muted
         playing = true
         player.seek(to: prepared.start, toleranceBefore: .zero, toleranceAfter: .zero) { finished in
             Task { @MainActor in

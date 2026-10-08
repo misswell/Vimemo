@@ -26,6 +26,14 @@ final class StudioFlowTests: XCTestCase {
         start.press(forDuration: 0.05, thenDragTo: end)
     }
 
+    private func scrollExport(_ app: XCUIApplication, to element: XCUIElement) {
+        let action = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@ OR label BEGINSWITH %@", "制作并保存", "制作文件")).firstMatch
+        for _ in 0..<6 {
+            if element.isHittable && element.frame.maxY < action.frame.minY - 8 { return }
+            app.scrollViews["exportOptionsScroll"].swipeUp()
+        }
+    }
+
     @MainActor func testNativeTabBarContinuousScrolling() throws {
         let app = XCUIApplication()
         app.launchArguments = ["--test-library", UUID().uuidString, "--scroll-fixture"]
@@ -88,13 +96,75 @@ final class StudioFlowTests: XCTestCase {
         app.launch()
         XCTAssertTrue(app.buttons["makeLivePhotos"].waitForExistence(timeout: 10))
 
-        let preview = app.descendants(matching: .any)["editorPreview"]
+        let preview = app.buttons["previewPlayback"]
         XCTAssertTrue(preview.waitForExistence(timeout: 5))
         screenshot(app, name: "portrait-preview")
         let bounds = preview.frame
         XCTAssertGreaterThan(bounds.height, 0)
         XCTAssertEqual(bounds.width / bounds.height, 0.75, accuracy: 0.08,
                        "Portrait video preview should use the source aspect ratio instead of a landscape frame.")
+    }
+
+    @MainActor func testPreviewBadgesStayAtCanvasCornersAcrossRatios() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["--test-library", UUID().uuidString, "--demo-editor"]
+        app.launch()
+        XCTAssertTrue(app.buttons["editorTool1"].waitForExistence(timeout: 10))
+        app.buttons["editorTool1"].tap()
+        let live = app.descendants(matching: .any).matching(identifier: "previewLiveBadge").firstMatch
+        let duration = app.descendants(matching: .any).matching(identifier: "previewDurationBadge").firstMatch
+        let sound = app.buttons["previewSound"]
+        let originalCorners = [live.frame, duration.frame, sound.frame]
+        for ratio in ["9:16", "1:1", "16:9"] {
+            app.buttons[ratio].tap()
+            // A containing AX element reports the union of its visible children,
+            // including the video. Measure the corner badges themselves.
+            for (element, frame) in zip([live, duration, sound], originalCorners) {
+                XCTAssertEqual(element.frame.midX, frame.midX, accuracy: 1)
+                XCTAssertEqual(element.frame.midY, frame.midY, accuracy: 1)
+            }
+            screenshot(app, name: "fixed-preview-corners-" + ratio.replacingOccurrences(of: ":", with: "-"))
+        }
+    }
+
+    @MainActor func testShortClipTrimmingAndCoverGripHaveSeparateTargets() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["--test-library", UUID().uuidString, "--demo-editor"]
+        app.launch()
+        let cover = app.descendants(matching: .any)["coverFrameHandle"]
+        let start = app.descendants(matching: .any)["trimStartHandle"]
+        let end = app.descendants(matching: .any)["trimEndHandle"]
+        XCTAssertTrue(cover.waitForExistence(timeout: 10))
+        for _ in 0..<5 {
+            if cover.isHittable && cover.frame.maxY < app.buttons["editorTool0"].frame.minY - 8 { break }
+            scrollEditor(app)
+        }
+        let oldStart = start.value as? String
+        let oldEnd = end.value as? String
+        let origin = app.coordinate(withNormalizedOffset: .zero)
+        let line = origin.withOffset(CGVector(dx: cover.frame.midX, dy: start.frame.midY))
+        line.press(forDuration: 0.05, thenDragTo: line.withOffset(CGVector(dx: 26, dy: 0)))
+        XCTAssertNotEqual(start.value as? String, oldStart, "Dragging the upper line must move the clip")
+        XCTAssertNotEqual(end.value as? String, oldEnd)
+        let right = end.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        right.press(forDuration: 0.05, thenDragTo: origin.withOffset(CGVector(dx: start.frame.midX + 12, dy: end.frame.midY)))
+        XCTAssertLessThan(end.frame.midX - start.frame.midX, 44, "The clip must be narrower than the original 44-point trim targets")
+        let shortStart = start.value as? String
+        let left = start.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        left.press(forDuration: 0.05, thenDragTo: left.withOffset(CGVector(dx: -8, dy: 0)))
+        XCTAssertNotEqual(start.value as? String, shortStart, "A short clip's start must remain draggable")
+        let shortEnd = end.value as? String
+        let endGrip = end.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        endGrip.press(forDuration: 0.05, thenDragTo: endGrip.withOffset(CGVector(dx: 24, dy: 0)))
+        XCTAssertNotEqual(end.value as? String, shortEnd, "The cover line must not intercept the end")
+        let beforeCover = cover.value as? String
+        let clipStart = start.value as? String, clipEnd = end.value as? String
+        let arrow = cover.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        arrow.press(forDuration: 0.05, thenDragTo: arrow.withOffset(CGVector(dx: -8, dy: 0)))
+        XCTAssertNotEqual(cover.value as? String, beforeCover)
+        XCTAssertEqual(start.value as? String, clipStart)
+        XCTAssertEqual(end.value as? String, clipEnd)
+        screenshot(app, name: "short-clip-separate-cover-grip")
     }
 
     @MainActor func testCoverScrubbingKeepsPreviewAndSettlesBeforeSaving() throws {
@@ -191,7 +261,7 @@ final class StudioFlowTests: XCTestCase {
         screenshot(app, name: "cover-line-after-continuous-drag")
     }
 
-    @MainActor func testHoldPreviewReleasesAndSoundIsIndependent() throws {
+    @MainActor func testHoldPreviewReleasesAndSoundIcon() throws {
         let app = XCUIApplication()
         app.launchArguments = ["--test-library", UUID().uuidString, "--demo-editor"]
         app.launch()
@@ -203,15 +273,15 @@ final class StudioFlowTests: XCTestCase {
         XCTAssertEqual(preview.label, "按住预览实况")
         let sound = app.buttons["previewSound"]
         XCTAssertTrue(sound.isHittable)
-        XCTAssertEqual(sound.value as? String, "静音")
+        XCTAssertEqual(sound.value as? String, sound.isEnabled ? "有声" : "静音")
         if sound.isEnabled {
             sound.tap()
-            XCTAssertEqual(sound.value as? String, "有声")
+            XCTAssertEqual(sound.value as? String, "静音")
             XCTAssertEqual(preview.value as? String, "封面", "Sound control must not start playback")
             preview.press(forDuration: 0.8)
-            XCTAssertEqual(sound.value as? String, "有声")
-            sound.tap()
             XCTAssertEqual(sound.value as? String, "静音")
+            sound.tap()
+            XCTAssertEqual(sound.value as? String, "有声")
         } else { XCTAssertEqual(sound.label, "原视频没有声音") }
         screenshot(app, name: "hold-live-preview-and-sound")
     }
@@ -312,7 +382,7 @@ final class StudioFlowTests: XCTestCase {
         XCTAssertEqual(app.buttons["appearance-system"].value as? String, "已选择")
     }
 
-    @MainActor func testPersistentToolsCoverResetAndQuickDraftExport() throws {
+    @MainActor func testPersistentToolsCoverResetAndDraftExport() throws {
         let app = XCUIApplication()
         app.launchArguments = ["--test-library", UUID().uuidString]
         app.launch()
@@ -343,13 +413,17 @@ final class StudioFlowTests: XCTestCase {
         field.tap()
         field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: "海边的最后一束光".count) + "重新命名")
         app.alerts.buttons["保存"].tap()
-        let quickExport = app.buttons["导出重新命名"]
-        XCTAssertTrue(quickExport.waitForExistence(timeout: 5))
-        quickExport.tap()
-        screenshot(app, name: "30-quick-export-after-tap")
+        XCTAssertFalse(app.buttons["导出重新命名"].exists)
+        let renamed = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label CONTAINS %@", "draft-", "重新命名")).firstMatch
+        XCTAssertTrue(renamed.waitForExistence(timeout: 5))
+        renamed.tap()
+        XCTAssertTrue(app.buttons["makeLivePhotos"].waitForExistence(timeout: 5))
+        app.buttons["makeLivePhotos"].tap()
         XCTAssertTrue(app.staticTexts["制作与导出"].waitForExistence(timeout: 5))
-        screenshot(app, name: "19-quick-export")
+        screenshot(app, name: "draft-editor-export")
+        scrollExport(app, to: app.buttons["静态照片"])
         app.buttons["静态照片"].tap()
+        scrollExport(app, to: app.buttons["本机作品 / 分享文件"])
         app.buttons["本机作品 / 分享文件"].tap()
         app.buttons["制作文件 · 1 个作品"].tap()
         XCTAssertTrue(app.staticTexts["已制作 1 个作品"].waitForExistence(timeout: 30))
@@ -430,31 +504,96 @@ final class StudioFlowTests: XCTestCase {
         XCTAssertEqual(app.buttons["gifFPS24"].value as? String, "已选择")
     }
 
-    @MainActor func testMuteToggleAppearsInVideoExportPrivacyOptions() throws {
+    @MainActor func testExportPreviewUsesEditsPlaysAndEnlarges() throws {
         let app = XCUIApplication()
         app.launchArguments = ["--test-library", UUID().uuidString, "--demo-editor"]
         app.launch()
-        XCTAssertTrue(app.buttons["makeLivePhotos"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["editorTool1"].waitForExistence(timeout: 10))
+        app.buttons["editorTool1"].tap()
+        app.buttons["1:1"].tap()
+        app.buttons["editorTool2"].tap()
+        app.buttons["胶片"].tap()
+        app.buttons["editorTool3"].tap()
+        app.buttons["2×"].tap()
         app.buttons["makeLivePhotos"].tap()
+        let preview = app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@", "exportClipPreview-")).firstMatch
+        XCTAssertTrue(preview.waitForExistence(timeout: 10))
+        XCTAssertTrue((preview.value as? String ?? "").contains("胶片"))
+        XCTAssertTrue((preview.value as? String ?? "").contains("2×"))
+        XCTAssertTrue((preview.value as? String ?? "").contains("1.50秒"))
+        XCTAssertEqual(preview.frame.width / preview.frame.height, 1, accuracy: 0.05)
+        preview.tap()
+        let playing = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value CONTAINS %@", "正在播放"), object: preview)
+        XCTAssertEqual(XCTWaiter.wait(for: [playing], timeout: 10), .completed)
+        screenshot(app, name: "real-edited-export-preview")
+        let inlineWidth = preview.frame.width
+        preview.press(forDuration: 0.8)
+        let enlarged = app.descendants(matching: .any)["expandedClipPreview"]
+        XCTAssertTrue(enlarged.waitForExistence(timeout: 5))
+        XCTAssertGreaterThan(enlarged.frame.width, inlineWidth)
+        let largePlaying = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value CONTAINS %@", "正在播放"), object: enlarged)
+        XCTAssertEqual(XCTWaiter.wait(for: [largePlaying], timeout: 10), .completed)
+        XCTAssertTrue((enlarged.value as? String ?? "").contains("胶片"))
+        screenshot(app, name: "enlarged-edited-export-preview")
+        app.buttons["closeExpandedPreview"].tap()
+        scrollExport(app, to: app.buttons["静态照片"])
+        app.buttons["静态照片"].tap()
+        app.scrollViews["exportOptionsScroll"].swipeDown()
+        XCTAssertTrue(preview.waitForExistence(timeout: 5))
+        preview.press(forDuration: 0.8)
+        XCTAssertTrue(enlarged.waitForExistence(timeout: 5))
+        XCTAssertTrue((enlarged.value as? String ?? "").contains("封面"))
+        app.buttons["closeExpandedPreview"].tap()
+    }
 
+    @MainActor func testEditorSoundIsUnifiedAndPersists() throws {
+        let library = UUID().uuidString
+        let fixture = try XCTUnwrap(Bundle(for: StudioFlowTests.self).url(forResource: "AudioFixture", withExtension: "mov"))
+        let app = XCUIApplication()
+        app.launchArguments = ["--test-library", library, "--test-editor-video", fixture.path]
+        app.launch()
+        let sound = app.buttons["previewSound"]
+        XCTAssertTrue(sound.waitForExistence(timeout: 10))
+        XCTAssertTrue(sound.isEnabled, "Use a source with a real audio track")
+        XCTAssertEqual(sound.value as? String, "有声")
+        sound.tap()
+        XCTAssertEqual(sound.value as? String, "静音")
+        XCTAssertFalse(app.buttons["发现更多片段"].exists)
+        let precise = app.buttons["精确裁剪"]
+        for _ in 0..<6 {
+            if precise.isHittable && precise.frame.maxY < app.buttons["editorTool0"].frame.minY - 8 { break }
+            scrollEditor(app)
+        }
+        precise.tap()
+        let step = app.buttons["入点后移一帧"]
+        for _ in 0..<6 {
+            if step.isHittable && step.frame.maxY < app.buttons["editorTool0"].frame.minY - 8 { break }
+            scrollEditor(app)
+        }
+        XCTAssertTrue(step.isHittable)
+        step.tap()
+        screenshot(app, name: "compact-precise-trim-and-sound-icon")
+        app.buttons["editorTool3"].tap()
+        XCTAssertFalse(app.switches["静音"].exists)
+        app.buttons["返回工作台"].tap()
+        app.terminate()
+        app.launchArguments = ["--test-library", library]
+        app.launch()
+        let draft = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "声音测试")).firstMatch
+        XCTAssertTrue(draft.waitForExistence(timeout: 10))
+        draft.tap()
+        XCTAssertTrue(sound.waitForExistence(timeout: 10))
+        XCTAssertEqual(sound.value as? String, "静音", "The speaker controls the saved project setting")
+        app.buttons["makeLivePhotos"].tap()
         let privacy = app.buttons["拍摄信息与隐私"]
         let exportButton = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "制作并保存")).firstMatch
         XCTAssertTrue(exportButton.waitForExistence(timeout: 5))
-        XCTAssertGreaterThan(app.scrollViews.count, 0)
-        let scroll = app.scrollViews.element(boundBy: app.scrollViews.count - 1)
+        let scroll = app.scrollViews["exportOptionsScroll"]
         for _ in 0..<5 where privacy.frame.maxY > exportButton.frame.minY { scroll.swipeUp() }
-        XCTAssertTrue(privacy.waitForExistence(timeout: 5))
-        XCTAssertLessThan(privacy.frame.maxY, exportButton.frame.minY)
         privacy.tap()
-        XCTAssertTrue(app.staticTexts["开启后，导出的视频不包含音轨；原始视频不受影响。"].waitForExistence(timeout: 5))
-
-        let mute = app.descendants(matching: .any).matching(identifier: "exportMute").firstMatch
-        XCTAssertTrue(mute.waitForExistence(timeout: 5))
-        for _ in 0..<3 where !mute.isHittable { scroll.swipeUp() }
-        XCTAssertTrue(mute.isHittable)
-        XCTAssertEqual(mute.value as? String, "0")
-        mute.tap()
-        XCTAssertEqual(mute.value as? String, "1")
+        XCTAssertFalse(app.descendants(matching: .any)["exportMute"].exists)
+        XCTAssertFalse(app.switches["静音导出"].exists)
+        screenshot(app, name: "export-uses-project-sound")
     }
 
     @MainActor func testPurchaseUnavailableKeepsVisibleRetryAndFreeExit() throws {

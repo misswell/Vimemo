@@ -77,6 +77,14 @@ struct HomeView: View {
         }
         .task {
             #if DEBUG
+            let args = ProcessInfo.processInfo.arguments
+            if let libraryIndex = args.firstIndex(of: "--test-library"), libraryIndex + 1 < args.count,
+               UUID(uuidString: args[libraryIndex + 1]) != nil,
+               let videoIndex = args.firstIndex(of: "--test-editor-video"), videoIndex + 1 < args.count {
+                do { editing = try await store.importVideo(URL(fileURLWithPath: args[videoIndex + 1]), title: "声音测试") }
+                catch { store.errorMessage = error.localizedDescription }
+                return
+            }
             if usesScrollFixture, let demo = await store.importDemo() {
                 store.projects = (0..<24).map { i in var item = demo; item.id = UUID(); item.title = "滚动示例 \(i)"; return item }
             }
@@ -122,27 +130,18 @@ struct HomeView: View {
                         }.frame(maxWidth: .infinity, alignment: .leading).padding(.vertical, 24)
                             .overlay(alignment: .top) { Rectangle().fill(StudioTheme.line).frame(height: 1) }
                     } else {
-                        StudioGlassGroup(spacing: 16) {
-                            LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 16)], spacing: 22) {
-                                ForEach(store.projects) { project in
-                                    ZStack(alignment: .topTrailing) {
-                                        Button {
-                                            if batchMode {
-                                                if batchIDs.contains(project.id) { batchIDs.remove(project.id) } else { batchIDs.insert(project.id) }
-                                            } else { editing = project }
-                                        } label: { projectCard(project) }.buttonStyle(.plain)
-                                            .accessibilityIdentifier("draft-\(project.id.uuidString)")
-                                            .contextMenu {
-                                                Button("重命名", systemImage: "pencil") { renameText = project.title; renaming = project }
-                                                Button("删除草稿", systemImage: "trash", role: .destructive) { deleting = project }
-                                            }
-                                        if !batchMode {
-                                            Button { exportProjects = [project]; exportSelection = ExportSelection(projects: [project]) } label: {
-                                                Image(systemName: "square.and.arrow.up").font(.system(size: 16, weight: .semibold)).frame(width: 44, height: 44).foregroundStyle(.white).contentShape(Circle())
-                                            }.studioGlassButton(circular: true, overImage: true).contentShape(Circle()).padding(8).zIndex(1).accessibilityLabel("导出\(project.title)")
-                                        }
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 16)], spacing: 22) {
+                            ForEach(store.projects) { project in
+                                Button {
+                                    if batchMode {
+                                        if batchIDs.contains(project.id) { batchIDs.remove(project.id) } else { batchIDs.insert(project.id) }
+                                    } else { editing = project }
+                                } label: { projectCard(project) }.buttonStyle(.plain)
+                                    .accessibilityIdentifier("draft-\(project.id.uuidString)")
+                                    .contextMenu {
+                                        Button("重命名", systemImage: "pencil") { renameText = project.title; renaming = project }
+                                        Button("删除草稿", systemImage: "trash", role: .destructive) { deleting = project }
                                     }
-                                }
                             }
                         }
                     }
@@ -176,7 +175,7 @@ struct HomeView: View {
                         Label("导入视频", systemImage: "plus.circle.fill")
                             .font(.subheadline.weight(.semibold)).foregroundStyle(.white)
                     }.padding(20)
-                }.frame(height: 260).clipShape(RoundedRectangle(cornerRadius: 12))
+                }.frame(height: 260).clipShape(RoundedRectangle(cornerRadius: 12)).contentShape(Rectangle())
             }.buttonStyle(.plain).accessibilityLabel("导入视频").accessibilityIdentifier("importVideos")
             HStack(spacing: 12) {
                 Button { fileImporter = true } label: {

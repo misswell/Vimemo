@@ -11,6 +11,9 @@ struct TimelineView: View {
     @State private var dragStart: Clip?
     @State private var coverDrag: FrameScrubSession?
     @State private var fineScrubbing = false
+    private let thumbnailHeight: CGFloat = 58
+    private let selectionHeight: CGFloat = 61
+    private let handleTouchHeight: CGFloat = 70
 
     var body: some View {
         VStack(spacing: 12) {
@@ -24,13 +27,14 @@ struct TimelineView: View {
                 ZStack(alignment: .topLeading) {
                     HStack(spacing: 1) {
                         ForEach(Array(thumbnails.enumerated()), id: \.offset) { _, image in
-                            Image(uiImage: image).resizable().scaledToFill().frame(width: max(1, width / CGFloat(max(1, thumbnails.count)) - 1), height: 58).clipped()
+                            Image(uiImage: image).resizable().scaledToFill().frame(width: max(1, width / CGFloat(max(1, thumbnails.count)) - 1), height: thumbnailHeight).clipped()
                         }
-                    }.frame(width: width, height: 58).background(StudioTheme.raised).clipShape(RoundedRectangle(cornerRadius: 10))
-                    Rectangle().fill(.black.opacity(0.55)).frame(width: left, height: 58).allowsHitTesting(false)
-                    Rectangle().fill(.black.opacity(0.55)).frame(width: max(0, width - right), height: 58).offset(x: right).allowsHitTesting(false)
-                    RoundedRectangle(cornerRadius: 8).stroke(StudioTheme.accent, lineWidth: 3).frame(width: max(8, right - left), height: 61).offset(x: left).allowsHitTesting(false)
-                    Rectangle().fill(.clear).contentShape(Rectangle()).frame(width: max(8, right - left), height: 58).offset(x: left)
+                    }.frame(width: width, height: thumbnailHeight).background(StudioTheme.raised).clipShape(RoundedRectangle(cornerRadius: 10))
+                    Rectangle().fill(.black.opacity(0.55)).frame(width: left, height: thumbnailHeight).allowsHitTesting(false)
+                    Rectangle().fill(.black.opacity(0.55)).frame(width: max(0, width - right), height: thumbnailHeight).offset(x: right).allowsHitTesting(false)
+                    RoundedRectangle(cornerRadius: 8).stroke(StudioTheme.accent, lineWidth: 3).frame(width: max(8, right - left), height: selectionHeight)
+                        .offset(x: left, y: (thumbnailHeight - selectionHeight) / 2).allowsHitTesting(false)
+                    Rectangle().fill(.clear).contentShape(Rectangle()).frame(width: max(8, right - left), height: thumbnailHeight).offset(x: left)
                         .simultaneousGesture(DragGesture(minimumDistance: 4).onChanged { value in
                             guard abs(value.translation.width) >= abs(value.translation.height) else { return }
                             if dragStart == nil { dragStart = clip }
@@ -42,7 +46,8 @@ struct TimelineView: View {
                             onSeek(clip.cover, true)
                         }.onEnded { _ in dragStart = nil; onSeek(clip.cover, false) })
                     coverHandle(width: width, duration: total).offset(x: cover - 22)
-                    handle.offset(x: left - 22).simultaneousGesture(DragGesture(minimumDistance: 0).onChanged { value in
+                    // Center the full touch target on the strip, not at its top edge.
+                    handle(isStart: true, selectionWidth: right - left).offset(x: left - 22, y: (thumbnailHeight - handleTouchHeight) / 2).simultaneousGesture(DragGesture(minimumDistance: 0).onChanged { value in
                         guard abs(value.translation.width) >= abs(value.translation.height) else { return }
                         if dragStart == nil { dragStart = clip }
                         let start = (dragStart?.start ?? clip.start) + value.translation.width / width * total
@@ -51,7 +56,9 @@ struct TimelineView: View {
                         clip.normalize(sourceDuration: duration, speed: speed, maxOutputDuration: maxOutputDuration)
                         onSeek(clip.start, true)
                     }.onEnded { _ in dragStart = nil; onSeek(clip.cover, false) })
-                    handle.offset(x: right - 22).simultaneousGesture(DragGesture(minimumDistance: 0).onChanged { value in
+                        .accessibilityElement(children: .ignore).accessibilityLabel("裁剪入点")
+                        .accessibilityValue(clip.start.timeLabel).accessibilityIdentifier("trimStartHandle")
+                    handle(isStart: false, selectionWidth: right - left).offset(x: right - 22, y: (thumbnailHeight - handleTouchHeight) / 2).simultaneousGesture(DragGesture(minimumDistance: 0).onChanged { value in
                         guard abs(value.translation.width) >= abs(value.translation.height) else { return }
                         if dragStart == nil { dragStart = clip }
                         let end = (dragStart?.end ?? clip.end) + value.translation.width / width * total
@@ -59,6 +66,8 @@ struct TimelineView: View {
                         clip.normalize(sourceDuration: duration, speed: speed, maxOutputDuration: maxOutputDuration)
                         onSeek(max(clip.start, clip.end - 1 / max(1, frameRate)), true)
                     }.onEnded { _ in dragStart = nil; onSeek(clip.cover, false) })
+                        .accessibilityElement(children: .ignore).accessibilityLabel("裁剪出点")
+                        .accessibilityValue(clip.end.timeLabel).accessibilityIdentifier("trimEndHandle")
                 }.coordinateSpace(name: "coverTimeline")
             }.frame(height: 96)
             HStack {
@@ -74,12 +83,13 @@ struct TimelineView: View {
     }
 
     private func coverHandle(width: CGFloat, duration: Double) -> some View {
-        VStack(spacing: -2) {
+        ZStack(alignment: .top) {
             Capsule().fill(StudioTheme.peach).frame(width: coverDrag == nil ? 2 : 3, height: 70)
+                .offset(y: 3).allowsHitTesting(false)
             Image(systemName: "arrow.left.and.right").font(.system(size: 10, weight: .bold))
                 .foregroundStyle(StudioTheme.onAccent).frame(width: 30, height: 22)
                 .background(StudioTheme.peach, in: Capsule())
-        }.frame(width: 44, height: 96).contentShape(Rectangle())
+                .frame(width: 44, height: 44).contentShape(Rectangle()).offset(y: 60)
             .gesture(DragGesture(minimumDistance: 0, coordinateSpace: .named("coverTimeline")).onChanged { value in
                 if coverDrag == nil {
                     let end = max(clip.start, clip.end - 1 / max(1, frameRate))
@@ -102,10 +112,25 @@ struct TimelineView: View {
                 clip.coverPhotoFilename = nil
                 onSeek(clip.cover, false)
             }.accessibilityIdentifier("coverFrameHandle")
+        }.frame(width: 44, height: 96, alignment: .top)
     }
-    private var handle: some View {
-        RoundedRectangle(cornerRadius: 5).fill(StudioTheme.accent).frame(width: 20, height: 61)
+    private func handle(isStart: Bool, selectionWidth: CGFloat) -> some View {
+        RoundedRectangle(cornerRadius: 5).fill(StudioTheme.accent).frame(width: 20, height: selectionHeight)
             .overlay { Capsule().fill(StudioTheme.onAccent.opacity(0.8)).frame(width: 2, height: 19) }
-            .frame(width: 44, height: 70).contentShape(Rectangle())
+            .frame(width: 44, height: handleTouchHeight)
+            .contentShape(TrimHandleTouchShape(isStart: isStart, halfSelectionWidth: selectionWidth / 2))
+    }
+
+    private struct TrimHandleTouchShape: Shape {
+        let isStart: Bool
+        let halfSelectionWidth: CGFloat
+        func path(in rect: CGRect) -> Path {
+            // When a clip is narrow, divide overlapping targets at its midpoint.
+            let innerReach = min(rect.width / 2, max(0, halfSelectionWidth))
+            let area = isStart
+                ? CGRect(x: rect.minX, y: rect.minY, width: rect.width / 2 + innerReach, height: rect.height)
+                : CGRect(x: rect.midX - innerReach, y: rect.minY, width: rect.width / 2 + innerReach, height: rect.height)
+            return Path(area)
+        }
     }
 }

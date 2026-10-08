@@ -270,7 +270,6 @@ struct ImportedMovie: Transferable {
         project.settings.quality = ExportQuality(rawValue: UserDefaults.standard.string(forKey: "defaultQuality") ?? "") ?? .high
         project.settings.preserveDate = UserDefaults.standard.object(forKey: "defaultPreserveDate") as? Bool ?? true
         project.settings.preserveLocation = UserDefaults.standard.bool(forKey: "defaultPreserveLocation")
-        project.settings.muted = UserDefaults.standard.bool(forKey: "defaultMuted")
         project.settings.unlimitedDuration = unlimitedDuration
         project.hasAudio = !(try await asset.loadTracks(withMediaType: .audio)).isEmpty
         projects.insert(project, at: 0)

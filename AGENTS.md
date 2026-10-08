@@ -1,7 +1,7 @@
 # Vimemo 项目规则
 
 - 整体样式以 iOS 27 Apple Music 为参照：系统黑白背景、红粉强调色、SF 系统字体、大标题及封面主导的内容网格。底栏必须使用原生 TabView，由系统提供统一浮动 Liquid Glass、选中态与滚动收起，禁止外层玻璃叠加多个独立玻璃 tab 按钮。外观默认跟随系统，可选择深色或浅色；使用动态 UIColor 随 trait 更新，编辑、导出及购买页不得强制独立深浅色。外观偏好持久化，DEBUG UI 测试随独立库隔离。编辑器固定预览、封面入口和底部工具，参数区独立滚动；宽屏双栏展示。精确参数按需展开，重置画面先确认。工作台导出使用携带完整项目快照的 `sheet(item:)`，避免布尔 sheet 初始化时读到旧的空数组；关闭导出只结束所选项目的临时编辑。
-- 使用 Xcode 27 SDK 构建并在 iOS 27 验证；原生底部导航与主操作使用系统 Liquid Glass，草稿快速导出、预览播放及封面操作使用 iOS 26 起的原生 Liquid Glass；成组控件使用 GlassEffectContainer。iOS 18–25 回退系统材质，降低透明度时采用实色底；图片上的控件仅局部设置深色环境，不能修改全局外观。按钮优先使用原生 buttonStyle(.glass)，保留 contentShape 触控范围；草稿快速导出位于独立 ZStack 层级，避免点击穿透至编辑按钮。
+- 使用 Xcode 27 SDK 构建并在 iOS 27 验证；原生底部导航与主操作使用系统 Liquid Glass，预览播放及封面操作使用 iOS 26 起的原生 Liquid Glass；成组控件使用 GlassEffectContainer。iOS 18–25 回退系统材质，降低透明度时采用实色底；图片上的控件仅局部设置深色环境，不能修改全局外观。按钮优先使用原生 buttonStyle(.glass)，保留 contentShape 触控范围。
 - 原生 iOS SwiftUI 应用，最低 iOS 18；使用 Apple AVFoundation、Photos、Core Image，没有第三方运行时依赖。
 - `project.yml` 是工程配置来源；调整 target、资源、权限或 scheme 后运行 `xcodegen generate`。
 - 保持视频转换在设备本地。使用 PhotosPicker / 文件选择器导入，照片权限仅请求 `.addOnly`。
@@ -21,7 +21,7 @@
 - GitHub 远端：`https://github.com/misswell/Vimemo.git`，主分支 `main`。改动验证通过后自动提交、推送，创建新的 patch tag 和正式 GitHub Release，不覆盖既有 tag；Release 附带正式签名 IPA。`build/`、`Reference/` 和签名凭据保持忽略。
 - GitHub 首次发布版本为 1.0.1（2），tag `v1.0.1`；与既有 TestFlight 1.0.0（1）分开记录。推送源码和创建 GitHub Release 不自动重复上传 TestFlight。
 - 不把 Apple 密码、签名私钥或 provisioning 凭据写入仓库。当前开发团队：`U8U443D7ZL`。
-- TestFlight：应用 ID `6819492441`，名称 `Vimemo 实刻`，Bundle ID `com.vimemo.live`，开发者资源 ID `B2FH899KC9`；复用证书 `L4SC3D834Q`（Apple Distribution，2027-07-20 到期）和 profile `BM6L3P6PT6` / `Vimemo App Store`。正式签名归档与 IPA 已验证；内部测试组 ID `58d7d5de-0316-4bf2-a7a5-5acf1387b9d5`。
+- TestFlight：应用 ID `6819492441`，名称 `Vimemo 实刻`，Bundle ID `com.vimemo.live`，开发者资源 ID `B2FH899KC9`；内部测试组 ID `58d7d5de-0316-4bf2-a7a5-5acf1387b9d5`。2026-10-08 当前本机可用签名证书为 `J4Z29X3RMS`（Apple Distribution，2027-09-06 到期），匹配 profile `6MHWC2L57T` / `Vimemo App Store 2026-10-08`，UUID `d8602249-9024-42f9-a428-8ce131ecd567`。旧证书 `L4SC3D834Q` 与 profile `BM6L3P6PT6` 保留，未撤销；本机当前私钥与旧 profile 不匹配，不直接复用旧导出配置。
 - 正式上传产物：`build/TestFlight/Vimemo-1.0.0-1.xcarchive`、`build/TestFlight/Export/Vimemo.ipa`。`build/TestFlight/ExportOptions.plist` 使用手动签名；版本与 build 分别取 `MARKETING_VERSION` / `CURRENT_PROJECT_VERSION`。上传前核对 IPA 内 Info.plist 的实际版本。
 - TestFlight 中文测试说明保存在 `build/TestFlight/WhatToTest.zh-Hans.txt`。应用使用 iOS、简体中文、Bundle ID `com.vimemo.live`、SKU `VIMEMO-IOS-001`；先查询已有 builds，防止重复上传同一版本号。
 - 2026-10-06 已完成首次 TestFlight 发布：1.0.0（1），构建 ID `54e012e6-b4cc-4c50-a763-8058c9640432`，处理状态 `VALID`，内部状态 `IN_BETA_TESTING`；中文说明已写入，`misswell@foxmail.com` 已加入内部组并获得邀请。测试者 ID `f12b8d21-7e69-4af8-b0b1-6d3bf08675f6`。后续上传递增 build number，复用现有内部组和测试者，不重复创建或发送邀请。
@@ -38,7 +38,7 @@
 - 2026-10-07 GitHub patch 1.0.14：整体样式对齐 iOS 27 Apple Music，使用系统黑白背景、红粉强调色、大标题与自适应封面网格；原生 TabView 统一浮动 Liquid Glass、选中态和滚动收起，iPad 使用系统顶部标签栏。设置采用系统分组列表，编辑、导出和购买页共享主题。使用 Xcode 27（27A5209h）及 iOS 27 SDK，App 版本保持 1.0.11，构建号 15；正式签名 IPA 为 `build/Release/Vimemo-1.0.11-15.ipa`。相关 iPhone 外观、编辑/封面/快速导出、静音、购买失败、原生导航、草稿临时清理及免费退出流程已通过，iPadOS 27 原生导航通过；UI 测试适配收起标签栏与系统列表开关点击。此次不重复上传 TestFlight。
 - 2026-10-07 已更新 TestFlight 内部测试至 1.0.11（15），构建 ID `aa78729d-70d0-422d-9dc2-1cdea6d58049`，状态 `VALID` / `IN_BETA_TESTING`；使用稳定版 Xcode 26.6 重建并签名，正式 IPA 为 `build/Release/Vimemo-1.0.11-15-stable.ipa`，复用现有 Internal Testers 组并写入中文测试说明，自动通知已开启。
 
-- 编辑预览采用按住播放、松手回封面，右下角扬声器只控制当前预览声音，默认静音，不改变导出静音设置。视频预览直接播放源文件，以 AVPlayerItemVideoOutput 和 Metal/Core Image 实时应用共享构图、调色；避免 iOS 27 合成视频播放的 -11800 / -12784 失败。首帧呈现前保持封面，静止时暂停显示刷新；裁剪起止与倍速由原生播放器控制。封面解码器复用、请求合并、缓存有内存上限，拖动时轻量预览，松手锁定精确帧；确认保存必须等待精确帧就绪。时间轴封面线可拖动，下拉慢速选帧；两侧帧按钮与中央拖动微调共用选择状态。
+- 编辑预览采用按住播放、松手回封面，作品静音统一由预览右下角的扬声器图标控制，图标没有按钮背景，保留 44 点触控范围；预览与导出共享草稿 settings.muted，默认保留原片声音，无音轨时禁用。编辑播放区、导出页和全局设置不重复提供静音开关，批量导出分别沿用每个作品的静音状态。视频预览直接播放源文件，以 AVPlayerItemVideoOutput 和 Metal/Core Image 实时应用共享构图、调色；避免 iOS 27 合成视频播放的 -11800 / -12784 失败。首帧呈现前保持封面，静止时暂停显示刷新；裁剪起止与倍速由原生播放器控制。封面解码器复用、请求合并、缓存有内存上限，拖动时轻量预览，松手锁定精确帧；确认保存必须等待精确帧就绪。时间轴封面线可拖动，下拉慢速选帧；两侧帧按钮与中央拖动微调共用选择状态。
 - 2026-10-07 GitHub patch 1.0.16：优化连续封面选帧，新增可拖动的时间轴封面线和中央逐帧微调；预览改为按住播放、松手返回封面，增加独立预览声音按钮，并绕开 iOS 27 合成播放失败。App 版本保持 1.0.11，构建号 16；17 项相关单元测试通过（含实际播放推进、倍速与裁剪终点、预览/导出一致及系统实况识别），iPhone 4 项与 iPad 2 项相关界面流程通过。正式 IPA 为 `build/Release/Vimemo-1.0.11-16.ipa`，使用稳定版 Xcode 26.6 签名，Xcode 27 / iOS 27 验证。此次不自动上传 TestFlight。
 - 画面选择裁剪比例后可直接拖动预览定位；缓存未经裁切但已应用旋转、翻转和调色的完整封面，拖动只更新显示偏移与共享 cropX/cropY，松手再刷新动态预览。拖动显示网格并限制边界，相册照片按自身宽高生成完整画布；水平与垂直滑杆保留在「精确位置」，按住预览继续可用。拖动位置必须与封面、动态预览、最终输出一致，并随草稿保存。
 - 2026-10-08 GitHub patch 1.0.17：新增直接拖动预览调整裁剪位置，支持边界限制、旋转、翻转、照片封面与草稿恢复。App 版本保持 1.0.11，构建号 17；5 项相关单元测试通过，覆盖移动映射、边界、视频/照片构图一致、预览/导出一致及系统实况识别；iPhone 拖动构图与按住预览/声音测试、iPad 拖动构图流程通过。正式 IPA 为 `build/Release/Vimemo-1.0.11-17.ipa`，使用稳定版 Xcode 26.6 签名，Xcode 27 / iOS 27 验证。此次不自动上传 TestFlight。
@@ -46,6 +46,11 @@
 - 封面线的拖动手势必须使用固定时间轴命名坐标空间，不能使用会随竖线移动的局部坐标；局部坐标反馈会使竖线在新旧位置之间来回跳动。`Scripts/verify-cover-line.swift` 可对模拟器拖动录制逐帧检测反向跳动；连续拖动 UI 测试同时校验竖线实际位移与手指位移一致。
 - 2026-10-08 GitHub patch 1.0.18：修复封面选帧竖线拖动闪烁，保留帧对齐、边界限制与下拉慢速选帧。同一段连续左右拖动的逐帧检测从修复前 285 次短暂反向跳动降至 0；3 项选帧单元测试、iPhone 与 iPad 各 2 项相关界面测试通过。App 版本保持 1.0.11，构建号 18，正式签名包为 `build/Release/Vimemo-1.0.11-18.ipa`；稳定版 Xcode 26.6 签名，Xcode 27 / iOS 27 验证。本次不自动上传 TestFlight。
 
-- 工作台与作品缩略图、示例封面使用共享 ThumbnailLoader：后台预解码、请求合并、最大边长限制、32 MiB 成本缓存；按最新文件修改时间与大小失效，不在 SwiftUI body 中同步读取图片。草稿网格中的原生玻璃快捷导出按钮放入统一 GlassEffectContainer，避免滚动与底栏动画同时触发多个独立玻璃渲染。原生底栏继续收缩/展开。DEBUG 的 --scroll-fixture 必须同时提供有效 UUID 的 --test-library，只创建隔离测试数据；滚动帧间隔测量不更新 SwiftUI 状态，不打包进 Release。
+- 工作台与作品缩略图、示例封面使用共享 ThumbnailLoader：后台预解码、请求合并、最大边长限制、32 MiB 成本缓存；按最新文件修改时间与大小失效，不在 SwiftUI body 中同步读取图片。最近添加网格的草稿按钮不附带单独导出操作，点击进入编辑器；单项目从编辑器底部导出，批量从工作台批量制作入口导出。原生底栏继续收缩/展开。DEBUG 的 --scroll-fixture 必须同时提供有效 UUID 的 --test-library，只创建隔离测试数据；滚动帧间隔测量不更新 SwiftUI 状态，不打包进 Release。
 - 2026-10-08 已更新 TestFlight 至 1.0.11（18），构建 ID `c807ec7b-0775-4bca-9cdf-89f92d82bfe3`，状态 `VALID` / `IN_BETA_TESTING`，现有内部组自动通知已开启。08:53 已提交 App Store 1.0.11（18）与不限制时长内购审核，submission ID `0faa36bc-fede-402b-93f9-0712016dc768`，提交时 `WAITING_FOR_REVIEW`；网页确认隐私声明已发布且不收集数据。后续 GitHub 构建不自动替换送审版本。
 - 2026-10-08 GitHub patch 1.0.19：优化底栏收缩/展开时的滚动卡顿，统一草稿玻璃容器并共享后台预解码缩略图缓存。24 草稿、8 次上下连续滚动的模拟器采样中，旧实现移动帧最大间隔 108.54 ms，优化后 46.19 ms；新增 UI 回归校验真实移动帧且不出现 100 ms 停顿。3 项单元测试、iPhone 3 项相关 UI 与 iPad 原生导航 UI 通过；既有编辑工具 UI 首跑点击未切换，原样重跑通过。App 版本 1.0.11，构建号 19；正式 IPA 为 `build/Release/Vimemo-1.0.11-19.ipa`，稳定版 Xcode 26.6 签名、Xcode 27 / iOS 27 验证。此次不自动上传 TestFlight，也不替换已提交审核的构建 18。
+
+- 裁剪片段两端拖柄及选区边框共享缩略图条的垂直中心，触控外框保持 44×70 点。精确裁剪加减使用 28 点普通按钮和 44 点触控范围，不使用液态玻璃。移除「发现更多片段」，新增片段由片段栏加号完成。
+- 封面线只有下方箭头的 44×44 点范围参与拖动，竖线不命中触控；缩略图条始终用于片段裁剪/移动。短片段两端触控区按选区中点分开，避免互相遮挡。预览外层区域尺寸仅随设备布局变化，内层视频保留当前构图比例并居中；LIVE 左上、时长右上、声音图标右下的角落位置不随视频比例改变。
+- 制作与导出页按每个片段的完整项目快照显示真实预览：封面使用共享 CoverFrameRenderer，动态播放使用 MediaProcessor.previewItem 与 PreviewSurface，保持裁剪、构图、调色、旋转、翻转和倍速一致；禁止用导入时缩略图冒充编辑结果。轻点播放/暂停，长按通过 item 驱动全屏放大；静态照片只显示封面，GIF 预览静音。只允许一个行内片段播放，进入放大、开始制作、切后台或离开时停止播放并取消不再需要的解码。
+- 2026-10-08 GitHub patch 1.0.20：制作与导出页新增真实处理后的逐片段播放及长按放大，作品声音统一为预览右下角的无背景扬声器图标并随草稿保存；裁剪拖柄居中，短选区端点触控分离，封面只从下方箭头拖动，固定预览角落标记。精确裁剪加减改为小尺寸普通按钮，移除「发现更多片段」及最近添加卡片的快捷导出，并修复 iPad 导入卡片透明点击范围挡住草稿。7 项相关单元测试、iPhone 10 项与 iPad 4 项界面测试通过，包含实际播放、倍速与裁剪终点、预览/导出几何颜色一致及系统实况识别。App 版本 1.0.11，构建号 20，正式 IPA 为 `build/Release/Vimemo-1.0.11-20.ipa`；Xcode 27（27A266a）与 iOS 27 SDK 构建，Apple Distribution 签名及正式包测试资源排除已验证。本轮运行验证使用本机可用的 iOS 26.3 模拟器，尚未进行 iOS 27 运行时验证。此次不自动上传 TestFlight，也不替换已提交审核的构建 18。

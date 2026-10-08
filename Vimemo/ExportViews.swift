@@ -15,11 +15,13 @@ struct ExportSheet: View {
     @State private var quality: ExportQuality
     @State private var preserveDate: Bool
     @State private var preserveLocation: Bool
-    @State private var muted: Bool
     @State private var saveToPhotos = true
     @State private var started = false
     @State private var sharing = false
     @State private var showPurchase = false
+    @State private var activePreviewID: String?
+    @State private var enlargedPreview: ClipPreviewSelection?
+    @State private var enlargedRecord: ExportRecord?
 
     init(projects: [VideoProject]) {
         _projects = State(initialValue: projects)
@@ -30,9 +32,18 @@ struct ExportSheet: View {
         _gifFrameRate = State(initialValue: settings.effectiveGIFFrameRate)
         _preserveDate = State(initialValue: settings.preserveDate)
         _preserveLocation = State(initialValue: settings.preserveLocation)
-        _muted = State(initialValue: settings.muted)
     }
     private var count: Int { projects.reduce(0) { $0 + $1.clips.count } }
+    private var previewSelections: [ClipPreviewSelection] {
+        projects.flatMap { original in
+            var project = original
+            project.settings.format = format
+            project.settings.quality = quality
+            project.settings.gifSize = gifSize
+            project.settings.gifFrameRate = gifFrameRate
+            return project.clips.map { ClipPreviewSelection(project: project, clip: $0) }
+        }
+    }
 
     var body: some View {
         NavigationStack {
@@ -42,7 +53,7 @@ struct ExportSheet: View {
                     VStack(spacing: 20) {
                         if started { resultView } else { optionsView }
                     }.frame(maxWidth: 680).frame(maxWidth: .infinity).padding(20)
-                }.scrollIndicators(.hidden)
+                }.scrollIndicators(.hidden).accessibilityIdentifier("exportOptionsScroll")
             }
             .navigationTitle(started ? "制作进度" : "制作与导出")
             .navigationBarTitleDisplayMode(.inline)
@@ -66,23 +77,27 @@ struct ExportSheet: View {
                 ShareSheet(urls: coordinator.completed.flatMap { $0.files.map { store.url(for: $0) } })
             }
             .sheet(isPresented: $showPurchase) { UnlimitedPurchaseView { start() } }
+            .fullScreenCover(item: $enlargedPreview) { EnlargedClipPreview(selection: $0) }
+            .fullScreenCover(item: $enlargedRecord) { record in
+                NavigationStack {
+                    MediaPreview(record: record, autoplay: true).padding(16).background(StudioTheme.background)
+                        .navigationTitle("作品预览").navigationBarTitleDisplayMode(.inline)
+                        .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("关闭") { enlargedRecord = nil } } }
+                }
+            }
         }
     }
 
     private var optionsView: some View {
         VStack(spacing: 20) {
             HStack {
-                Group {
-                    if let project = projects.first {
-                        ThumbnailImage(url: store.url(for: project.thumbnailFilename)).frame(width: 48, height: 60).clipShape(RoundedRectangle(cornerRadius: 6))
-                    }
-                }
                 VStack(alignment: .leading, spacing: 5) {
                     Text("\(projects.count) 个视频 · \(count) 个片段").font(.headline)
                     Text("选择格式，带走这一刻。").font(.caption).foregroundStyle(StudioTheme.secondary)
                 }
                 Spacer()
             }.padding(.vertical, 5)
+            previewCards
             if ExportAccess.requiresUnlimited(projects, format: format) {
                 Label(purchases.hasUnlimited ? "不限制时长 · 已解锁" : "超过 3 秒的导出需一次性解锁", systemImage: purchases.hasUnlimited ? "checkmark.circle" : "lock")
                     .font(.caption).foregroundStyle(StudioTheme.peach).accessibilityIdentifier("longExportNotice")
@@ -106,7 +121,7 @@ struct ExportSheet: View {
                             }
                         }
                     }
-                    Text(format == .livePhoto ? "保存到相册后长按播放。分享文件包含 JPG 与 MOV 配对原件。" : format == .gif ? "GIF 循环播放，不含声音。尺寸和帧率可自由选择。" : format == .photo ? "导出所选封面帧，保留裁剪与调色。" : "导出裁剪后的 MOV 视频；可在拍摄信息与隐私中选择是否保留声音。")
+                    Text(format == .livePhoto ? "保存到相册后长按播放。分享文件包含 JPG 与 MOV 配对原件。" : format == .gif ? "GIF 循环播放，不含声音。尺寸和帧率可自由选择。" : format == .photo ? "导出所选封面帧，保留裁剪与调色。" : "导出裁剪后的 MOV 视频，声音沿用作品预览右下角的设置。")
                         .font(.system(size: 11)).foregroundStyle(StudioTheme.secondary)
                 }
             }
@@ -160,14 +175,6 @@ struct ExportSheet: View {
             StudioCard {
                 DisclosureGroup("拍摄信息与隐私") {
                     VStack(alignment: .leading, spacing: 15) {
-                        if format == .livePhoto || format == .video {
-                            Toggle("静音导出", isOn: $muted)
-                                .font(.system(size: 14))
-                                .accessibilityIdentifier("exportMute")
-                            Text("开启后，导出的视频不包含音轨；原始视频不受影响。")
-                                .font(.system(size: 11)).foregroundStyle(StudioTheme.secondary)
-                            Divider()
-                        }
                         Toggle("保留原始拍摄时间", isOn: $preserveDate).font(.system(size: 14))
                         Divider()
                         Toggle("保留原始位置", isOn: $preserveLocation).font(.system(size: 14))
@@ -176,6 +183,32 @@ struct ExportSheet: View {
                 }.font(.subheadline.weight(.medium))
             }
 
+        }
+    }
+
+    private var previewCards: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            SectionLabel(title: "片段预览", detail: format == .photo ? "长按放大封面" : "轻点播放 · 长按放大")
+            ScrollView(.horizontal) {
+                HStack(alignment: .top, spacing: 16) {
+                    ForEach(previewSelections) { selection in
+                        let dimensions = MediaProcessor.dimensions(CGSize(width: selection.project.width, height: selection.project.height), settings: selection.project.settings)
+                        let scale = min(160 / dimensions.width, 180 / dimensions.height)
+                        VStack(spacing: 8) {
+                            ClipPlaybackPreview(project: selection.project, clip: selection.clip,
+                                                isActive: activePreviewID == selection.id,
+                                                identifier: "exportClipPreview-\(selection.id)",
+                                                onPlay: { activePreviewID = selection.id },
+                                                onEnlarge: { activePreviewID = nil; enlargedPreview = selection })
+                                .frame(width: dimensions.width * scale, height: dimensions.height * scale)
+                                .clipShape(RoundedRectangle(cornerRadius: 12)).frame(height: 180)
+                            Text(selection.project.title).font(.caption).lineLimit(1)
+                            Text("\(String(format: "%.2f", selection.clip.duration / selection.project.settings.speed)) s · \(selection.project.settings.speed.formatted())×")
+                                .font(.caption2.monospaced()).foregroundStyle(StudioTheme.secondary)
+                        }.frame(width: 160)
+                    }
+                }.padding(.vertical, 2)
+            }.scrollIndicators(.hidden)
         }
     }
     @ViewBuilder private var resultView: some View {
@@ -199,6 +232,8 @@ struct ExportSheet: View {
                 }.padding(.vertical, 18)
                 if let first = coordinator.completed.first {
                     MediaPreview(record: first).frame(height: 270).clipShape(RoundedRectangle(cornerRadius: 20))
+                        .onLongPressGesture { enlargedRecord = first }
+                        .accessibilityAction(named: Text("放大预览")) { enlargedRecord = first }
                 }
                 if let error = coordinator.errorMessage {
                     Text(error).font(.subheadline).foregroundStyle(StudioTheme.peach).frame(maxWidth: .infinity, alignment: .leading)
@@ -222,6 +257,7 @@ struct ExportSheet: View {
         }
     }
     private func start() {
+        activePreviewID = nil
         guard !ExportAccess.requiresUnlimited(projects, format: format) || purchases.hasUnlimited else {
             showPurchase = true; return
         }
@@ -232,7 +268,6 @@ struct ExportSheet: View {
             projects[index].settings.gifFrameRate = gifFrameRate
             projects[index].settings.preserveDate = preserveDate
             projects[index].settings.preserveLocation = preserveLocation
-            projects[index].settings.muted = muted
             store.update(projects[index])
         }
         store.persist()
@@ -250,6 +285,7 @@ struct ShareSheet: UIViewControllerRepresentable {
 struct MediaPreview: View {
     @EnvironmentObject private var store: ProjectStore
     let record: ExportRecord
+    var autoplay = false
     @State private var player: AVPlayer?
     var body: some View {
         Group {
@@ -263,7 +299,10 @@ struct MediaPreview: View {
             }
         }.frame(maxWidth: .infinity).background(.black)
             .task(id: record.id) {
-                if record.format == .video, let file = record.files.first { player = AVPlayer(url: store.url(for: file)) }
+                if record.format == .video, let file = record.files.first {
+                    player = AVPlayer(url: store.url(for: file))
+                    if autoplay { player?.play() }
+                }
             }
             .onDisappear { player?.pause() }
     }
