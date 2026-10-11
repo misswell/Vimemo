@@ -9,6 +9,11 @@ final class StudioFlowTests: XCTestCase {
         attachment.name = name; attachment.lifetime = .keepAlways
         add(attachment)
     }
+    private func screenshot(_ image: UIImage, name: String) {
+        let attachment = XCTAttachment(image: image)
+        attachment.name = name; attachment.lifetime = .keepAlways
+        add(attachment)
+    }
     private func selectTab(_ app: XCUIApplication, title: String) {
         let tab = app.buttons.matching(NSPredicate(format: "label == %@", title)).firstMatch
         // Music-style navigation minimizes after scrolling; tap the active tab to expand it.
@@ -31,6 +36,102 @@ final class StudioFlowTests: XCTestCase {
         for _ in 0..<6 {
             if element.isHittable && element.frame.maxY < action.frame.minY - 8 { return }
             app.scrollViews["exportOptionsScroll"].swipeUp()
+        }
+    }
+
+    private func mediaElement(_ app: XCUIApplication, identifier: String) -> XCUIElement {
+        app.descendants(matching: .any).matching(identifier: identifier).firstMatch
+    }
+
+    private func assertContained(_ inner: CGRect, in outer: CGRect, file: StaticString = #filePath, line: UInt = #line) {
+        XCTAssertGreaterThan(inner.width, 0, file: file, line: line)
+        XCTAssertGreaterThan(inner.height, 0, file: file, line: line)
+        XCTAssertGreaterThanOrEqual(inner.minX, outer.minX - 1, file: file, line: line)
+        XCTAssertGreaterThanOrEqual(inner.minY, outer.minY - 1, file: file, line: line)
+        XCTAssertLessThanOrEqual(inner.maxX, outer.maxX + 1, file: file, line: line)
+        XCTAssertLessThanOrEqual(inner.maxY, outer.maxY + 1, file: file, line: line)
+    }
+
+    private func normalizedRGBSamples(_ screenshot: UIImage, in frame: CGRect, screenFrame: CGRect) -> [SIMD3<Double>] {
+        guard let image = screenshot.cgImage else { return [] }
+        let width = image.width, height = image.height
+        let rowBytes = width * 4
+        let pixels = UnsafeMutablePointer<UInt8>.allocate(capacity: height * rowBytes)
+        defer { pixels.deallocate() }
+        pixels.initialize(repeating: 0, count: height * rowBytes)
+        guard let context = CGContext(data: pixels, width: width, height: height,
+                                      bitsPerComponent: 8, bytesPerRow: rowBytes,
+                                      space: CGColorSpaceCreateDeviceRGB(),
+                                      bitmapInfo: CGBitmapInfo.byteOrder32Big.rawValue | CGImageAlphaInfo.premultipliedLast.rawValue) else { return [] }
+        context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+
+        // Stay clear of the LIVE, duration, cover, and sound controls while
+        // sampling close enough to every edge to reveal a clipped/cropped frame.
+        let points: [(CGFloat, CGFloat)] = [
+            (0.08, 0.30), (0.08, 0.50), (0.08, 0.70),
+            (0.92, 0.30), (0.92, 0.50), (0.92, 0.70),
+            (0.30, 0.08), (0.50, 0.08), (0.70, 0.08),
+            (0.30, 0.92), (0.50, 0.92), (0.70, 0.92), (0.50, 0.50)
+        ]
+        let scaleX = CGFloat(width) / screenFrame.width
+        let scaleY = CGFloat(height) / screenFrame.height
+        return points.compactMap { x, y in
+            let px = Int((frame.minX + frame.width * x) * scaleX)
+            let topY = Int((frame.minY + frame.height * y) * scaleY)
+            let py = topY
+            guard px >= 0, px < width, py >= 0, py < height else { return nil }
+            let offset = py * rowBytes + px * 4
+            return SIMD3(Double(pixels[offset]) / 255,
+                         Double(pixels[offset + 1]) / 255,
+                         Double(pixels[offset + 2]) / 255)
+        }
+    }
+
+    private func visibleContentFrame(_ screenshot: UIImage, within frame: CGRect, screenFrame: CGRect) -> CGRect? {
+        guard let image = screenshot.cgImage else { return nil }
+        let width = image.width, height = image.height, rowBytes = image.width * 4
+        let pixels = UnsafeMutablePointer<UInt8>.allocate(capacity: height * rowBytes)
+        defer { pixels.deallocate() }
+        pixels.initialize(repeating: 0, count: height * rowBytes)
+        guard let context = CGContext(data: pixels, width: width, height: height,
+                                      bitsPerComponent: 8, bytesPerRow: rowBytes,
+                                      space: CGColorSpaceCreateDeviceRGB(),
+                                      bitmapInfo: CGBitmapInfo.byteOrder32Big.rawValue | CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
+        context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+        let scaleX = CGFloat(width) / screenFrame.width
+        let scaleY = CGFloat(height) / screenFrame.height
+        let left = max(0, Int(frame.minX * scaleX)), right = min(width - 1, Int(frame.maxX * scaleX))
+        let top = max(0, Int(frame.minY * scaleY)), bottom = min(height - 1, Int(frame.maxY * scaleY))
+        guard right > left, bottom > top else { return nil }
+        func brightness(_ x: Int, _ topY: Int) -> Double {
+            let y = topY
+            guard x >= 0, x < width, y >= 0, y < height else { return 0 }
+            let offset = y * rowBytes + x * 4
+            return (0.2126 * Double(pixels[offset]) + 0.7152 * Double(pixels[offset + 1]) + 0.0722 * Double(pixels[offset + 2])) / 255
+        }
+        let probes = (2...8).map { CGFloat($0) / 10 }
+        let activeRows = (top..<bottom).filter { y in
+            probes.filter { x in brightness(left + Int(CGFloat(right - left) * x), y) > 0.06 }.count >= 5
+        }
+        let activeColumns = (left..<right).filter { x in
+            probes.filter { y in brightness(x, top + Int(CGFloat(bottom - top) * y)) > 0.06 }.count >= 5
+        }
+        guard let firstY = activeRows.first, let lastY = activeRows.last,
+              let firstX = activeColumns.first, let lastX = activeColumns.last else { return nil }
+        return CGRect(x: CGFloat(firstX) / scaleX, y: CGFloat(firstY) / scaleY,
+                      width: CGFloat(lastX - firstX + 1) / scaleX,
+                      height: CGFloat(lastY - firstY + 1) / scaleY)
+    }
+
+    private func compare(_ lhs: [SIMD3<Double>], _ rhs: [SIMD3<Double>], file: StaticString = #filePath, line: UInt = #line) {
+        XCTAssertEqual(lhs.count, 13, "Editor screenshot must expose every normalized sample", file: file, line: line)
+        XCTAssertEqual(rhs.count, lhs.count, "Completed photo screenshot must expose matching samples", file: file, line: line)
+        guard lhs.count == rhs.count else { return }
+        for (index, (a, b)) in zip(lhs, rhs).enumerated() {
+            let meanError = (abs(a.x - b.x) + abs(a.y - b.y) + abs(a.z - b.z)) / 3
+            XCTAssertLessThanOrEqual(meanError, 0.15,
+                                     "Normalized media sample \(index) differs by \(meanError), RGB editor=\(a), result=\(b); editor and saved photo should show the same crop and color.",
+                                     file: file, line: line)
         }
     }
 
@@ -669,25 +770,38 @@ final class StudioFlowTests: XCTestCase {
         app.buttons["makeLivePhotos"].tap()
         app.buttons["GIF 动图"].tap()
         let size = app.buttons["gifSize480"]
+        scrollExport(app, to: size)
         XCTAssertTrue(size.waitForExistence(timeout: 5))
         size.tap()
         XCTAssertEqual(size.value as? String, "已选择")
-        app.swipeUp()
         let fps = app.buttons["gifFPS24"]
+        scrollExport(app, to: fps)
         XCTAssertTrue(fps.waitForExistence(timeout: 5))
         fps.tap()
         XCTAssertEqual(fps.value as? String, "已选择")
         screenshot(app, name: "15-gif-size-and-frame-rate")
-        app.swipeUp()
-        app.buttons["本机作品 / 分享文件"].tap()
-        app.buttons["制作文件 · 1 个作品"].tap()
+        let localFiles = app.buttons["本机作品 / 分享文件"]
+        scrollExport(app, to: localFiles)
+        XCTAssertTrue(localFiles.isHittable)
+        localFiles.tap()
+        let makeFile = app.buttons["制作文件 · 1 个作品"]
+        XCTAssertTrue(makeFile.waitForExistence(timeout: 5), "The local-output segment must be selected before producing a file.")
+        makeFile.tap()
         XCTAssertTrue(app.staticTexts["已制作 1 个作品"].waitForExistence(timeout: 30))
         XCTAssertTrue(app.staticTexts["已保存到本机作品"].exists)
+        let canvas = mediaElement(app, identifier: "completedMediaCanvas")
+        let surface = mediaElement(app, identifier: "completedGIFSurface")
+        XCTAssertTrue(canvas.waitForExistence(timeout: 10))
+        XCTAssertTrue(surface.waitForExistence(timeout: 10), "GIF must expose its actual native playback view bounds")
+        assertContained(surface.frame, in: canvas.frame)
+        XCTAssertEqual(surface.frame.width / surface.frame.height, 0.75, accuracy: 0.08,
+                       "The native GIF view must retain the exported cover's portrait aspect ratio.")
         screenshot(app, name: "16-gif-result")
         app.terminate()
         app.launch()
         XCTAssertTrue(app.buttons["makeLivePhotos"].waitForExistence(timeout: 10))
         app.buttons["makeLivePhotos"].tap()
+        scrollExport(app, to: app.buttons["gifSize480"])
         XCTAssertTrue(app.buttons["gifSize480"].waitForExistence(timeout: 5))
         XCTAssertEqual(app.buttons["gifSize480"].value as? String, "已选择")
         app.swipeUp()
@@ -734,6 +848,79 @@ final class StudioFlowTests: XCTestCase {
         XCTAssertTrue(enlarged.waitForExistence(timeout: 5))
         XCTAssertTrue((enlarged.value as? String ?? "").contains("封面"))
         app.buttons["closeExpandedPreview"].tap()
+    }
+
+    @MainActor func testCompletedStaticPhotoMatchesEditorAcrossCanvasRatios() throws {
+        for ratio in ["16:9", "9:16"] {
+            let app = XCUIApplication()
+            app.launchArguments = ["--test-library", UUID().uuidString, "--demo-editor"]
+            app.launch()
+            XCTAssertTrue(app.buttons["editorTool1"].waitForExistence(timeout: 10))
+            app.buttons["editorTool1"].tap()
+            app.buttons[ratio].tap()
+
+            let editorPreview = app.buttons["previewPlayback"]
+            let cropReady = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value CONTAINS %@", "水平"), object: editorPreview)
+            XCTAssertEqual(XCTWaiter.wait(for: [cropReady], timeout: 15), .completed,
+                           "Wait for the edited cover frame before using it as the image comparison baseline.")
+            let editorFrame = editorPreview.frame
+            let editorCapture = app.screenshot().image
+            screenshot(editorCapture, name: "completed-photo-editor-\(ratio.replacingOccurrences(of: ":", with: "-"))")
+            let screenFrame = app.windows.firstMatch.frame
+            let editorSamples = normalizedRGBSamples(editorCapture, in: editorFrame, screenFrame: screenFrame)
+
+            app.buttons["makeLivePhotos"].tap()
+            let staticPhoto = app.buttons["静态照片"]
+            scrollExport(app, to: staticPhoto)
+            staticPhoto.tap()
+            scrollExport(app, to: app.buttons["本机作品 / 分享文件"])
+            app.buttons["本机作品 / 分享文件"].tap()
+            app.buttons["制作文件 · 1 个作品"].tap()
+            XCTAssertTrue(app.staticTexts["已制作 1 个作品"].waitForExistence(timeout: 30))
+
+            let canvas = mediaElement(app, identifier: "completedMediaCanvas")
+            XCTAssertTrue(canvas.waitForExistence(timeout: 10))
+            let expectedAspect = ratio == "16:9" ? 16.0 / 9.0 : 9.0 / 16.0
+            let image = mediaElement(app, identifier: "completedMediaImage")
+            let imageLoaded = image.waitForExistence(timeout: 10)
+            XCTAssertTrue(imageLoaded, "Wait for the static cover image to replace the loading indicator before capturing the result.")
+            let resultCapture = app.screenshot().image
+            screenshot(resultCapture, name: "completed-photo-result-\(ratio.replacingOccurrences(of: ":", with: "-"))")
+            let imageFrame = imageLoaded
+                ? image.frame
+                : try XCTUnwrap(visibleContentFrame(resultCapture, within: canvas.frame, screenFrame: screenFrame),
+                                "The photo must draw visible pixels inside the completed preview canvas.")
+            assertContained(imageFrame, in: canvas.frame)
+            XCTAssertEqual(imageFrame.width / imageFrame.height, expectedAspect, accuracy: 0.08,
+                           "The visible photo bounds must match the editor's \(ratio) composition.")
+            compare(editorSamples, normalizedRGBSamples(resultCapture, in: imageFrame, screenFrame: screenFrame))
+            app.terminate()
+        }
+    }
+
+    @MainActor func testCompletedLivePhotoNativeSurfaceMatchesCoverAspect() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["--test-library", UUID().uuidString, "--demo-editor"]
+        app.launch()
+        XCTAssertTrue(app.buttons["makeLivePhotos"].waitForExistence(timeout: 10))
+        app.buttons["makeLivePhotos"].tap()
+        let localFiles = app.buttons["本机作品 / 分享文件"]
+        scrollExport(app, to: localFiles)
+        XCTAssertTrue(localFiles.isHittable)
+        localFiles.tap()
+        let makeFile = app.buttons["制作文件 · 1 个作品"]
+        XCTAssertTrue(makeFile.waitForExistence(timeout: 5), "Selecting local output must update the action label.")
+        makeFile.tap()
+        XCTAssertTrue(app.staticTexts["已制作 1 个作品"].waitForExistence(timeout: 30))
+
+        let canvas = mediaElement(app, identifier: "completedMediaCanvas")
+        let liveSurface = mediaElement(app, identifier: "completedLivePhotoSurface")
+        XCTAssertTrue(canvas.waitForExistence(timeout: 10))
+        XCTAssertTrue(liveSurface.waitForExistence(timeout: 15), "The completed Live Photo must expose its native PHLivePhotoView bounds.")
+        assertContained(liveSurface.frame, in: canvas.frame)
+        XCTAssertEqual(liveSurface.frame.width / liveSurface.frame.height, 0.75, accuracy: 0.08,
+                       "The native surface must use the Demo cover's 3:4 aspect ratio.")
+        screenshot(app, name: "completed-live-photo-native-surface")
     }
 
     @MainActor func testEditorSoundIsUnifiedAndPersists() throws {

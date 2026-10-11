@@ -4,8 +4,17 @@ import ImageIO
 
 struct AnimatedGIF: UIViewRepresentable {
     let url: URL
-    func makeUIView(context: Context) -> GIFPlaybackView { GIFPlaybackView() }
+    func makeUIView(context: Context) -> GIFPlaybackView {
+        let view = GIFPlaybackView()
+        view.isAccessibilityElement = true
+        view.accessibilityLabel = "GIF预览"
+        view.accessibilityIdentifier = "completedGIFSurface"
+        return view
+    }
     func updateUIView(_ uiView: GIFPlaybackView, context: Context) { uiView.load(url) }
+    func sizeThatFits(_ proposal: ProposedViewSize, uiView: GIFPlaybackView, context: Context) -> CGSize? {
+        proposal.replacingUnspecifiedDimensions()
+    }
     static func dismantleUIView(_ uiView: GIFPlaybackView, coordinator: ()) { uiView.stop() }
 }
 

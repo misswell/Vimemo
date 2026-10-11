@@ -287,18 +287,35 @@ struct MediaPreview: View {
     let record: ExportRecord
     var autoplay = false
     @State private var player: AVPlayer?
+    @State private var cover: UIImage?
     var body: some View {
-        Group {
-            if record.format == .livePhoto { LivePhotoPreview(urls: record.files.map { store.url(for: $0) }) }
-            else if record.format == .video {
-                if let player { VideoPlayer(player: player) } else { ProgressView().tint(.white) }
-            } else if record.format == .gif, let file = record.files.first {
-                AnimatedGIF(url: store.url(for: file))
-            } else {
-                if let image = UIImage(contentsOfFile: store.url(for: record.thumbnailFilename).path) { Image(uiImage: image).resizable().scaledToFit() }
+        GeometryReader { geometry in
+            // Bound every native surface to the exported cover's aspect ratio.
+            // UIKit's intrinsic image size must not expand beyond the result card
+            // and then be cropped by its rounded clipping mask.
+            let bounds = CGRect(origin: .zero, size: geometry.size)
+            let fitted = cover.map { AVMakeRect(aspectRatio: $0.size, insideRect: bounds) } ?? bounds
+            ZStack {
+                Color.black
+                Group {
+                    if record.format == .livePhoto { LivePhotoPreview(urls: record.files.map { store.url(for: $0) }) }
+                    else if record.format == .video {
+                        if let player { VideoPlayer(player: player) } else { ProgressView().tint(.white) }
+                    } else if record.format == .gif, let file = record.files.first {
+                        AnimatedGIF(url: store.url(for: file))
+                    } else if let cover {
+                        Image(uiImage: cover).resizable().scaledToFit()
+                            .accessibilityIdentifier("completedMediaImage")
+                    } else { ProgressView().tint(.white) }
+                }
+                .frame(width: fitted.width, height: fitted.height)
+                .position(x: bounds.midX, y: bounds.midY)
             }
-        }.frame(maxWidth: .infinity).background(.black)
+        }.accessibilityElement(children: .contain).accessibilityIdentifier("completedMediaCanvas")
             .task(id: record.id) {
+                let loadedCover = await ThumbnailLoader.shared.image(for: store.url(for: record.thumbnailFilename), maxPixelSize: 1600)
+                guard !Task.isCancelled else { return }
+                cover = loadedCover
                 if record.format == .video, let file = record.files.first {
                     player = AVPlayer(url: store.url(for: file))
                     if autoplay { player?.play() }
@@ -345,7 +362,14 @@ struct LivePhotoSurface: UIViewRepresentable {
     final class Coordinator { var token = 0 }
     func makeCoordinator() -> Coordinator { Coordinator() }
     func makeUIView(context: Context) -> PHLivePhotoView {
-        let view = PHLivePhotoView(); view.contentMode = .scaleAspectFit; view.livePhoto = photo; return view
+        let view = PHLivePhotoView()
+        view.contentMode = .scaleAspectFit
+        view.accessibilityIdentifier = "completedLivePhotoSurface"
+        view.livePhoto = photo
+        return view
+    }
+    func sizeThatFits(_ proposal: ProposedViewSize, uiView: PHLivePhotoView, context: Context) -> CGSize? {
+        proposal.replacingUnspecifiedDimensions()
     }
     func updateUIView(_ uiView: PHLivePhotoView, context: Context) {
         uiView.livePhoto = photo

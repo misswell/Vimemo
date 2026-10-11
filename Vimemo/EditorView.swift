@@ -500,14 +500,23 @@ struct EditorView: View {
     }
 
     private func loadThumbnails() async {
-        let generator = AVAssetImageGenerator(asset: AVURLAsset(url: sourceURL))
-        generator.appliesPreferredTrackTransform = true
+        let asset = AVURLAsset(url: sourceURL)
+        let generator = AVAssetImageGenerator(asset: asset)
+        // Stored-pixel decode with a Core Image orientation, matching the cover
+        // pipeline: iOS 27's composited decoder can fail with -12784.
+        generator.appliesPreferredTrackTransform = false
         generator.maximumSize = CGSize(width: 120, height: 120)
+        generator.requestedTimeToleranceBefore = CMTime(seconds: 1.0 / 30, preferredTimescale: 600)
+        generator.requestedTimeToleranceAfter = CMTime(seconds: 1.0 / 30, preferredTimescale: 600)
+        let transform = (try? await asset.loadTracks(withMediaType: .video).first?.load(.preferredTransform)) ?? nil
         var frames: [UIImage] = []
         for index in 0..<16 {
             if Task.isCancelled { return }
             let time = Double(index) / 16 * project.duration
-            if let frame = try? await generator.image(at: CMTime(seconds: time, preferredTimescale: 600)) { frames.append(UIImage(cgImage: frame.image)) }
+            if let frame = try? await generator.image(at: CMTime(seconds: time, preferredTimescale: 600)),
+               let upright = try? MediaProcessor.oriented(frame.image, transform: transform ?? .identity) {
+                frames.append(UIImage(cgImage: upright))
+            }
         }
         thumbnails = frames
     }

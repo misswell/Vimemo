@@ -10,11 +10,20 @@ struct ImportedMovie: Transferable {
     let name: String
     static var transferRepresentation: some TransferRepresentation {
         FileRepresentation(importedContentType: .movie) { received in
+            let operation = UUID().uuidString
+            let sourceBytes = (try? received.file.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? -1
+            DiagnosticLog.shared.record("import.transfer-received", "op=\(operation) bytes=\(sourceBytes)")
             let directory = FileManager.default.temporaryDirectory.appendingPathComponent("VimemoImports", isDirectory: true)
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
             let target = directory.appendingPathComponent(UUID().uuidString).appendingPathExtension(received.file.pathExtension.isEmpty ? "mov" : received.file.pathExtension)
-            do { try FileManager.default.copyItem(at: received.file, to: target) }
-            catch { try? FileManager.default.removeItem(at: target); throw error }
+            do {
+                try await LocalVideoCopy.copy(received.file, to: target)
+                let bytes = try target.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? -1
+                DiagnosticLog.shared.record("import.transfer-copied", "op=\(operation) bytes=\(bytes)")
+            } catch {
+                DiagnosticLog.shared.record("import.transfer-copy-failed", "op=\(operation)", error: error)
+                try? FileManager.default.removeItem(at: target); throw error
+            }
             return ImportedMovie(url: target, name: received.file.deletingPathExtension().lastPathComponent)
         }
     }
@@ -25,6 +34,10 @@ struct ImportedMovie: Transferable {
     @Published var exports: [ExportRecord] = []
     @Published var importing = false
     @Published var importMessage = ""
+    @Published var importFraction: Double?
+    @Published private(set) var retrySelections: [PhotosPickerItem] = []
+    private var pickerRequest: PickerMovieRequest?
+    private var importCancelled = false
     @Published var errorMessage: String?
     let root: URL
     @Published private(set) var savesDrafts: Bool
@@ -238,18 +251,57 @@ struct ImportedMovie: Transferable {
     func importSelections(_ items: [PhotosPickerItem]) async {
         guard !items.isEmpty, !importing else { return }
         importing = true
-        defer { importing = false }
+        importCancelled = false
+        retrySelections = []
+        defer { importing = false; importFraction = nil; pickerRequest = nil }
         var failures: [String] = []
         for (index, item) in items.enumerated() {
-            importMessage = "正在导入 \(index + 1) / \(items.count)…"
+            if importCancelled || Task.isCancelled { break }
+            importMessage = "正在获取视频 \(index + 1) / \(items.count)…"
+            let operation = UUID().uuidString
+            DiagnosticLog.shared.record("import.picker-load-begin", "op=\(operation) index=\(index + 1)")
+            var stage = "从系统照片选择器获取视频"
+            let request = PickerMovieRequest()
+            pickerRequest = request
+            let progressTask = Task { @MainActor in
+                while !Task.isCancelled {
+                    importFraction = request.fractionCompleted
+                    do { try await Task.sleep(for: .milliseconds(200)) } catch { return }
+                }
+            }
+            defer { progressTask.cancel(); importFraction = nil; pickerRequest = nil }
             do {
-                guard let movie = try await item.loadTransferable(type: ImportedMovie.self) else { throw StudioError.message("无法下载视频，请确认 iCloud 原片可以读取。") }
+                guard let movie = try await request.load(start: { completion in
+                    item.loadTransferable(type: ImportedMovie.self, completionHandler: completion)
+                }) else { throw StudioError.message("系统未能提供视频文件。若素材保存在 iCloud，请确认网络可用后重试。") }
+                DiagnosticLog.shared.record("import.picker-load-completed", "op=\(operation)")
                 defer { try? FileManager.default.removeItem(at: movie.url) }
+                progressTask.cancel(); importFraction = nil; pickerRequest = nil
+                try Task.checkCancellation()
+                if importCancelled { throw CancellationError() }
+                importMessage = "正在校验本地视频 \(index + 1) / \(items.count)…"
+                stage = "导入本地视频"
                 _ = try await importVideo(movie.url, title: movie.name.isEmpty ? nil : movie.name)
-            } catch { failures.append("第 \(index + 1) 个视频：\(error.localizedDescription)") }
+            } catch is CancellationError {
+                DiagnosticLog.shared.record("import.picker-cancelled", "op=\(operation)")
+                break
+            } catch {
+                DiagnosticLog.shared.record("import.picker-failed", "op=\(operation) stage=\(stage)", error: error)
+                let message = error is MediaStageError ? error.localizedDescription : MediaStageError(stage: stage, underlying: error).localizedDescription
+                failures.append("第 \(index + 1) 个视频：\(message)")
+                retrySelections.append(item)
+            }
         }
         if !failures.isEmpty { errorMessage = failures.joined(separator: "\n") }
     }
+
+    func cancelPickerImport() {
+        guard let pickerRequest else { return }
+        importCancelled = true
+        pickerRequest.cancel()
+    }
+    func dismissPickerRetry() { retrySelections = [] }
+    var canCancelPickerImport: Bool { pickerRequest != nil }
 
     func importFiles(_ urls: [URL]) async {
         guard !importing else { return }
@@ -279,46 +331,66 @@ struct ImportedMovie: Transferable {
     @discardableResult func importVideo(_ source: URL, title: String?) async throws -> VideoProject {
         activeImports += 1
         defer { activeImports -= 1 }
-        let id = UUID()
-        let folder = root.appendingPathComponent("Projects/\(id.uuidString)", isDirectory: true)
-        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        var completed = false
-        defer { if !completed { try? FileManager.default.removeItem(at: folder) } }
-        let filename = "Projects/\(id.uuidString)/source.\(source.pathExtension.isEmpty ? "mov" : source.pathExtension)"
-        try FileManager.default.copyItem(at: source, to: url(for: filename))
-        let asset = AVURLAsset(url: url(for: filename))
-        let duration = try await asset.load(.duration).seconds
-        guard duration.isFinite, duration >= 0.1, let track = try await asset.loadTracks(withMediaType: .video).first else { throw StudioError.message("请选择时长至少 0.1 秒、可播放的视频。") }
-        let size = try await track.load(.naturalSize)
-        let transform = try await track.load(.preferredTransform)
-        let oriented = size.applying(transform)
-        let rawFrameRate = try await track.load(.nominalFrameRate)
-        let frameRate = rawFrameRate.isFinite && rawFrameRate > 0 ? rawFrameRate : 30
-        let thumbnailFilename = "Projects/\(id.uuidString)/thumbnail.jpg"
-        let frame = try await MediaProcessor.frame(url: url(for: filename), time: min(0.5, duration / 2))
-        guard let jpeg = UIImage(cgImage: frame).jpegData(compressionQuality: 0.8) else { throw StudioError.message("无法生成视频缩略图。") }
-        try jpeg.write(to: url(for: thumbnailFilename))
-        var date: Date?, location: String?
-        let metadata = try await asset.load(.metadata)
-        for item in metadata {
-            if item.identifier == .quickTimeMetadataCreationDate || item.commonKey == .commonKeyCreationDate {
-                if let value = try? await item.load(.stringValue) { date = ISO8601DateFormatter().date(from: value) }
+        let operation = UUID().uuidString
+        let bytes = (try? source.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? -1
+        DiagnosticLog.shared.record("import.local-begin", "op=\(operation) exists=\(FileManager.default.fileExists(atPath: source.path)) bytes=\(bytes)")
+        var stage = "获取并复制视频到本机"
+        do {
+            let id = UUID()
+            let folder = root.appendingPathComponent("Projects/\(id.uuidString)", isDirectory: true)
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            var completed = false
+            defer { if !completed { try? FileManager.default.removeItem(at: folder) } }
+            let filename = "Projects/\(id.uuidString)/source.\(source.pathExtension.isEmpty ? "mov" : source.pathExtension)"
+            try await LocalVideoCopy.copy(source, to: url(for: filename))
+            let localBytes = try url(for: filename).resourceValues(forKeys: [.fileSizeKey]).fileSize ?? -1
+            DiagnosticLog.shared.record("import.local-copied", "op=\(operation) bytes=\(localBytes)")
+            stage = "读取本地视频信息"
+            let asset = AVURLAsset(url: url(for: filename))
+            let duration = try await asset.load(.duration).seconds
+            guard duration.isFinite, duration >= 0.1, let track = try await asset.loadTracks(withMediaType: .video).first else { throw StudioError.message("请选择时长至少 0.1 秒、可播放的视频。") }
+            let size = try await track.load(.naturalSize)
+            let transform = try await track.load(.preferredTransform)
+            let oriented = size.applying(transform)
+            let rawFrameRate = try await track.load(.nominalFrameRate)
+            let frameRate = rawFrameRate.isFinite && rawFrameRate > 0 ? rawFrameRate : 30
+            await DiagnosticLog.shared.asset(asset, operation: operation)
+            DiagnosticLog.shared.record("import.local-validated", "op=\(operation) duration=\(duration)")
+            let thumbnailFilename = "Projects/\(id.uuidString)/thumbnail.jpg"
+            stage = "读取导入封面"
+            let frame = try await MediaProcessor.frame(url: url(for: filename), time: min(0.5, duration / 2))
+            guard let jpeg = UIImage(cgImage: frame).jpegData(compressionQuality: 0.8) else { throw StudioError.message("无法生成视频缩略图。") }
+            try jpeg.write(to: url(for: thumbnailFilename))
+            stage = "读取视频元数据"
+            var date: Date?, location: String?
+            let metadata = try await asset.load(.metadata)
+            for item in metadata {
+                if item.identifier == .quickTimeMetadataCreationDate || item.commonKey == .commonKeyCreationDate {
+                    if let value = try? await item.load(.stringValue) { date = ISO8601DateFormatter().date(from: value) }
+                }
+                if item.identifier == .quickTimeMetadataLocationISO6709 { location = try? await item.load(.stringValue) }
             }
-            if item.identifier == .quickTimeMetadataLocationISO6709 { location = try? await item.load(.stringValue) }
+            let unlimitedDuration = UserDefaults.standard.bool(forKey: "unlimitedDuration")
+            let end = unlimitedDuration ? duration : min(3, duration)
+            var project = VideoProject(id: id, title: title ?? "视频 · \(Date().formatted(.dateTime.month().day().hour().minute()))", filename: filename, thumbnailFilename: thumbnailFilename, duration: duration, width: abs(oriented.width), height: abs(oriented.height), frameRate: Double(frameRate), originalDate: date, locationISO6709: location, clips: [Clip(start: 0, end: end, cover: end / 2)])
+            project.settings.quality = ExportQuality(rawValue: UserDefaults.standard.string(forKey: "defaultQuality") ?? "") ?? .high
+            project.settings.preserveDate = UserDefaults.standard.object(forKey: "defaultPreserveDate") as? Bool ?? true
+            project.settings.preserveLocation = UserDefaults.standard.bool(forKey: "defaultPreserveLocation")
+            project.settings.unlimitedDuration = unlimitedDuration
+            project.hasAudio = !(try await asset.loadTracks(withMediaType: .audio)).isEmpty
+            projects.insert(project, at: 0)
+            setTemporaryBackup(project, temporary: !savesDrafts)
+            persist()
+            completed = true
+            DiagnosticLog.shared.record("import.completed", "op=\(operation)")
+            return project
+        } catch is CancellationError {
+            DiagnosticLog.shared.record("import.local-cancelled", "op=\(operation) stage=\(stage)")
+            throw CancellationError()
+        } catch {
+            DiagnosticLog.shared.record("import.local-failed", "op=\(operation) stage=\(stage)", error: error)
+            throw MediaStageError(stage: stage, underlying: error)
         }
-        let unlimitedDuration = UserDefaults.standard.bool(forKey: "unlimitedDuration")
-        let end = unlimitedDuration ? duration : min(3, duration)
-        var project = VideoProject(id: id, title: title ?? "视频 · \(Date().formatted(.dateTime.month().day().hour().minute()))", filename: filename, thumbnailFilename: thumbnailFilename, duration: duration, width: abs(oriented.width), height: abs(oriented.height), frameRate: Double(frameRate), originalDate: date, locationISO6709: location, clips: [Clip(start: 0, end: end, cover: end / 2)])
-        project.settings.quality = ExportQuality(rawValue: UserDefaults.standard.string(forKey: "defaultQuality") ?? "") ?? .high
-        project.settings.preserveDate = UserDefaults.standard.object(forKey: "defaultPreserveDate") as? Bool ?? true
-        project.settings.preserveLocation = UserDefaults.standard.bool(forKey: "defaultPreserveLocation")
-        project.settings.unlimitedDuration = unlimitedDuration
-        project.hasAudio = !(try await asset.loadTracks(withMediaType: .audio)).isEmpty
-        projects.insert(project, at: 0)
-        setTemporaryBackup(project, temporary: !savesDrafts)
-        persist()
-        completed = true
-        return project
     }
     func record(_ media: ExportedMedia, project: VideoProject, saved: Bool) -> ExportRecord {
         func relative(_ url: URL) -> String { String(url.path.dropFirst(root.path.count + 1)) }

@@ -30,7 +30,9 @@ actor CoverFrameRenderer {
         else {
             let asset = AVURLAsset(url: source)
             let prepared = AVAssetImageGenerator(asset: asset)
-            prepared.appliesPreferredTrackTransform = true
+            // Decode stored pixels; iOS 27's composited decoder (track transform,
+            // HDR tone mapping) can fail with -12784. Orientation happens in Core Image.
+            prepared.appliesPreferredTrackTransform = false
             layout = try await MediaProcessor.nativeFrameLayout(asset: asset, settings: project.settings, maxSize: maxSize)
             try Task.checkCancellation()
             generator = prepared
@@ -43,9 +45,19 @@ actor CoverFrameRenderer {
         decoder.maximumSize = requestedLayout?.decodeSize ?? maxSize
         decoder.requestedTimeToleranceBefore = tolerance
         decoder.requestedTimeToleranceAfter = tolerance
-        let result = try await MediaProcessor.decodedFrame(decoder, at: requested)
+        let decoded: CGImage
+        do {
+            decoded = try await MediaProcessor.decodedFrame(decoder, at: requested)
+        } catch {
+            try Task.checkCancellation()
+            guard let fallbackLayout = layout else { throw error }
+            DiagnosticLog.shared.record("cover.reader-fallback", "time=\(time)", error: error)
+            let recovered = try await MediaProcessor.composedFrame(source: source, time: time, settings: project.settings, outputSize: fallbackLayout.outputSize)
+            if exact { cache.setObject(recovered, forKey: key, cost: recovered.bytesPerRow * recovered.height) }
+            return recovered
+        }
         try Task.checkCancellation()
-        let rendered = try MediaProcessor.renderNativeFrame(result, settings: project.settings, outputSize: requestedLayout?.outputSize)
+        let rendered = try MediaProcessor.renderNativeFrame(decoded, settings: project.settings, outputSize: requestedLayout?.outputSize, sourceTransform: layout?.sourceTransform ?? .identity)
         if exact { cache.setObject(rendered, forKey: key, cost: rendered.bytesPerRow * rendered.height) }
         return rendered
     }

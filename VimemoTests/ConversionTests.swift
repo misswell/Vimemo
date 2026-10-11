@@ -347,7 +347,9 @@ final class ConversionTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: directory.path))
     }
 
-    func testSourceWithRotationMetadataExportsUpright() async throws {
+    /// A copy of the demo source carrying 90° rotation metadata, the shape of
+    /// real camera recordings that iOS 27 must not decode through its compositor.
+    private func rotatedSource() async throws -> URL {
         let asset = AVURLAsset(url: source)
         let tracks = try await asset.loadTracks(withMediaType: .video)
         let track = try XCTUnwrap(tracks.first)
@@ -367,6 +369,73 @@ final class ConversionTests: XCTestCase {
         }
         input.markAsFinished(); await writer.finishWriting()
         XCTAssertEqual(writer.status, .completed)
+        return rotatedURL
+    }
+
+    private func quadrantAverages(_ image: CGImage) -> [[UInt8]] {
+        let width = CGFloat(image.width), height = CGFloat(image.height)
+        var result: [[UInt8]] = []
+        for y in 0..<2 {
+            for x in 0..<2 {
+                let offsetX = CGFloat(x) * width / 2
+                let offsetY = CGFloat(y) * height / 2
+                var pixel = [UInt8](repeating: 0, count: 4)
+                let context = CGContext(data: &pixel, width: 1, height: 1, bitsPerComponent: 8, bytesPerRow: 4, space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+                context.interpolationQuality = .none
+                context.translateBy(x: -offsetX, y: -offsetY)
+                context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+                result.append(pixel)
+            }
+        }
+        return result
+    }
+
+    func testRotatedSourceStillFramesMatchExportedComposition() async throws {
+        let rotatedURL = try await rotatedSource()
+        let settings = EditSettings()
+        let frame = try await MediaProcessor.frame(url: rotatedURL, time: 2.25, settings: settings, maxSize: CGSize(width: 4096, height: 4096))
+        XCTAssertEqual(frame.width, 1280, "The stored-orientation decode must be oriented upright in Core Image")
+        XCTAssertEqual(frame.height, 960)
+        let renderer = CoverFrameRenderer(source: rotatedURL, project: project())
+        let cover = try await renderer.frame(time: 2.25, photo: nil, exact: true)
+        XCTAssertEqual(cover.width, 800, "The editor cover keeps its 800-pixel bound but must be upright")
+        XCTAssertEqual(cover.height, 600)
+        // The rotated display is the stored frame turned 90° clockwise: display
+        // top-left shows the stored bottom-left quadrant, etc.
+        let stored = try await MediaProcessor.frame(url: source, time: 2.25, settings: settings, maxSize: CGSize(width: 4096, height: 4096))
+        XCTAssertEqual(stored.width, 960); XCTAssertEqual(stored.height, 1280)
+        let displayQuadrants = quadrantAverages(frame)
+        let storedQuadrants = quadrantAverages(stored)
+        // display[y][x] == stored[x][1 - y] for this clockwise transform
+        for y in 0..<2 {
+            for x in 0..<2 {
+                let display = displayQuadrants[y * 2 + x]
+                let expected = storedQuadrants[x * 2 + (1 - y)]
+                for channel in 0..<3 {
+                    XCTAssertEqual(Double(display[channel]), Double(expected[channel]), accuracy: 12,
+                                   "Display quadrant (\(x),\(y)) must show the rotated stored quadrant")
+                }
+            }
+        }
+    }
+
+    func testComposedFrameFallbackMatchesGeneratorGeometry() async throws {
+        let settings = EditSettings()
+        let reference = try await MediaProcessor.frame(url: source, time: 2.25, settings: settings)
+        let layout = try await MediaProcessor.nativeFrameLayout(asset: AVURLAsset(url: source), settings: settings, maxSize: CGSize(width: 800, height: 800))
+        let fallback = try await MediaProcessor.composedFrame(source: source, time: 2.25, settings: settings, outputSize: layout.outputSize)
+        XCTAssertEqual(fallback.width, reference.width)
+        XCTAssertEqual(fallback.height, reference.height)
+        for (index, (a, b)) in zip(quadrantAverages(fallback), quadrantAverages(reference)).enumerated() {
+            for channel in 0..<3 {
+                XCTAssertEqual(Double(a[channel]), Double(b[channel]), accuracy: 12,
+                               "Reader-fallback quadrant \(index) must match the generator geometry")
+            }
+        }
+    }
+
+    func testSourceWithRotationMetadataExportsUpright() async throws {
+        let rotatedURL = try await rotatedSource()
         let project = project()
         let result = try await LivePhotoExporter().export(source: rotatedURL, project: project, clip: project.clips[0], directory: folder.appendingPathComponent("RotatedExport")) { _ in }
         let movie = AVURLAsset(url: result.urls[1])

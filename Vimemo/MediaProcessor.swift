@@ -44,8 +44,30 @@ enum MediaProcessor {
                       width: size.width, height: size.height)
     }
 
-    static func transformed(_ source: CIImage, settings: EditSettings, outputSize: CGSize? = nil, cropRatio: Double? = nil) -> CIImage {
-        var image = source.transformed(by: CGAffineTransform(translationX: -source.extent.minX, y: -source.extent.minY))
+    /// Maps an AVFoundation (top-left origin) track transform into Core Image's
+    /// bottom-left space, matching the layer geometry the movie export composes.
+    static func displayOriented(_ source: CIImage, _ trackTransform: CGAffineTransform) -> CIImage {
+        guard trackTransform != .identity else { return source }
+        let natural = source.extent
+        let display = CGRect(origin: .zero, size: natural.size).applying(trackTransform)
+        let flipIn = CGAffineTransform(1, 0, 0, -1, 0, natural.height)
+        let flipOut = CGAffineTransform(1, 0, 0, -1, 0, display.height)
+        return source.transformed(by: flipIn.concatenating(trackTransform)
+            .concatenating(CGAffineTransform(translationX: -display.minX, y: -display.minY))
+            .concatenating(flipOut))
+    }
+
+    /// Upright frame for callers outside the shared edit pipeline, e.g. import thumbnails.
+    static func oriented(_ image: CGImage, transform: CGAffineTransform) throws -> CGImage {
+        guard transform != .identity else { return image }
+        let source = displayOriented(CIImage(cgImage: image), transform)
+        guard let rendered = context.createCGImage(source, from: source.extent) else { throw StudioError.message("无法读取这一帧。") }
+        return rendered
+    }
+
+    static func transformed(_ source: CIImage, settings: EditSettings, outputSize: CGSize? = nil, cropRatio: Double? = nil, sourceTransform: CGAffineTransform = .identity) -> CIImage {
+        var image = displayOriented(source, sourceTransform)
+        image = image.transformed(by: CGAffineTransform(translationX: -image.extent.minX, y: -image.extent.minY))
         if settings.rotation != 0 {
             image = image.transformed(by: CGAffineTransform(rotationAngle: -CGFloat(settings.rotation) * .pi / 2))
             image = image.transformed(by: CGAffineTransform(translationX: -image.extent.minX, y: -image.extent.minY))
@@ -137,26 +159,80 @@ enum MediaProcessor {
     static func frame(url: URL, time: Double, settings: EditSettings? = nil, maxSize: CGSize = CGSize(width: 800, height: 800)) async throws -> CGImage {
         let asset = AVURLAsset(url: url)
         let generator = AVAssetImageGenerator(asset: asset)
-        generator.appliesPreferredTrackTransform = true
-        let layout: NativeFrameLayout?
-        if let settings { layout = try await nativeFrameLayout(asset: asset, settings: settings, maxSize: maxSize) }
-        else { layout = nil }
+        // Decode stored pixels only. iOS 27 routes the track transform (and HDR
+        // tone mapping) through its composited decoder, which fails with -12784
+        // on some sources; the transform is applied in Core Image instead.
+        generator.appliesPreferredTrackTransform = false
+        var layout: NativeFrameLayout?
+        var sourceTransform = CGAffineTransform.identity
+        if let settings {
+            layout = try await nativeFrameLayout(asset: asset, settings: settings, maxSize: maxSize)
+            sourceTransform = layout?.sourceTransform ?? .identity
+        } else if let track = try await asset.loadTracks(withMediaType: .video).first {
+            sourceTransform = try await track.load(.preferredTransform)
+        }
         generator.maximumSize = layout?.decodeSize ?? maxSize
         generator.requestedTimeToleranceBefore = .zero
         generator.requestedTimeToleranceAfter = .zero
         // Decode the native source first. Applying a composition here made both
         // cover preview and the first export step depend on the composition decoder.
-        let image = try await decodedFrame(generator, at: CMTime(seconds: max(0, time), preferredTimescale: 600))
-        guard let settings else { return image }
-        return try renderNativeFrame(image, settings: settings, outputSize: layout?.outputSize)
+        let image: CGImage
+        do {
+            image = try await decodedFrame(generator, at: CMTime(seconds: max(0, time), preferredTimescale: 600))
+        } catch {
+            guard let settings, let layout, !Task.isCancelled else { throw error }
+            DiagnosticLog.shared.record("frame.reader-fallback", "time=\(time)", error: error)
+            return try await composedFrame(source: url, time: time, settings: settings, outputSize: layout.outputSize)
+        }
+        guard let settings else { return try oriented(image, transform: sourceTransform) }
+        return try renderNativeFrame(image, settings: settings, outputSize: layout?.outputSize, sourceTransform: sourceTransform)
+    }
+
+    /// Single-frame grab through the composition reader — the same geometry the
+    /// movie export renders — for sources the system image generator refuses.
+    static func composedFrame(source: URL, time: Double, settings: EditSettings, outputSize: CGSize) async throws -> CGImage {
+        let asset = AVURLAsset(url: source)
+        let duration = try await asset.load(.duration).seconds
+        let start = max(0, min(time - 0.2, max(0, duration - 0.4)))
+        let end = min(duration, max(time + 0.2, start + 0.4))
+        let clip = Clip(start: start, end: max(end, min(max(0, duration - start), start + 0.1)), cover: time)
+        let (composition, geometry) = try await composition(for: asset, clip: clip, settings: settings)
+        let reader = try AVAssetReader(asset: composition)
+        let tracks = try await composition.loadTracks(withMediaType: .video)
+        let output = AVAssetReaderVideoCompositionOutput(videoTracks: tracks, videoSettings: [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA])
+        output.videoComposition = geometry
+        guard reader.canAdd(output) else { throw StudioError.message("无法解码这个视频。") }
+        reader.add(output)
+        guard reader.startReading() else { throw reader.error ?? StudioError.message("无法解码这个视频。") }
+        defer { if reader.status == .reading { reader.cancelReading() } }
+        let target = CMTime(seconds: (time - clip.start) / settings.speed, preferredTimescale: 600)
+        var best: CIImage?
+        var bestDistance = Double.infinity
+        while let sample = output.copyNextSampleBuffer() {
+            let distance = abs(CMTimeSubtract(CMSampleBufferGetPresentationTimeStamp(sample), target).seconds)
+            if distance < bestDistance, let buffer = CMSampleBufferGetImageBuffer(sample) {
+                bestDistance = distance
+                best = CIImage(cvPixelBuffer: buffer)
+            }
+        }
+        guard reader.status == .completed, var image = best else { throw reader.error ?? StudioError.message("无法读取这一帧。") }
+        image = filtered(image, settings: settings)
+        image = image.transformed(by: CGAffineTransform(scaleX: outputSize.width / image.extent.width, y: outputSize.height / image.extent.height))
+        image = image.cropped(to: CGRect(origin: .zero, size: outputSize))
+        guard let rendered = context.createCGImage(image, from: CGRect(origin: .zero, size: outputSize), format: .RGBA8, colorSpace: videoColorSpace) else {
+            throw StudioError.message("无法读取这一帧。")
+        }
+        return rendered
     }
 
     struct NativeFrameLayout {
         let decodeSize: CGSize
         let outputSize: CGSize
+        let sourceTransform: CGAffineTransform
         func scaled(by scale: CGFloat) -> NativeFrameLayout {
             NativeFrameLayout(decodeSize: CGSize(width: decodeSize.width * scale, height: decodeSize.height * scale),
-                              outputSize: CGSize(width: max(2, floor(outputSize.width * scale / 2) * 2), height: max(2, floor(outputSize.height * scale / 2) * 2)))
+                              outputSize: CGSize(width: max(2, floor(outputSize.width * scale / 2) * 2), height: max(2, floor(outputSize.height * scale / 2) * 2)),
+                              sourceTransform: sourceTransform)
         }
     }
 
@@ -173,7 +249,9 @@ enum MediaProcessor {
         // Decode enough native pixels for the chosen crop, rather than magnifying
         // a thumbnail that was scaled down before cropping/zooming.
         let decodeScale = min(1, max(output.width / crop.width, output.height / crop.height))
-        return NativeFrameLayout(decodeSize: CGSize(width: oriented.width * decodeScale, height: oriented.height * decodeScale), outputSize: output)
+        // maximumSize now bounds the stored frame; the track transform is applied
+        // later in Core Image, so the decode target follows the natural size.
+        return NativeFrameLayout(decodeSize: CGSize(width: natural.width * decodeScale, height: natural.height * decodeScale), outputSize: output, sourceTransform: transform)
     }
 
     static func decodedFrame(_ generator: AVAssetImageGenerator, at time: CMTime) async throws -> CGImage {
@@ -200,8 +278,8 @@ enum MediaProcessor {
         } onCancel: { generator.cancelAllCGImageGeneration() }
     }
 
-    static func renderNativeFrame(_ source: CGImage, settings: EditSettings, outputSize: CGSize? = nil) throws -> CGImage {
-        let image = transformed(CIImage(cgImage: source), settings: settings, outputSize: outputSize)
+    static func renderNativeFrame(_ source: CGImage, settings: EditSettings, outputSize: CGSize? = nil, sourceTransform: CGAffineTransform = .identity) throws -> CGImage {
+        let image = transformed(CIImage(cgImage: source), settings: settings, outputSize: outputSize, sourceTransform: sourceTransform)
         guard let rendered = context.createCGImage(image, from: image.extent) else { throw StudioError.message("无法读取这一帧。") }
         return rendered
     }

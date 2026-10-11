@@ -157,10 +157,45 @@ import UIKit
         try FileManager.default.createSymbolicLink(at: link, withDestinationURL: outside)
         store.clearTemporaryCache()
         XCTAssertTrue(exists(sentinel)); XCTAssertTrue(exists(link))
-        do { _ = try await store.importVideo(sentinel, title: nil); XCTFail("Invalid movie should fail") } catch {}
+        do { _ = try await store.importVideo(sentinel, title: nil); XCTFail("Invalid movie should fail") }
+        catch {
+            let failure = try XCTUnwrap(error as? MediaStageError)
+            XCTAssertEqual(failure.stage, "读取本地视频信息")
+            XCTAssertFalse(failure.localizedDescription.contains(sentinel.path))
+        }
         let folders = try FileManager.default.contentsOfDirectory(atPath: root.appendingPathComponent("Projects").path)
         XCTAssertTrue(folders.isEmpty)
         XCTAssertTrue(exists(sentinel))
+    }
+
+    func testMissingImportReportsCopyStageWithoutCreatingDraft() async throws {
+        let store = ProjectStore(root: root, defaults: defaults)
+        let missing = root.appendingPathComponent("not-downloaded.mov")
+        do { _ = try await store.importVideo(missing, title: "Private title"); XCTFail("Missing source should fail") }
+        catch {
+            let failure = try XCTUnwrap(error as? MediaStageError)
+            XCTAssertEqual(failure.stage, "获取并复制视频到本机")
+            XCTAssertFalse(failure.localizedDescription.contains(missing.path))
+            XCTAssertFalse(failure.localizedDescription.contains("Private title"))
+        }
+        XCTAssertTrue(store.projects.isEmpty)
+        let folders = try FileManager.default.contentsOfDirectory(atPath: root.appendingPathComponent("Projects").path)
+        XCTAssertTrue(folders.isEmpty)
+    }
+
+    func testEmptyDeliveredVideoIsRejectedBeforeCreatingDraft() async throws {
+        let store = ProjectStore(root: root, defaults: defaults)
+        let empty = root.appendingPathComponent("empty.mov")
+        try Data().write(to: empty)
+        do { _ = try await store.importVideo(empty, title: nil); XCTFail("Empty delivery should fail") }
+        catch {
+            let failure = try XCTUnwrap(error as? MediaStageError)
+            XCTAssertEqual(failure.stage, "获取并复制视频到本机")
+        }
+        XCTAssertTrue(store.projects.isEmpty)
+        XCTAssertTrue(exists(empty))
+        let folders = try FileManager.default.contentsOfDirectory(atPath: root.appendingPathComponent("Projects").path)
+        XCTAssertTrue(folders.isEmpty)
     }
 
     func testBulkDraftDeletionPreservesUnselectedDraftOutputsAndLeasedInputs() async throws {

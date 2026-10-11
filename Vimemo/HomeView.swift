@@ -25,7 +25,16 @@ struct HomeView: View {
             if store.importing {
                 Color.black.opacity(0.6).ignoresSafeArea()
                 StudioCard {
-                    VStack(spacing: 18) { ProgressView(); Text(store.importMessage).font(.subheadline) }
+                    VStack(spacing: 18) {
+                        if let fraction = store.importFraction { ProgressView(value: fraction) }
+                        else { ProgressView() }
+                        Text(store.importMessage).font(.subheadline)
+                        if store.canCancelPickerImport {
+                            Text("iCloud 中的视频需要先下载，下载时间取决于网络和文件大小。")
+                                .font(.caption).foregroundStyle(.secondary)
+                            Button("取消下载", role: .cancel) { store.cancelPickerImport() }
+                        }
+                    }
                         .padding(16)
                 }.padding(48)
             }
@@ -61,7 +70,17 @@ struct HomeView: View {
         }
         .sheet(item: $exportSelection, onDismiss: { for project in exportProjects { store.endEditing(project.id) }; exportProjects = []; batchIDs = [] }) { selection in ExportSheet(projects: selection.projects) }
         .alert("需要处理", isPresented: Binding(get: { store.errorMessage != nil }, set: { if !$0 { store.errorMessage = nil } })) {
-            Button("知道了") { store.errorMessage = nil }
+            if !store.retrySelections.isEmpty {
+                Button("重试导入") {
+                    let items = store.retrySelections
+                    Task {
+                        let previous = store.projects.count
+                        await store.importSelections(items)
+                        if items.count == 1, store.projects.count > previous { editing = store.projects.first }
+                    }
+                }
+            }
+            Button("知道了") { store.errorMessage = nil; store.dismissPickerRetry() }
         } message: { Text(store.errorMessage ?? "") }
         .alert("重命名视频", isPresented: Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } })) {
             TextField("视频名称", text: $renameText)
