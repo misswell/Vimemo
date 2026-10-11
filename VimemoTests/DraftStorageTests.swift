@@ -163,4 +163,75 @@ import UIKit
         XCTAssertTrue(exists(sentinel))
     }
 
+    func testBulkDraftDeletionPreservesUnselectedDraftOutputsAndLeasedInputs() async throws {
+        let store = ProjectStore(root: root, defaults: defaults)
+        let first = try await store.importVideo(source, title: "First")
+        let second = try await store.importVideo(source, title: "Second")
+        let kept = try await store.importVideo(source, title: "Keep")
+        let record = try makeOutput(store, project: first)
+        let lease = store.retainExportInputs([first])
+        store.setSavesDrafts(false)
+        XCTAssertTrue(store.deleteProjects(ids: [first.id, second.id]))
+        XCTAssertEqual(store.projects.map(\.id), [kept.id])
+        XCTAssertTrue(exists(store.url(for: first.filename)), "Active export inputs must survive bulk deletion")
+        XCTAssertFalse(exists(store.url(for: second.filename)))
+        XCTAssertTrue(exists(store.url(for: kept.filename)))
+        XCTAssertTrue(exists(store.url(for: record.files[0])), "Deleting drafts must preserve completed works")
+        store.releaseExportInputs(lease)
+        XCTAssertFalse(exists(store.url(for: first.filename)))
+        let restored = ProjectStore(root: root, defaults: defaults)
+        XCTAssertEqual(restored.projects.map(\.id), [kept.id])
+        XCTAssertEqual(restored.exports.map(\.id), [record.id])
+        XCTAssertTrue(exists(source), "The original imported video is never deleted")
+    }
+
+    func testBulkExportDeletionPreservesDraftsAndSharedOrActiveOutputFolders() async throws {
+        let store = ProjectStore(root: root, defaults: defaults)
+        let project = try await store.importVideo(source, title: "Keep draft")
+        let first = try makeOutput(store, project: project)
+        let sharedFolder = store.url(for: first.files[0]).deletingLastPathComponent()
+        let kept = try makeOutput(store, project: project, folder: sharedFolder)
+        let second = try makeOutput(store, project: project)
+        let activeFolder = store.url(for: second.files[0]).deletingLastPathComponent()
+        store.protectExportFolder(activeFolder)
+        XCTAssertTrue(store.deleteExports(ids: [first.id, second.id]))
+        XCTAssertEqual(store.exports.map(\.id), [kept.id])
+        XCTAssertTrue(exists(store.url(for: kept.files[0])), "A selected record must not delete a surviving record's folder")
+        XCTAssertTrue(exists(activeFolder))
+        XCTAssertTrue(exists(store.url(for: project.filename)))
+        store.releaseExportFolder(activeFolder)
+        store.clearTemporaryCache()
+        XCTAssertFalse(exists(activeFolder))
+        XCTAssertTrue(exists(sharedFolder))
+        let restored = ProjectStore(root: root, defaults: defaults)
+        XCTAssertEqual(restored.exports.map(\.id), [kept.id])
+    }
+
+    func testBulkDeletionRollsBackWhenLibraryCannotBeSaved() async throws {
+        let store = ProjectStore(root: root, defaults: defaults)
+        let project = try await store.importVideo(source, title: "Keep on failure")
+        let record = try makeOutput(store, project: project)
+        let index = root.appendingPathComponent("library.json")
+        let original = try Data(contentsOf: index)
+        try FileManager.default.removeItem(at: index)
+        try FileManager.default.createDirectory(at: index, withIntermediateDirectories: false)
+        defer { try? FileManager.default.removeItem(at: index); try? original.write(to: index) }
+        XCTAssertFalse(store.deleteProjects(ids: [project.id]))
+        XCTAssertEqual(store.projects.map(\.id), [project.id])
+        XCTAssertFalse(store.deleteExports(ids: [record.id]))
+        XCTAssertEqual(store.exports.map(\.id), [record.id])
+        XCTAssertNotNil(store.errorMessage)
+        XCTAssertTrue(exists(store.url(for: project.filename)))
+        XCTAssertTrue(exists(store.url(for: record.files[0])))
+    }
+
+    private func makeOutput(_ store: ProjectStore, project: VideoProject, folder: URL? = nil) throws -> ExportRecord {
+        let directory = folder ?? root.appendingPathComponent("Exports/\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let output = directory.appendingPathComponent("\(UUID().uuidString).jpg")
+        try photo().write(to: output)
+        return store.record(ExportedMedia(directory: directory, urls: [output], thumbnailURL: output,
+                                          format: .photo, duration: 1), project: project, saved: false)
+    }
+
 }

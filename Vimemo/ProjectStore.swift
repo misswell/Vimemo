@@ -180,18 +180,60 @@ struct ImportedMovie: Transferable {
             self?.persist()
         }
     }
-    func delete(_ project: VideoProject) {
-        projects.removeAll { $0.id == project.id }
-        savedProjects.removeAll { $0.id == project.id }
-        if persist() { cleanTemporaryFiles() }
-    }
-    func delete(_ export: ExportRecord) {
-        exports.removeAll { $0.id == export.id }
-        guard persist() else { return }
-        if let first = export.files.first {
-            LibraryStorage.removeOwnedFolder(url(for: first).deletingLastPathComponent(), parent: root.appendingPathComponent("Exports"))
+    func delete(_ project: VideoProject) { _ = deleteProjects(ids: [project.id]) }
+    func delete(_ export: ExportRecord) { _ = deleteExports(ids: [export.id]) }
+
+    @discardableResult func deleteProjects(ids: Set<UUID>) -> Bool {
+        guard !ids.isEmpty else { return true }
+        saveTask?.cancel()
+        let previous = projects
+        let saved = savedProjects
+        projects.removeAll { ids.contains($0.id) }
+        savedProjects.removeAll { ids.contains($0.id) }
+        guard persist() else {
+            projects = previous; savedProjects = saved
+            return false
         }
+        cleanTemporaryFiles()
+        return true
     }
+
+    @discardableResult func deleteExports(ids: Set<UUID>) -> Bool {
+        guard !ids.isEmpty else { return true }
+        saveTask?.cancel()
+        let previous = exports
+        exports.removeAll { ids.contains($0.id) }
+        guard persist() else { exports = previous; return false }
+        // Use reference-aware cleanup so shared output folders and active exports survive.
+        cleanTemporaryFiles()
+        return true
+    }
+
+    #if DEBUG
+    func prepareBatchDeletionFixture() async {
+        let args = ProcessInfo.processInfo.arguments
+        guard args.contains("--batch-delete-fixture"), let index = args.firstIndex(of: "--test-library"),
+              args.count > index + 1, UUID(uuidString: args[index + 1]) != nil,
+              projects.isEmpty, exports.isEmpty,
+              let source = Bundle.main.url(forResource: "Demo", withExtension: "mov"),
+              let poster = Bundle.main.url(forResource: "DemoPoster", withExtension: "jpg") else { return }
+        do {
+            for number in 1...3 {
+                var project = try await importVideo(source, title: "批量草稿 \(number)")
+                project.title = "批量作品 \(number)"
+                let folder = root.appendingPathComponent("Exports/\(UUID().uuidString)")
+                try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+                let thumbnail = folder.appendingPathComponent("thumbnail.jpg")
+                try FileManager.default.copyItem(at: poster, to: thumbnail)
+                let format: OutputFormat = number == 2 ? .video : .photo
+                let output = folder.appendingPathComponent(format == .video ? "output.mov" : "output.jpg")
+                try FileManager.default.copyItem(at: format == .video ? source : poster, to: output)
+                _ = record(ExportedMedia(directory: folder, urls: [output], thumbnailURL: thumbnail,
+                                         format: format, duration: 1), project: project, saved: false)
+            }
+        } catch { errorMessage = error.localizedDescription }
+    }
+    #endif
 
     func importSelections(_ items: [PhotosPickerItem]) async {
         guard !items.isEmpty, !importing else { return }

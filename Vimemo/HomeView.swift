@@ -15,7 +15,7 @@ struct HomeView: View {
     @State private var exportProjects: [VideoProject] = []
     @State private var exportSelection: ExportSelection?
     private struct ExportSelection: Identifiable { let id = UUID(); let projects: [VideoProject] }
-    @State private var deleting: VideoProject?
+    @State private var deletingIDs: Set<UUID>?
     @State private var renaming: VideoProject?
     @State private var renameText = ""
 
@@ -72,9 +72,16 @@ struct HomeView: View {
                 renaming = nil
             }
         }
-        .confirmationDialog("删除这个草稿及其导入视频？已导出的作品会保留。", isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }), titleVisibility: .visible) {
-            Button("删除草稿", role: .destructive) { if let deleting { store.delete(deleting) }; deleting = nil }
+        .confirmationDialog("删除所选的 \(deletingIDs?.count ?? 0) 个草稿？", isPresented: Binding(get: { deletingIDs != nil }, set: { if !$0 { deletingIDs = nil } }), titleVisibility: .visible, presenting: deletingIDs) { ids in
+            Button("删除 \(ids.count) 个草稿", role: .destructive) {
+                if store.deleteProjects(ids: ids) { batchIDs = []; batchMode = false }
+                deletingIDs = nil
+            }.accessibilityIdentifier("confirmDeleteDrafts")
+            Button("取消", role: .cancel) {}
+        } message: { _ in
+            Text("将删除所选草稿及其导入副本。已导出的作品和照片图库中的原视频会保留。")
         }
+        .onChange(of: store.projects.map(\.id)) { _, ids in batchIDs.formIntersection(Set(ids)) }
         .task {
             #if DEBUG
             let args = ProcessInfo.processInfo.arguments
@@ -85,6 +92,7 @@ struct HomeView: View {
                 catch { store.errorMessage = error.localizedDescription }
                 return
             }
+            await store.prepareBatchDeletionFixture()
             if usesScrollFixture, let demo = await store.importDemo() {
                 store.projects = (0..<24).map { i in var item = demo; item.id = UUID(); item.title = "滚动示例 \(i)"; return item }
             }
@@ -116,10 +124,10 @@ struct HomeView: View {
                         Spacer()
                         if !store.projects.isEmpty {
                             Button { batchMode.toggle(); batchIDs = [] } label: {
-                                    Text(batchMode ? "完成" : "批量制作").font(.system(size: 13, weight: .semibold))
+                                    Text(batchMode ? "完成" : "选择").font(.system(size: 13, weight: .semibold))
                                     .padding(.horizontal, 14).frame(minHeight: 44).contentShape(Capsule())
                                     .studioGlass(in: Capsule(), interactive: false, tint: StudioTheme.accent.opacity(0.14))
-                            }.buttonStyle(.plain)
+                            }.buttonStyle(.plain).accessibilityIdentifier("draftSelectionMode")
                         }
                     }
                     if store.projects.isEmpty {
@@ -138,23 +146,32 @@ struct HomeView: View {
                                     } else { editing = project }
                                 } label: { projectCard(project) }.buttonStyle(.plain)
                                     .accessibilityIdentifier("draft-\(project.id.uuidString)")
+                                    .accessibilityValue(batchMode ? (batchIDs.contains(project.id) ? "已选择" : "未选择") : "")
                                     .contextMenu {
-                                        Button("重命名", systemImage: "pencil") { renameText = project.title; renaming = project }
-                                        Button("删除草稿", systemImage: "trash", role: .destructive) { deleting = project }
+                                        if !batchMode {
+                                            Button("重命名", systemImage: "pencil") { renameText = project.title; renaming = project }
+                                            Button("删除草稿", systemImage: "trash", role: .destructive) { deletingIDs = [project.id] }
+                                        }
                                     }
                             }
                         }
-                    }
-                    if batchMode {
-                        PrimaryButton(title: "制作选中的 \(batchIDs.count) 个视频", symbol: "square.stack.3d.up") {
-                            exportProjects = store.projects.filter { batchIDs.contains($0.id) }; exportSelection = ExportSelection(projects: exportProjects)
-                        }.disabled(batchIDs.isEmpty || exporter.running).opacity(batchIDs.isEmpty ? 0.4 : 1)
                     }
                 }
                 Label("离线制作，原视频留在你的设备上", systemImage: "lock.shield")
                     .font(.caption).foregroundStyle(StudioTheme.secondary).padding(.bottom, 20)
             }.frame(maxWidth: 1000).frame(maxWidth: .infinity).padding(.horizontal, 20).padding(.top, 12)
         }.scrollIndicators(.hidden).foregroundStyle(StudioTheme.ink)
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                if batchMode {
+                    SelectionActions(count: batchIDs.count, total: store.projects.count, identifier: "draft",
+                                     onSelectAll: { batchIDs = batchIDs.count == store.projects.count ? [] : Set(store.projects.map(\.id)) },
+                                     onDelete: { deletingIDs = batchIDs }, exportDisabled: exporter.running,
+                                     onExport: {
+                        exportProjects = store.projects.filter { batchIDs.contains($0.id) }
+                        exportSelection = ExportSelection(projects: exportProjects)
+                    })
+                }
+            }
             .background(StudioTheme.background)
             .navigationTitle("工作台")
             .navigationBarTitleDisplayMode(.large)

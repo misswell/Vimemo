@@ -3,13 +3,24 @@ import SwiftUI
 struct HistoryView: View {
     @EnvironmentObject private var store: ProjectStore
     @State private var selected: ExportRecord?
-    @State private var deleting: ExportRecord?
+    @State private var deletingIDs: Set<UUID>?
+    @State private var selecting = false
+    @State private var selectedIDs: Set<UUID> = []
     @State private var filter: OutputFormat?
     private var filtered: [ExportRecord] { store.exports.filter { filter == nil || $0.format == filter } }
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
-                Text("\(store.exports.count) 个作品").font(.subheadline).foregroundStyle(StudioTheme.secondary)
+                HStack {
+                    Text("\(store.exports.count) 个作品").font(.subheadline).foregroundStyle(StudioTheme.secondary)
+                    Spacer()
+                    if !store.exports.isEmpty {
+                        Button { selecting.toggle(); selectedIDs = [] } label: {
+                            Text(selecting ? "完成" : "选择").font(.subheadline.weight(.semibold))
+                                .padding(.horizontal, 14).frame(minHeight: 44).contentShape(Capsule())
+                        }.studioGlassButton().accessibilityIdentifier("historySelectionMode")
+                    }
+                }
                 ScrollView(.horizontal) {
                     StudioGlassGroup(spacing: 8) {
                         HStack(spacing: 8) {
@@ -29,7 +40,11 @@ struct HistoryView: View {
                 } else {
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 16)], spacing: 22) {
                         ForEach(filtered) { item in
-                            Button { selected = item } label: {
+                            Button {
+                                if selecting {
+                                    if selectedIDs.contains(item.id) { selectedIDs.remove(item.id) } else { selectedIDs.insert(item.id) }
+                                } else { selected = item }
+                            } label: {
                                 VStack(alignment: .leading, spacing: 9) {
                                     ZStack(alignment: .bottomLeading) {
                                         ThumbnailImage(url: store.url(for: item.thumbnailFilename)).aspectRatio(1, contentMode: .fit).clipShape(RoundedRectangle(cornerRadius: 10))
@@ -38,20 +53,46 @@ struct HistoryView: View {
                                     Text(item.projectTitle).font(.subheadline.weight(.medium)).lineLimit(1)
                                     Text(item.createdAt.formatted(.dateTime.month().day().hour().minute())).font(.caption).foregroundStyle(StudioTheme.secondary)
                                 }.foregroundStyle(StudioTheme.ink)
-                            }.buttonStyle(.plain).contextMenu {
-                                Button("查看 / 分享", systemImage: "square.and.arrow.up") { selected = item }
-                                Button("删除本机作品", systemImage: "trash", role: .destructive) { deleting = item }
-                            }
+                                    .overlay(alignment: .topTrailing) {
+                                        if selecting {
+                                            Image(systemName: selectedIDs.contains(item.id) ? "checkmark.circle.fill" : "circle")
+                                                .font(.title2).foregroundStyle(StudioTheme.accent).padding(12)
+                                        }
+                                    }
+                            }.buttonStyle(.plain).accessibilityIdentifier("export-\(item.id.uuidString)")
+                                .accessibilityValue(selecting ? (selectedIDs.contains(item.id) ? "已选择" : "未选择") : "")
+                                .contextMenu {
+                                    if !selecting {
+                                        Button("查看 / 分享", systemImage: "square.and.arrow.up") { selected = item }
+                                        Button("删除本机作品", systemImage: "trash", role: .destructive) { deletingIDs = [item.id] }
+                                    }
+                                }
                         }
                     }
                 }
             }.frame(maxWidth: 1000).frame(maxWidth: .infinity).padding(.horizontal, 20).padding(.top, 12).padding(.bottom, 24)
-        }.scrollIndicators(.hidden).background(StudioTheme.background)
+        }.scrollIndicators(.hidden)
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                if selecting {
+                    SelectionActions(count: selectedIDs.count, total: filtered.count, identifier: "history",
+                                     onSelectAll: { selectedIDs = selectedIDs.count == filtered.count ? [] : Set(filtered.map(\.id)) },
+                                     onDelete: { deletingIDs = selectedIDs })
+                }
+            }.background(StudioTheme.background)
             .navigationTitle("片刻收藏").navigationBarTitleDisplayMode(.large)
             .sheet(item: $selected) { record in ExportDetailView(record: record) }
-            .confirmationDialog("删除本机作品？照片图库中的作品不受影响。", isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }), titleVisibility: .visible) {
-                Button("删除本机作品", role: .destructive) { if let deleting { store.delete(deleting) }; deleting = nil }
+            .confirmationDialog("删除所选的 \(deletingIDs?.count ?? 0) 个作品？", isPresented: Binding(get: { deletingIDs != nil }, set: { if !$0 { deletingIDs = nil } }), titleVisibility: .visible, presenting: deletingIDs) { ids in
+                Button("删除 \(ids.count) 个作品", role: .destructive) {
+                    if store.deleteExports(ids: ids) { selectedIDs = []; selecting = false }
+                    deletingIDs = nil
+                }.accessibilityIdentifier("confirmDeleteExports")
+                Button("取消", role: .cancel) {}
+            } message: { _ in
+                Text("仅删除本机收藏文件。照片图库中已保存的作品会保留。")
             }
+            .onChange(of: filter) { _, _ in selectedIDs = []; deletingIDs = nil }
+            .onChange(of: store.exports.map(\.id)) { _, ids in selectedIDs.formIntersection(Set(ids)) }
+            .onDisappear { selectedIDs = []; selecting = false; deletingIDs = nil }
     }
 }
 
