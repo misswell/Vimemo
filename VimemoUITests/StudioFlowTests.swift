@@ -34,6 +34,121 @@ final class StudioFlowTests: XCTestCase {
         }
     }
 
+    private func batchFixture() -> XCUIApplication {
+        let app = XCUIApplication()
+        app.launchArguments = ["--test-library", UUID().uuidString, "--batch-delete-fixture"]
+        app.launch()
+        XCTAssertTrue(app.staticTexts["3 个草稿 · 自动保存已开启"].waitForExistence(timeout: 25))
+        return app
+    }
+    private func draft(_ app: XCUIApplication, number: Int) -> XCUIElement {
+        app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label CONTAINS %@", "draft-", "批量草稿 \(number)")).firstMatch
+    }
+    private func work(_ app: XCUIApplication, number: Int) -> XCUIElement {
+        app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label CONTAINS %@", "export-", "批量作品 \(number)")).firstMatch
+    }
+    private func enterDraftSelection(_ app: XCUIApplication) {
+        let mode = app.buttons["draftSelectionMode"]
+        for _ in 0..<4 where !mode.isHittable { app.scrollViews.firstMatch.swipeUp() }
+        mode.tap()
+        XCTAssertTrue(app.staticTexts["draftSelectionCount"].waitForExistence(timeout: 5))
+        // The fixed selection actions reduce the visible area; reveal the first row before tapping.
+        if UIDevice.current.userInterfaceIdiom == .phone { app.scrollViews.firstMatch.swipeUp(velocity: .slow) }
+    }
+    private func cancelDeletion(_ app: XCUIApplication) {
+        let confirm = app.buttons.matching(NSPredicate(format: "identifier == %@ OR identifier == %@", "confirmDeleteDrafts", "confirmDeleteExports")).firstMatch
+        if app.buttons["取消"].exists { app.buttons["取消"].tap() }
+        else { app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: 20, dy: 110)).tap() }
+        XCTAssertTrue(confirm.waitForNonExistence(timeout: 5))
+    }
+
+    @MainActor func testBulkDraftDeletionRequiresConfirmationAndPersists() throws {
+        let app = batchFixture()
+        enterDraftSelection(app)
+        XCTAssertFalse(app.buttons["draftDeleteSelected"].isEnabled)
+        draft(app, number: 3).tap()
+        draft(app, number: 2).tap()
+        XCTAssertEqual(app.staticTexts["draftSelectionCount"].label, "已选 2 个")
+        draft(app, number: 2).tap()
+        XCTAssertEqual(app.staticTexts["draftSelectionCount"].label, "已选 1 个")
+        draft(app, number: 2).tap()
+        screenshot(app, name: "bulk-drafts-selected")
+        app.buttons["draftDeleteSelected"].tap()
+        XCTAssertTrue(app.buttons["删除 2 个草稿"].firstMatch.waitForExistence(timeout: 5))
+        cancelDeletion(app)
+        XCTAssertEqual(app.staticTexts["draftSelectionCount"].label, "已选 2 个")
+        XCTAssertEqual(draft(app, number: 3).value as? String, "已选择")
+        app.buttons["draftDeleteSelected"].tap()
+        XCTAssertTrue(app.buttons["删除 2 个草稿"].firstMatch.waitForExistence(timeout: 5))
+        app.buttons["删除 2 个草稿"].firstMatch.tap()
+        XCTAssertTrue(app.staticTexts["1 个草稿 · 自动保存已开启"].waitForExistence(timeout: 5))
+        XCTAssertFalse(draft(app, number: 3).exists)
+        XCTAssertFalse(draft(app, number: 2).exists)
+        XCTAssertTrue(draft(app, number: 1).exists)
+        screenshot(app, name: "bulk-drafts-deleted")
+        app.terminate(); app.launch()
+        XCTAssertTrue(draft(app, number: 1).waitForExistence(timeout: 15))
+        XCTAssertFalse(draft(app, number: 3).exists)
+        selectTab(app, title: "作品")
+        XCTAssertTrue(work(app, number: 3).exists, "Deleting drafts must preserve completed works")
+    }
+
+    @MainActor func testFilteredBulkExportDeletionClearsHiddenSelection() throws {
+        let app = batchFixture()
+        selectTab(app, title: "作品")
+        XCTAssertTrue(app.buttons["historySelectionMode"].waitForExistence(timeout: 5))
+        app.buttons["historySelectionMode"].tap()
+        XCTAssertTrue(app.staticTexts["historySelectionCount"].waitForExistence(timeout: 5))
+        work(app, number: 2).tap()
+        XCTAssertEqual(app.staticTexts["historySelectionCount"].label, "已选 1 个")
+        let photos = app.buttons["静态照片"]
+        if !photos.isHittable { app.scrollViews.element(boundBy: 1).swipeLeft() }
+        photos.tap()
+        XCTAssertEqual(app.staticTexts["historySelectionCount"].label, "已选 0 个")
+        XCTAssertFalse(app.buttons["historyDeleteSelected"].isEnabled)
+        app.buttons["historySelectAll"].tap()
+        XCTAssertEqual(app.staticTexts["historySelectionCount"].label, "已选 2 个")
+        screenshot(app, name: "bulk-filtered-exports-selected")
+        app.buttons["historyDeleteSelected"].tap()
+        XCTAssertTrue(app.buttons["删除 2 个作品"].firstMatch.waitForExistence(timeout: 5))
+        cancelDeletion(app)
+        XCTAssertEqual(app.staticTexts["historySelectionCount"].label, "已选 2 个")
+        app.buttons["historyDeleteSelected"].tap()
+        app.buttons["删除 2 个作品"].firstMatch.tap()
+        let all = app.buttons["全部"]
+        if !all.isHittable { app.scrollViews.element(boundBy: 1).swipeRight() }
+        all.tap()
+        XCTAssertTrue(work(app, number: 2).exists)
+        XCTAssertFalse(work(app, number: 1).exists)
+        XCTAssertFalse(work(app, number: 3).exists)
+        app.terminate(); app.launch()
+        XCTAssertTrue(app.buttons["draftSelectionMode"].waitForExistence(timeout: 15))
+        selectTab(app, title: "作品")
+        XCTAssertTrue(work(app, number: 2).exists)
+        XCTAssertFalse(work(app, number: 1).exists)
+        screenshot(app, name: "bulk-filtered-exports-deleted")
+    }
+
+    @MainActor func testSelectAllDraftsCanBeClearedAndDeleted() throws {
+        let app = batchFixture()
+        enterDraftSelection(app)
+        app.buttons["draftSelectAll"].tap()
+        XCTAssertEqual(app.staticTexts["draftSelectionCount"].label, "已选 3 个")
+        app.buttons["draftSelectAll"].tap()
+        XCTAssertEqual(app.staticTexts["draftSelectionCount"].label, "已选 0 个")
+        XCTAssertFalse(app.buttons["draftDeleteSelected"].isEnabled)
+        app.buttons["draftSelectAll"].tap()
+        app.buttons["draftDeleteSelected"].tap()
+        app.buttons["删除 3 个草稿"].firstMatch.tap()
+        XCTAssertTrue(app.staticTexts["下一张实况，从这里开始"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["draftSelectionMode"].exists)
+        XCTAssertFalse(app.buttons["draftDeleteSelected"].exists)
+        selectTab(app, title: "作品")
+        XCTAssertTrue(work(app, number: 1).exists)
+        XCTAssertTrue(work(app, number: 2).exists)
+        XCTAssertTrue(work(app, number: 3).exists)
+    }
+
     @MainActor func testNativeTabBarContinuousScrolling() throws {
         let app = XCUIApplication()
         app.launchArguments = ["--test-library", UUID().uuidString, "--scroll-fixture"]
