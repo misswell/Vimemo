@@ -324,7 +324,8 @@ final class ConversionTests: XCTestCase {
         let reloaded = ProjectStore(root: root)
         XCTAssertEqual(reloaded.projects.first?.clips.count, 2)
         XCTAssertEqual(reloaded.projects.first?.settings.ratio, .square)
-        let output = try await LivePhotoExporter().export(source: store.url(for: imported.filename), project: imported, clip: imported.clips[0], directory: root.appendingPathComponent("Exports/test")) { _ in }
+        let exportFolder = root.appendingPathComponent("Exports/\(UUID().uuidString)")
+        let output = try await LivePhotoExporter().export(source: store.url(for: imported.filename), project: imported, clip: imported.clips[0], directory: exportFolder) { _ in }
         _ = store.record(output, project: imported, saved: false)
         store.delete(imported)
         XCTAssertTrue(store.projects.isEmpty)

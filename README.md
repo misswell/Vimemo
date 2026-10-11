@@ -175,7 +175,7 @@ swiftc -target arm64-apple-macos14.0 -parse-as-library \
 
 ## GitHub 发布
 
-源码仓库：[misswell/Vimemo](https://github.com/misswell/Vimemo)。当前源码发布版本为 1.0.24，GitHub tag 为 `v1.0.24`；随附 IPA 的 App 版本为 1.0.11（24），使用 Xcode 27（27A266a）及 iOS 27 SDK 构建。相关回归覆盖 iOS 26.3.1 模拟器的 31 项单元测试与 5 项界面测试。iOS 27.0.1 真机隔离安装验证了实况配对、非默认轨道编号视频的封面/MOV 导出、预览与输出的几何颜色一致性；播放推进测试首轮超时，单项复跑通过。真机界面测试因测试运行器断连未执行，模拟器结果不代替这项验证。用户报错的原视频仍需通过复现日志确认。
+源码仓库：[misswell/Vimemo](https://github.com/misswell/Vimemo)。当前源码发布版本为 1.0.24，GitHub tag 为 `v1.0.24`；随附 IPA 的 App 版本为 1.0.11（24），使用 Xcode 27（27A266a）及 iOS 27 SDK 构建。合并后相关回归覆盖 iOS 26.3.1 模拟器的 42 项单元测试与 5 项界面测试。41 项单元测试首轮通过，一项旧测试的非 UUID 输出目录修正为生产使用的 UUID 目录后复跑通过；生产文件清理规则和原有断言保留。iOS 27.0.1 真机隔离安装验证了实况配对、非默认轨道编号视频的封面/MOV 导出、预览与输出的几何颜色一致性；播放推进测试首轮超时，单项复跑通过。真机界面测试因测试运行器断连未执行，模拟器结果不代替这项验证。用户报错的原视频仍需通过复现日志确认。
 
 2026-10-11 GitHub patch 1.0.23 保留工作台与作品页的多选删除能力；草稿删除不清除导出作品，本机作品删除不影响图库副本。11 项草稿存储测试、iPhone 4 项和 iPad 3 项界面回归在 iOS 27.0 通过，覆盖删除确认、取消、筛选、保存失败回滚、文件保护及既有编辑入口。该版本没有更新 TestFlight，也未替换送审构建。
 Release 附带 Apple Distribution 签名的 App Store IPA，仅供 App Store Connect 上传；日常安装请使用下方 TestFlight 邀请。
