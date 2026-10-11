@@ -22,34 +22,56 @@ actor LivePhotoExporter {
         let settings = project.settings
         var clip = clip
         clip.normalize(sourceDuration: project.duration, speed: settings.speed, maxOutputDuration: settings.maxOutputDuration)
-        let thumbnail = directory.appendingPathComponent("cover.jpg")
-        let identifier = UUID().uuidString
-        // Cover photos live alongside the project's source, including in restored drafts.
-        let photo = clip.coverPhotoFilename.map { source.deletingLastPathComponent().appendingPathComponent(URL(fileURLWithPath: $0).lastPathComponent) }
-        let coverImage = try await MediaProcessor.cover(source: source, project: project, clip: clip, photo: photo, maxSize: CGSize(width: 4096, height: 4096))
-        try writeJPEG(coverImage, to: thumbnail, identifier: settings.format == .livePhoto ? identifier : nil, date: settings.preserveDate ? project.originalDate : nil, location: settings.preserveLocation ? project.locationISO6709 : nil)
-        progress(0.05)
-        if settings.format == .photo {
+        let operation = UUID().uuidString
+        var stage = "读取封面"
+        DiagnosticLog.shared.record("export.begin", "op=\(operation) format=\(settings.format.rawValue) start=\(clip.start) end=\(clip.end) cover=\(clip.cover) speed=\(settings.speed) muted=\(settings.muted) rotation=\(settings.rotation) mirror=\(settings.mirrored) zoom=\(settings.effectiveCropZoom) crop=\(settings.cropX),\(settings.cropY)")
+        let sourceBytes = (try? source.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? -1
+        DiagnosticLog.shared.record("export.source", "op=\(operation) exists=\(FileManager.default.fileExists(atPath: source.path)) bytes=\(sourceBytes)")
+        await DiagnosticLog.shared.asset(AVURLAsset(url: source), operation: operation)
+        do {
+            let thumbnail = directory.appendingPathComponent("cover.jpg")
+            let identifier = UUID().uuidString
+            // Cover photos live alongside the project's source, including in restored drafts.
+            let photo = clip.coverPhotoFilename.map { source.deletingLastPathComponent().appendingPathComponent(URL(fileURLWithPath: $0).lastPathComponent) }
+            let coverImage = try await MediaProcessor.cover(source: source, project: project, clip: clip, photo: photo, maxSize: CGSize(width: 4096, height: 4096))
+            stage = "保存封面"
+            try writeJPEG(coverImage, to: thumbnail, identifier: settings.format == .livePhoto ? identifier : nil, date: settings.preserveDate ? project.originalDate : nil, location: settings.preserveLocation ? project.locationISO6709 : nil)
+            progress(0.05)
+            if settings.format == .photo {
+                completed = true
+                DiagnosticLog.shared.record("export.completed", "op=\(operation) photo")
+                progress(1)
+                return ExportedMedia(directory: directory, urls: [thumbnail], thumbnailURL: thumbnail, format: .photo, duration: 0)
+            }
+            let asset = AVURLAsset(url: source)
+            stage = "准备视频轨道"
+            DiagnosticLog.shared.record("export.stage", "op=\(operation) composition")
+            let (composition, geometry) = try await MediaProcessor.composition(for: asset, clip: clip, settings: settings)
+            let duration = clip.duration / settings.speed
+            let movie = directory.appendingPathComponent("motion.mov")
+            stage = "转换视频"
+            DiagnosticLog.shared.record("export.stage", "op=\(operation) movie")
+            try await writeMovie(composition: composition, geometry: geometry, url: movie, settings: settings, identifier: settings.format == .livePhoto ? identifier : nil, coverTime: (clip.cover - clip.start) / settings.speed, duration: duration, project: project, progress: progress)
+            try Task.checkCancellation()
+            var urls = settings.format == .livePhoto ? [thumbnail, movie] : [movie]
+            if settings.format == .gif {
+                stage = "编码 GIF"
+                let gif = directory.appendingPathComponent("animation.gif")
+                try await writeGIF(movie: movie, url: gif, duration: duration, size: settings.effectiveGIFSize, frameRate: settings.effectiveGIFFrameRate, progress: progress)
+                try FileManager.default.removeItem(at: movie)
+                urls = [gif]
+            }
             completed = true
+            DiagnosticLog.shared.record("export.completed", "op=\(operation)")
             progress(1)
-            return ExportedMedia(directory: directory, urls: [thumbnail], thumbnailURL: thumbnail, format: .photo, duration: 0)
+            return ExportedMedia(directory: directory, urls: urls, thumbnailURL: thumbnail, format: settings.format, duration: duration)
+        } catch is CancellationError {
+            DiagnosticLog.shared.record("export.cancelled", "op=\(operation) stage=\(stage)")
+            throw CancellationError()
+        } catch {
+            DiagnosticLog.shared.record("export.failed", "op=\(operation) stage=\(stage)", error: error)
+            throw MediaStageError(stage: stage, underlying: error)
         }
-        let asset = AVURLAsset(url: source)
-        let (composition, geometry) = try await MediaProcessor.composition(for: asset, clip: clip, settings: settings)
-        let duration = clip.duration / settings.speed
-        let movie = directory.appendingPathComponent("motion.mov")
-        try await writeMovie(composition: composition, geometry: geometry, url: movie, settings: settings, identifier: settings.format == .livePhoto ? identifier : nil, coverTime: (clip.cover - clip.start) / settings.speed, duration: duration, project: project, progress: progress)
-        try Task.checkCancellation()
-        var urls = settings.format == .livePhoto ? [thumbnail, movie] : [movie]
-        if settings.format == .gif {
-            let gif = directory.appendingPathComponent("animation.gif")
-            try await writeGIF(movie: movie, url: gif, duration: duration, size: settings.effectiveGIFSize, frameRate: settings.effectiveGIFFrameRate, progress: progress)
-            try FileManager.default.removeItem(at: movie)
-            urls = [gif]
-        }
-        completed = true
-        progress(1)
-        return ExportedMedia(directory: directory, urls: urls, thumbnailURL: thumbnail, format: settings.format, duration: duration)
     }
 
     private func writeJPEG(_ image: CGImage, to url: URL, identifier: String?, date: Date?, location: String?) throws {
@@ -145,10 +167,20 @@ actor LivePhotoExporter {
             metadataInput = input
             metadataAdaptor = AVAssetWriterInputMetadataAdaptor(assetWriterInput: input)
         }
-        guard writer.startWriting(), reader.startReading() else { throw writer.error ?? reader.error ?? StudioError.message("转换无法开始。") }
-        writer.startSession(atSourceTime: .zero)
         var success = false
-        defer { if !success { reader.cancelReading(); writer.cancelWriting() } }
+        var frameCount = 0
+        var phase = "start"
+        defer {
+            if !success {
+                DiagnosticLog.shared.record("movie.failed", "phase=\(phase) frames=\(frameCount) reader=\(reader.status.rawValue) writer=\(writer.status.rawValue)", error: reader.error ?? writer.error)
+                if reader.status == .reading { reader.cancelReading() }
+                if writer.status == .writing { writer.cancelWriting() }
+            }
+        }
+        guard writer.startWriting(), reader.startReading() else { throw writer.error ?? reader.error ?? StudioError.message("转换无法开始。") }
+        DiagnosticLog.shared.record("movie.started", "size=\(size.width)x\(size.height) duration=\(duration)")
+        writer.startSession(atSourceTime: .zero)
+        phase = "metadata"
         if let metadataAdaptor {
             let stillTime = AVMutableMetadataItem()
             stillTime.keySpace = .quickTimeMetadata
@@ -161,10 +193,17 @@ actor LivePhotoExporter {
             metadataInput?.markAsFinished()
         }
         var videoDone = false, audioDone = audioInput == nil
+        phase = "samples"
+        var lastProgress = Date()
         // Drain both streams together so neither encoder can deadlock waiting for the other.
         while !videoDone || !audioDone {
             try Task.checkCancellation()
             if writer.status == .failed { throw writer.error ?? StudioError.message("视频编码失败。") }
+            if reader.status == .failed { throw reader.error ?? StudioError.message("视频读取失败。") }
+            if Date().timeIntervalSince(lastProgress) > 30 {
+                DiagnosticLog.shared.record("movie.stalled", "frames=\(frameCount) reader=\(reader.status.rawValue) writer=\(writer.status.rawValue)")
+                throw StudioError.message("视频转换等待超时，请重试并导出诊断日志。")
+            }
             var madeProgress = false
             if !videoDone, videoInput.isReadyForMoreMediaData {
                 if let sample = videoOutput.copyNextSampleBuffer(), let sourceBuffer = CMSampleBufferGetImageBuffer(sample) {
@@ -176,6 +215,8 @@ actor LivePhotoExporter {
                     MediaProcessor.context.render(image, to: buffer, bounds: CGRect(origin: .zero, size: size), colorSpace: MediaProcessor.videoColorSpace)
                     let time = CMSampleBufferGetPresentationTimeStamp(sample)
                     guard adaptor.append(buffer, withPresentationTime: time) else { throw writer.error ?? StudioError.message("视频帧写入失败。") }
+                    frameCount += 1
+                    if frameCount == 1 { DiagnosticLog.shared.record("movie.first-frame", "time=\(time.seconds)") }
                     progress(0.05 + 0.8 * min(1, time.seconds / duration))
                 } else { videoDone = true; videoInput.markAsFinished() }
                 madeProgress = true
@@ -186,12 +227,15 @@ actor LivePhotoExporter {
                 } else { audioDone = true; audioInput.markAsFinished() }
                 madeProgress = true
             }
-            if !madeProgress { try await Task.sleep(for: .milliseconds(2)) }
+            if madeProgress { lastProgress = Date() }
+            else { try await Task.sleep(for: .milliseconds(2)) }
         }
         guard reader.status != .failed else { throw reader.error ?? StudioError.message("视频读取失败。") }
         writer.endSession(atSourceTime: CMTime(seconds: duration, preferredTimescale: 600))
+        phase = "finish"
         await writer.finishWriting()
         guard writer.status == .completed else { throw writer.error ?? StudioError.message("视频保存失败。") }
+        DiagnosticLog.shared.record("movie.completed", "frames=\(frameCount)")
         success = true
     }
 

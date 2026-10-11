@@ -1,11 +1,12 @@
 import AVFoundation
 import CoreImage
 
-/// One decoder/composition per picker, with a bounded cache of exact frames.
+/// One native source decoder per picker, with a bounded cache of exact frames.
 actor CoverFrameRenderer {
     private let source: URL
     private let project: VideoProject
     private var generator: AVAssetImageGenerator?
+    private var layout: MediaProcessor.NativeFrameLayout?
     private let cache = NSCache<NSNumber, CGImage>()
     private let maxSize = CGSize(width: 800, height: 800)
 
@@ -30,24 +31,21 @@ actor CoverFrameRenderer {
             let asset = AVURLAsset(url: source)
             let prepared = AVAssetImageGenerator(asset: asset)
             prepared.appliesPreferredTrackTransform = true
-            prepared.maximumSize = maxSize
-            let total = try await asset.load(.duration).seconds
-            var settings = project.settings; settings.speed = 1
-            let (_, composition) = try await MediaProcessor.composition(for: asset, clip: Clip(start: 0, end: total), settings: settings)
+            layout = try await MediaProcessor.nativeFrameLayout(asset: asset, settings: project.settings, maxSize: maxSize)
             try Task.checkCancellation()
-            prepared.videoComposition = composition
             generator = prepared
             decoder = prepared
         }
         // A small tolerance avoids frame-accurate random seeks on every drag event.
         // Releasing the slider and frame-step buttons always request an exact frame.
         let tolerance = exact ? CMTime.zero : CMTime(seconds: 1.0 / 15, preferredTimescale: 600)
-        decoder.maximumSize = exact ? maxSize : CGSize(width: 480, height: 480)
+        let requestedLayout = exact ? layout : layout?.scaled(by: 0.6)
+        decoder.maximumSize = requestedLayout?.decodeSize ?? maxSize
         decoder.requestedTimeToleranceBefore = tolerance
         decoder.requestedTimeToleranceAfter = tolerance
-        let result = try await decoder.image(at: requested)
+        let result = try await MediaProcessor.decodedFrame(decoder, at: requested)
         try Task.checkCancellation()
-        let rendered = try MediaProcessor.renderFrame(result.image, settings: project.settings)
+        let rendered = try MediaProcessor.renderNativeFrame(result, settings: project.settings, outputSize: requestedLayout?.outputSize)
         if exact { cache.setObject(rendered, forKey: key, cost: rendered.bytesPerRow * rendered.height) }
         return rendered
     }

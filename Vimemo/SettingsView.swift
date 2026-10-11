@@ -14,6 +14,10 @@ struct SettingsView: View {
     @State private var showCacheResult = false
     @State private var showPurchase = false
     @State private var showRestoreResult = false
+    @State private var diagnosticShare: DiagnosticShare?
+    @State private var preparingDiagnostics = false
+    @State private var diagnosticError: String?
+    private struct DiagnosticShare: Identifiable { let id = UUID(); let url: URL }
     var body: some View {
         Form {
             Section("外观") {
@@ -66,6 +70,18 @@ struct SettingsView: View {
             } header: { Text("本机存储") } footer: {
                 Text("保存草稿默认开启。关闭后，本次编辑文件在返回时清理；已有草稿及导出作品保留，修改不自动保存。长按草稿或作品可删除本机文件，相册中的原视频与已保存作品不受影响。")
             }
+            Section {
+                Button(preparingDiagnostics ? "正在准备日志…" : "导出诊断日志") {
+                    preparingDiagnostics = true
+                    Task {
+                        defer { preparingDiagnostics = false }
+                        do { diagnosticShare = DiagnosticShare(url: try await DiagnosticLog.shared.snapshot()) }
+                        catch { diagnosticError = "日志导出失败，请重试。" }
+                    }
+                }.disabled(preparingDiagnostics).accessibilityIdentifier("exportDiagnostics")
+            } header: { Text("问题诊断") } footer: {
+                Text("遇到预览或导出问题后，可分享本机日志用于排查。日志只记录处理阶段、系统错误码和编码参数，不包含视频、文件名、路径或拍摄信息，不会自动上传。")
+            }
             Section("关于实况") {
                 tip("怎样播放？", "保存到照片 App 后，打开实况照片并长按。应用内也可以在作品预览中播放。")
                 tip("怎样制作长片段？", "默认输出最长 3 秒。开启「不限制时长」后，在编辑器选择「使用整段视频」或拖动裁剪两端，自行决定长度。")
@@ -86,6 +102,14 @@ struct SettingsView: View {
             .alert("临时缓存已检查", isPresented: $showCacheResult) { Button("好", role: .cancel) {} } message: { Text("已清理可移除的临时文件。正在编辑或导出的文件、草稿及作品会保留。") }
             .onChange(of: unlimitedDuration) { _, enabled in store.setUnlimitedDuration(enabled) }
             .sheet(isPresented: $showPurchase) { UnlimitedPurchaseView { unlimitedDuration = true } }
+            .sheet(item: $diagnosticShare) { share in
+                ShareSheet(urls: [share.url]).onDisappear {
+                    try? FileManager.default.removeItem(at: share.url.deletingLastPathComponent())
+                }
+            }
+            .alert("诊断日志", isPresented: Binding(get: { diagnosticError != nil }, set: { if !$0 { diagnosticError = nil } })) {
+                Button("好", role: .cancel) { diagnosticError = nil }
+            } message: { Text(diagnosticError ?? "") }
             .alert("恢复购买", isPresented: $showRestoreResult) {
                 Button("好", role: .cancel) {}
             } message: { Text(purchases.message ?? "已恢复不限制时长。") }

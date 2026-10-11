@@ -34,6 +34,80 @@ final class ConversionTests: XCTestCase {
         XCTAssertNil(LivePhotoExporter.parseLocation("+99.0+181.0/"))
     }
 
+    func testUnreadableSourceReportsCoverStageAndRemovesPartialExport() async throws {
+        let outputFolder = folder.appendingPathComponent("FailedExport")
+        do {
+            _ = try await LivePhotoExporter().export(source: folder.appendingPathComponent("missing.mov"), project: project(), clip: project().clips[0], directory: outputFolder) { _ in }
+            XCTFail("Missing source must fail")
+        } catch {
+            XCTAssertTrue(error.localizedDescription.contains("读取封面"))
+            XCTAssertTrue(error.localizedDescription.contains("诊断日志"))
+            XCTAssertFalse(error.localizedDescription.contains(folder.path))
+        }
+        XCTAssertFalse(FileManager.default.fileExists(atPath: outputFolder.path))
+    }
+
+    func testNativeCoverDecodesEnoughPixelsForZoomedCrop() async throws {
+        var settings = EditSettings()
+        settings.ratio = .square; settings.cropZoom = 2
+        let asset = AVURLAsset(url: source)
+        let layout = try await MediaProcessor.nativeFrameLayout(asset: asset, settings: settings, maxSize: CGSize(width: 800, height: 800))
+        XCTAssertEqual(layout.outputSize, CGSize(width: 800, height: 800))
+        XCTAssertEqual(layout.decodeSize, CGSize(width: 960, height: 1280), "A zoomed crop must decode native pixels instead of enlarging a small full-frame thumbnail")
+        let image = try await MediaProcessor.frame(url: source, time: 2.25, settings: settings)
+        XCTAssertEqual(image.width, 800); XCTAssertEqual(image.height, 800)
+    }
+
+    func testNonDefaultSourceTrackIDCanRenderCoverAndExport() async throws {
+        // The original cover path applied composition-track instructions (ID 1)
+        // to the source asset. A valid movie is allowed to use any track ID.
+        var data = try Data(contentsOf: source)
+        func read32(_ offset: Int) -> UInt32 {
+            (0..<4).reduce(UInt32(0)) { ($0 << 8) | UInt32(data[offset + $1]) }
+        }
+        func write32(_ value: UInt32, at offset: Int) {
+            for index in 0..<4 { data[offset + index] = UInt8((value >> (8 * (3 - index))) & 0xff) }
+        }
+        var changed = false
+        func visit(_ lower: Int, _ upper: Int) throws {
+            var offset = lower
+            while offset + 8 <= upper {
+                var header = 8, size = Int(read32(offset))
+                if size == 1 {
+                    guard offset + 16 <= upper else { throw StudioError.message("Invalid test movie atom") }
+                    header = 16
+                    size = Int((UInt64(read32(offset + 8)) << 32) | UInt64(read32(offset + 12)))
+                } else if size == 0 { size = upper - offset }
+                guard size >= header, size <= upper - offset else { throw StudioError.message("Invalid test movie atom") }
+                let type = String(bytes: data[(offset + 4)..<(offset + 8)], encoding: .ascii)
+                if type == "moov" || type == "trak" { try visit(offset + header, offset + size) }
+                if type == "tkhd" {
+                    let field = offset + header + (data[offset + header] == 1 ? 20 : 12)
+                    guard field + 4 <= offset + size else { throw StudioError.message("Invalid test track header") }
+                    write32(42, at: field); changed = true
+                }
+                if type == "mvhd" { write32(43, at: offset + size - 4) }
+                offset += size
+            }
+        }
+        try visit(0, data.count)
+        XCTAssertTrue(changed)
+        let differentID = folder.appendingPathComponent("track42.mov")
+        try data.write(to: differentID)
+        let asset = AVURLAsset(url: differentID)
+        let tracks = try await asset.loadTracks(withMediaType: .video)
+        XCTAssertEqual(try XCTUnwrap(tracks.first).trackID, 42)
+        let image = try await MediaProcessor.frame(url: differentID, time: 2.25, settings: EditSettings())
+        XCTAssertGreaterThan(image.width, 0)
+        let renderer = CoverFrameRenderer(source: differentID, project: project())
+        let selected = try await renderer.frame(time: 2.25, photo: nil, exact: true)
+        XCTAssertEqual(selected.width, image.width); XCTAssertEqual(selected.height, image.height)
+        let output = try await LivePhotoExporter().export(source: differentID, project: project(), clip: project().clips[0], directory: folder.appendingPathComponent("Track42Export")) { _ in }
+        let movie = AVURLAsset(url: output.urls[1])
+        let duration = try await movie.load(.duration).seconds
+        XCTAssertEqual(duration, 3, accuracy: 0.05)
+    }
+
     func testLivePhotoPairIsRecognizedAndMetadataMatches() async throws {
         var settings = EditSettings()
         settings.preserveLocation = true; settings.cropZoom = 1.8; settings.cropX = 0.35

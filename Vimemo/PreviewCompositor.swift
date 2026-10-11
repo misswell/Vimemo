@@ -19,6 +19,9 @@ struct VideoPreview {
 extension MediaProcessor {
     @MainActor static func previewItem(source: URL, clip: Clip, settings: EditSettings) async throws -> VideoPreview {
         let asset = AVURLAsset(url: source)
+        let operation = UUID().uuidString
+        DiagnosticLog.shared.record("preview.prepare", "op=\(operation) start=\(clip.start) end=\(clip.end) speed=\(settings.speed)")
+        await DiagnosticLog.shared.asset(asset, operation: operation)
         let (composition, geometry) = try await composition(for: asset, clip: clip, settings: settings)
         guard let track = try await composition.loadTracks(withMediaType: .video).first,
               let base = geometry.instructions.first as? AVMutableVideoCompositionInstruction,

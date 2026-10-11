@@ -345,7 +345,10 @@ struct ImportedMovie: Transferable {
                     var saved = false
                     if saveToPhotos {
                         do { try await exporter.saveToPhotos(media, project: project); saved = true }
-                        catch { saveFailures.append(error.localizedDescription) }
+                        catch {
+                            DiagnosticLog.shared.record("photos.save-failed", "format=\(media.format.rawValue)", error: error)
+                            saveFailures.append(error.localizedDescription)
+                        }
                     }
                     self.completed.append(store.record(media, project: project, saved: saved))
                 }

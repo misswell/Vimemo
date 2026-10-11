@@ -138,20 +138,72 @@ enum MediaProcessor {
         let asset = AVURLAsset(url: url)
         let generator = AVAssetImageGenerator(asset: asset)
         generator.appliesPreferredTrackTransform = true
-        generator.maximumSize = maxSize
+        let layout: NativeFrameLayout?
+        if let settings { layout = try await nativeFrameLayout(asset: asset, settings: settings, maxSize: maxSize) }
+        else { layout = nil }
+        generator.maximumSize = layout?.decodeSize ?? maxSize
         generator.requestedTimeToleranceBefore = .zero
         generator.requestedTimeToleranceAfter = .zero
-        if let settings {
-            let total = try await asset.load(.duration).seconds
-            let clip = Clip(start: 0, end: total, cover: time)
-            var stillSettings = settings
-            stillSettings.speed = 1
-            let (_, videoComposition) = try await composition(for: asset, clip: clip, settings: stillSettings)
-            generator.videoComposition = videoComposition
+        // Decode the native source first. Applying a composition here made both
+        // cover preview and the first export step depend on the composition decoder.
+        let image = try await decodedFrame(generator, at: CMTime(seconds: max(0, time), preferredTimescale: 600))
+        guard let settings else { return image }
+        return try renderNativeFrame(image, settings: settings, outputSize: layout?.outputSize)
+    }
+
+    struct NativeFrameLayout {
+        let decodeSize: CGSize
+        let outputSize: CGSize
+        func scaled(by scale: CGFloat) -> NativeFrameLayout {
+            NativeFrameLayout(decodeSize: CGSize(width: decodeSize.width * scale, height: decodeSize.height * scale),
+                              outputSize: CGSize(width: max(2, floor(outputSize.width * scale / 2) * 2), height: max(2, floor(outputSize.height * scale / 2) * 2)))
         }
-        let result = try await generator.image(at: CMTime(seconds: max(0, time), preferredTimescale: 600))
-        guard let settings else { return result.image }
-        return try renderFrame(result.image, settings: settings)
+    }
+
+    static func nativeFrameLayout(asset: AVAsset, settings: EditSettings, maxSize: CGSize) async throws -> NativeFrameLayout {
+        guard let track = try await asset.loadTracks(withMediaType: .video).first else { throw StudioError.message("这个文件没有可用的视频轨道。") }
+        let natural = try await track.load(.naturalSize)
+        let transform = try await track.load(.preferredTransform)
+        let oriented = CGRect(origin: .zero, size: natural).applying(transform).size
+        let fullOutput = dimensions(oriented, settings: settings)
+        let scale = min(1, maxSize.width / fullOutput.width, maxSize.height / fullOutput.height)
+        let output = CGSize(width: max(2, floor(fullOutput.width * scale / 2) * 2), height: max(2, floor(fullOutput.height * scale / 2) * 2))
+        let rotated = settings.rotation % 2 == 0 ? oriented : CGSize(width: oriented.height, height: oriented.width)
+        let crop = cropRect(CGRect(origin: .zero, size: rotated), settings: settings)
+        // Decode enough native pixels for the chosen crop, rather than magnifying
+        // a thumbnail that was scaled down before cropping/zooming.
+        let decodeScale = min(1, max(output.width / crop.width, output.height / crop.height))
+        return NativeFrameLayout(decodeSize: CGSize(width: oriented.width * decodeScale, height: oriented.height * decodeScale), outputSize: output)
+    }
+
+    static func decodedFrame(_ generator: AVAssetImageGenerator, at time: CMTime) async throws -> CGImage {
+        let operation = UUID().uuidString
+        DiagnosticLog.shared.record("frame.begin", "op=\(operation) time=\(time.seconds)")
+        let timeout = Task {
+            do { try await Task.sleep(for: .seconds(15)) } catch { return }
+            guard !Task.isCancelled else { return }
+            DiagnosticLog.shared.record("frame.timeout", "op=\(operation)")
+            generator.cancelAllCGImageGeneration()
+        }
+        defer { timeout.cancel() }
+        return try await withTaskCancellationHandler {
+            do {
+                let result = try await generator.image(at: time)
+                try Task.checkCancellation()
+                DiagnosticLog.shared.record("frame.completed", "op=\(operation) actual=\(result.actualTime.seconds)")
+                return result.image
+            } catch {
+                try Task.checkCancellation()
+                DiagnosticLog.shared.record("frame.failed", "op=\(operation)", error: error)
+                throw MediaStageError(stage: "读取视频帧", underlying: error)
+            }
+        } onCancel: { generator.cancelAllCGImageGeneration() }
+    }
+
+    static func renderNativeFrame(_ source: CGImage, settings: EditSettings, outputSize: CGSize? = nil) throws -> CGImage {
+        let image = transformed(CIImage(cgImage: source), settings: settings, outputSize: outputSize)
+        guard let rendered = context.createCGImage(image, from: image.extent) else { throw StudioError.message("无法读取这一帧。") }
+        return rendered
     }
 
     static func renderFrame(_ source: CGImage, settings: EditSettings) throws -> CGImage {

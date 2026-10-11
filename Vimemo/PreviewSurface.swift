@@ -10,6 +10,7 @@ struct PreviewSurface: UIViewRepresentable {
     let preview: VideoPreview?
     let playing: Bool
     var onReady: (Bool) -> Void
+    var onFailure: (String) -> Void = { _ in }
 
     final class Surface: UIView, MTKViewDelegate {
         private let metalView: MTKView
@@ -20,11 +21,15 @@ struct PreviewSurface: UIViewRepresentable {
         private var item: AVPlayerItem?
         private var output: AVPlayerItemVideoOutput?
         private var ready = false
+        private var firstFramePending = false
         private var pendingFrame: CIImage?
+        private var waitingSince: Date?
+        private var reportedFailure = false
         var isPlaying = false
         var player: AVPlayer?
         var preview: VideoPreview?
         var onReady: ((Bool) -> Void)?
+        var onFailure: ((String) -> Void)?
 
         override init(frame: CGRect) {
             let device = MTLCreateSystemDefaultDevice()
@@ -60,7 +65,17 @@ struct PreviewSurface: UIViewRepresentable {
                 item?.add(next)
                 output = next
                 ready = false
+                firstFramePending = false
+                waitingSince = nil; reportedFailure = false
                 onReady?(false)
+            }
+            guard !reportedFailure else { return }
+            if item?.status == .failed { fail("preview.item-failed", error: item?.error); return }
+            if isPlaying && !ready {
+                if waitingSince == nil { waitingSince = Date(); DiagnosticLog.shared.record("preview.waiting-first-frame") }
+                if let waitingSince, Date().timeIntervalSince(waitingSince) > 10 {
+                    fail("preview.first-frame-timeout", error: item?.error); return
+                }
             }
             guard let preview, let output else { return }
             let time = player.rate == 0 ? player.currentTime() : output.itemTime(forHostTime: CACurrentMediaTime())
@@ -70,8 +85,17 @@ struct PreviewSurface: UIViewRepresentable {
             metalView.draw()
         }
 
+        private func fail(_ event: String, error: Error?) {
+            guard !reportedFailure else { return }
+            reportedFailure = true
+            DiagnosticLog.shared.record(event, "status=\(item?.status.rawValue ?? -1) time=\(player?.currentTime().seconds ?? -1)", error: error)
+            displayLink?.isPaused = true
+            onFailure?("视频预览未能读取画面，请重试；若仍失败，请在设置中导出诊断日志。")
+        }
+
         func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {}
         func draw(in view: MTKView) {
+            guard context != nil, queue != nil else { fail("preview.metal-unavailable", error: nil); return }
             guard let frame = pendingFrame, let context, let queue,
                   let drawable = view.currentDrawable, let commands = queue.makeCommandBuffer() else { return }
             let size = metalView.drawableSize
@@ -85,12 +109,16 @@ struct PreviewSurface: UIViewRepresentable {
             let image = fitted.composited(over: CIImage(color: .black).cropped(to: bounds))
             context.render(image, to: drawable.texture, commandBuffer: commands, bounds: bounds, colorSpace: colorSpace)
             commands.present(drawable)
-            if !ready {
-                ready = true
+            if !ready && !firstFramePending {
+                firstFramePending = true
                 let renderedItem = item
-                commands.addCompletedHandler { [weak self] _ in
+                commands.addCompletedHandler { [weak self] completed in
                     Task { @MainActor in
-                        guard let self, self.item === renderedItem else { return }
+                        guard let self, self.item === renderedItem, !self.reportedFailure else { return }
+                        self.firstFramePending = false
+                        guard completed.status == .completed else { self.fail("preview.render-failed", error: completed.error); return }
+                        self.ready = true
+                        DiagnosticLog.shared.record("preview.first-frame")
                         self.onReady?(true)
                         self.updateActivity()
                     }
@@ -100,16 +128,17 @@ struct PreviewSurface: UIViewRepresentable {
         }
 
         func updateActivity() {
-            displayLink?.isPaused = preview == nil || (!isPlaying && ready && item === player?.currentItem)
+            if !isPlaying { waitingSince = nil }
+            displayLink?.isPaused = preview == nil || !isPlaying
         }
         func stop() {
             displayLink?.invalidate(); displayLink = nil
             if let output { item?.remove(output) }
-            output = nil; item = nil; player = nil; onReady = nil; pendingFrame = nil
+            output = nil; item = nil; player = nil; onReady = nil; onFailure = nil; pendingFrame = nil
             metalView.delegate = nil
         }
     }
     func makeUIView(context: Context) -> Surface { let view = Surface(frame: .zero); updateUIView(view, context: context); return view }
-    func updateUIView(_ view: Surface, context: Context) { view.player = player; view.preview = preview; view.isPlaying = playing; view.onReady = onReady; view.updateActivity() }
+    func updateUIView(_ view: Surface, context: Context) { view.player = player; view.preview = preview; view.isPlaying = playing; view.onReady = onReady; view.onFailure = onFailure; view.updateActivity() }
     static func dismantleUIView(_ view: Surface, coordinator: ()) { view.stop() }
 }

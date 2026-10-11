@@ -245,13 +245,20 @@ struct EditorView: View {
 
             ZStack(alignment: .topLeading) {
                 Color.black
-                PreviewSurface(player: player, preview: preparedPreview, playing: playing) { ready in playerFrameReady = ready }
+                PreviewSurface(player: player, preview: preparedPreview, playing: playing, onReady: { playerFrameReady = $0 }, onFailure: { message in
+                    stopPlayback(); preparedPreview = nil; store.errorMessage = message
+                })
                 if !playing || !playerFrameReady {
                     if cropPreview.isSettled, let image = cropPreview.image {
                         CropPositionPreview(image: image, x: project.settings.cropX, y: project.settings.cropY,
                                             zoom: project.settings.effectiveCropZoom, editing: cropDragging)
                     } else if let coverImage = framePreview.image {
                         Image(uiImage: coverImage).resizable().scaledToFit().frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else if let error = framePreview.errorMessage ?? cropPreview.errorMessage {
+                        VStack(spacing: 12) {
+                            Text(error).font(.caption).multilineTextAlignment(.center)
+                            Button("重试预览") { refreshPreview(); cropPreview.request(time: clip.cover, photo: clip.coverPhotoFilename.map { store.url(for: $0) }) }
+                        }.foregroundStyle(.white).padding().frame(maxWidth: .infinity, maxHeight: .infinity)
                     } else { ProgressView().tint(.white).frame(maxWidth: .infinity, maxHeight: .infinity) }
                 }
             }.frame(width: imageSize.width, height: imageSize.height)
@@ -541,11 +548,15 @@ struct EditorView: View {
                         if previewHeld && !cropDragging { startPlayback() } else { stopPlayback() }
                     }
                 }
-            } catch is CancellationError {} catch { store.errorMessage = "动态预览失败：\(error.localizedDescription)" }
+            } catch is CancellationError {} catch {
+                guard !Task.isCancelled, previewGeneration == generation else { return }
+                DiagnosticLog.shared.record("preview.prepare-failed", error: error)
+                store.errorMessage = MediaStageError(stage: "准备动态预览", underlying: error).localizedDescription
+            }
         }
     }
     private func startPlayback() {
-        guard let prepared = preparedPreview, player.currentItem === prepared.item else { return }
+        guard let prepared = preparedPreview, player.currentItem === prepared.item else { refreshPreview(); return }
         let generation = UUID(); playbackGeneration = generation
         player.isMuted = project.settings.muted
         playing = true
@@ -553,6 +564,7 @@ struct EditorView: View {
             Task { @MainActor in
                 guard playbackGeneration == generation, playing, previewHeld || accessiblePlayback else { return }
                 guard finished, player.currentItem?.status != .failed else {
+                    DiagnosticLog.shared.record("preview.seek-failed", error: player.currentItem?.error)
                     stopPlayback()
                     if let error = player.currentItem?.error { store.errorMessage = "预览播放失败：\(error.localizedDescription)" }
                     return

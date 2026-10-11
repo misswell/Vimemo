@@ -39,10 +39,12 @@ struct ClipPlaybackPreview: View {
     var body: some View {
         ZStack {
             Color.black
-            PreviewSurface(player: player, preview: prepared, playing: playing) { ready = $0 }
+            PreviewSurface(player: player, preview: prepared, playing: playing, onReady: { ready = $0 }, onFailure: { message in
+                stopPlayback(release: true); error = message
+            })
             if prepared == nil || !ready {
                 if let image = cover.image { Image(uiImage: image).resizable().scaledToFit() }
-                else { ProgressView().tint(.white) }
+                else if cover.errorMessage == nil { ProgressView().tint(.white) }
             }
             if let error = error ?? cover.errorMessage {
                 Text(error).font(.caption).foregroundStyle(.white).padding(12)
@@ -104,7 +106,8 @@ struct ClipPlaybackPreview: View {
                 startPlayback()
             } catch is CancellationError {} catch {
                 guard generation == token else { return }
-                loading = false; self.error = "预览失败：\(error.localizedDescription)。轻点重试。"
+                DiagnosticLog.shared.record("preview.prepare-failed", error: error)
+                loading = false; self.error = MediaStageError(stage: "准备动态预览", underlying: error).localizedDescription
             }
         }
     }
@@ -117,6 +120,7 @@ struct ClipPlaybackPreview: View {
             Task { @MainActor in
                 guard playing, generation == token else { return }
                 if !finished || player.currentItem?.status == .failed {
+                    DiagnosticLog.shared.record("preview.seek-failed", error: player.currentItem?.error)
                     stopPlayback(release: true); error = "视频暂时无法预览，请重试。"
                     return
                 }
