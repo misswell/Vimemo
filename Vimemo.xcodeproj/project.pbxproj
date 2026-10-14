@@ -8,8 +8,13 @@
 
 /* Begin PBXBuildFile section */
 		02E6641867670C735FCBAB36 /* Paywall-3.jpg in Resources */ = {isa = PBXBuildFile; fileRef = C8E4F9EA53521DD2BFC30BD3 /* Paywall-3.jpg */; };
+		049ABF1D23236C4341C274D5 /* TimelineInteractionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2632B790C557980E3B14BA7 /* TimelineInteractionTests.swift */; };
 		05F848268836991683CF3424 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3C1E5F2CD456963D32BD9D7 /* SettingsView.swift */; };
 		06E182B08076624CEAD77B7E /* DraftStorageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 074509D7A51E4F5CF3F199AD /* DraftStorageTests.swift */; };
+		07CBF2C03CD4C1D3F97E8877 /* TimelineViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F490C50034EA14F6A80DA212 /* TimelineViewModel.swift */; };
+		0F49D0F3C214DFD39A1C71E2 /* TimelineState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A9EF047A737F233C94836C7 /* TimelineState.swift */; };
+		134E88445BE3F13C0494EBF0 /* TimelinePinchGesture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B86BB6417C0535431C93D2B /* TimelinePinchGesture.swift */; };
+		13D48DBE8D45D68093754048 /* TimelineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08D593C98B21CD7C8FDA32B0 /* TimelineTests.swift */; };
 		14D1BD4D86CCCCBCC9C07B0D /* LocalVideoCopy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0169A77B976C8F4D3911FCAC /* LocalVideoCopy.swift */; };
 		18C6526278A41E4FB5142FE2 /* DemoPoster.jpg in Resources */ = {isa = PBXBuildFile; fileRef = 745A5B234A67FC388657143C /* DemoPoster.jpg */; };
 		1D8EB763F07CA06C7022B9BB /* MediaProcessor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F8C0E5F75CE0686900A20D5 /* MediaProcessor.swift */; };
@@ -42,6 +47,7 @@
 		9384B9FB636A894E5C59DB26 /* Unlimited.storekit in Resources */ = {isa = PBXBuildFile; fileRef = 2BC9EE96736328AC1A0FB560 /* Unlimited.storekit */; };
 		93930505FB31C0352BF6DBC6 /* CoverFrameRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 162A240C7111F37689EE1952 /* CoverFrameRenderer.swift */; };
 		97A21B6B687698052BA05F97 /* FrameSelectionControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F53DC6D5DBB0C08976B5A2A /* FrameSelectionControl.swift */; };
+		98D3ECF39CFA42C3D24CF11E /* TimelineThumbnailManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 597472893B5220DFE4CEF22E /* TimelineThumbnailManager.swift */; };
 		9BC70E6FFB176F3B7319ABC6 /* PickerMovieRequest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98101DE825E9251109AF287E /* PickerMovieRequest.swift */; };
 		9CAF0EDDABDE813ECCCEB0F1 /* StudioFlowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A78144CB0D2A6734E514D19B /* StudioFlowTests.swift */; };
 		A528BE8C0054AB49DEB85CFC /* DiagnosticLogTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B9DD5D3C6075D06D0987B16 /* DiagnosticLogTests.swift */; };
@@ -86,6 +92,7 @@
 		0169A77B976C8F4D3911FCAC /* LocalVideoCopy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalVideoCopy.swift; sourceTree = "<group>"; };
 		074509D7A51E4F5CF3F199AD /* DraftStorageTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DraftStorageTests.swift; sourceTree = "<group>"; };
 		078BBD8DC83BDFD7C61D8962 /* DurationAndCoverTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DurationAndCoverTests.swift; sourceTree = "<group>"; };
+		08D593C98B21CD7C8FDA32B0 /* TimelineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimelineTests.swift; sourceTree = "<group>"; };
 		0F8C0E5F75CE0686900A20D5 /* MediaProcessor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaProcessor.swift; sourceTree = "<group>"; };
 		10B0A96F505D0B09A6A3FCF9 /* DiagnosticLog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticLog.swift; sourceTree = "<group>"; };
 		15AC16403C80A25C3B71B15A /* Vimemo.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Vimemo.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -93,6 +100,7 @@
 		164CF80884B18FDBB0790EA0 /* PreviewCompositor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewCompositor.swift; sourceTree = "<group>"; };
 		175B89EDFA7EBC3587FA81AE /* CoverPreviewTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoverPreviewTests.swift; sourceTree = "<group>"; };
 		1B4D9F0B7B088B69F6FC6162 /* PurchaseTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PurchaseTests.swift; sourceTree = "<group>"; };
+		1B86BB6417C0535431C93D2B /* TimelinePinchGesture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimelinePinchGesture.swift; sourceTree = "<group>"; };
 		1C1DF2992F97A0A043F73C3C /* Paywall-1.jpg */ = {isa = PBXFileReference; lastKnownFileType = image.jpeg; path = "Paywall-1.jpg"; sourceTree = "<group>"; };
 		1CEB44D62EB5D262FF2E5974 /* VimemoTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = VimemoTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		2004620AB707B86C25E51F04 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
@@ -109,6 +117,7 @@
 		526AEC8B2AB81852BFBDA44D /* ProjectStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectStore.swift; sourceTree = "<group>"; };
 		54A8AA74B56AE08436D70E5C /* TimelineView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimelineView.swift; sourceTree = "<group>"; };
 		56AF31788AE3F5373000CF2C /* PurchaseStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PurchaseStore.swift; sourceTree = "<group>"; };
+		597472893B5220DFE4CEF22E /* TimelineThumbnailManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimelineThumbnailManager.swift; sourceTree = "<group>"; };
 		5A8D1F8B507869296D816F47 /* HistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryView.swift; sourceTree = "<group>"; };
 		6DF44DFEAB48AB616615A737 /* LibraryStorage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryStorage.swift; sourceTree = "<group>"; };
 		745A5B234A67FC388657143C /* DemoPoster.jpg */ = {isa = PBXFileReference; lastKnownFileType = image.jpeg; path = DemoPoster.jpg; sourceTree = "<group>"; };
@@ -121,9 +130,11 @@
 		9527BD47AB760D3345DF4F33 /* DiagnosticShareTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticShareTests.swift; sourceTree = "<group>"; };
 		98101DE825E9251109AF287E /* PickerMovieRequest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PickerMovieRequest.swift; sourceTree = "<group>"; };
 		99A09C42B31EADE21A37BA7C /* CoverPreview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoverPreview.swift; sourceTree = "<group>"; };
+		9A9EF047A737F233C94836C7 /* TimelineState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimelineState.swift; sourceTree = "<group>"; };
 		9B9DD5D3C6075D06D0987B16 /* DiagnosticLogTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticLogTests.swift; sourceTree = "<group>"; };
 		9DA4C5E5126BE5F137FBD722 /* ClipPlaybackPreview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipPlaybackPreview.swift; sourceTree = "<group>"; };
 		9F53DC6D5DBB0C08976B5A2A /* FrameSelectionControl.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrameSelectionControl.swift; sourceTree = "<group>"; };
+		A2632B790C557980E3B14BA7 /* TimelineInteractionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimelineInteractionTests.swift; sourceTree = "<group>"; };
 		A69AC0915475CBC17874E71A /* PreviewSurface.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewSurface.swift; sourceTree = "<group>"; };
 		A78144CB0D2A6734E514D19B /* StudioFlowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudioFlowTests.swift; sourceTree = "<group>"; };
 		ACFAF2A2EAB11395E7003787 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -138,6 +149,7 @@
 		DD671452152F7FFF1BE8F4F1 /* LivePhotoExporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LivePhotoExporter.swift; sourceTree = "<group>"; };
 		E61D0FE5A8B9D494C91643A7 /* AudioFixture.mov */ = {isa = PBXFileReference; lastKnownFileType = video.quicktime; path = AudioFixture.mov; sourceTree = "<group>"; };
 		F1833BB2A2319ADF80E72874 /* PickerMovieRequestTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PickerMovieRequestTests.swift; sourceTree = "<group>"; };
+		F490C50034EA14F6A80DA212 /* TimelineViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimelineViewModel.swift; sourceTree = "<group>"; };
 		F6709B8760847CC3D5E8176F /* CoverPickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoverPickerView.swift; sourceTree = "<group>"; };
 		FBCA03C66EB23962C5B87906 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		FC63619BFAEA882D7D7307EC /* Paywall-2.jpg */ = {isa = PBXFileReference; lastKnownFileType = image.jpeg; path = "Paywall-2.jpg"; sourceTree = "<group>"; };
@@ -179,7 +191,11 @@
 				D35BC4007A3663455B2FE7F8 /* Theme.swift */,
 				C2F97789DC3CCD74BDCF5030 /* ThumbnailImage.swift */,
 				33B0839D33DF7EF490619010 /* ThumbnailLoader.swift */,
+				1B86BB6417C0535431C93D2B /* TimelinePinchGesture.swift */,
+				9A9EF047A737F233C94836C7 /* TimelineState.swift */,
+				597472893B5220DFE4CEF22E /* TimelineThumbnailManager.swift */,
 				54A8AA74B56AE08436D70E5C /* TimelineView.swift */,
+				F490C50034EA14F6A80DA212 /* TimelineViewModel.swift */,
 				369967D8B65C6C3879219404 /* UnlimitedPurchaseView.swift */,
 				8C7EB6C4F034914E55CF7210 /* VimemoApp.swift */,
 				91046CB5A66C155C2903F7A7 /* Resources */,
@@ -210,6 +226,7 @@
 				F1833BB2A2319ADF80E72874 /* PickerMovieRequestTests.swift */,
 				1B4D9F0B7B088B69F6FC6162 /* PurchaseTests.swift */,
 				B7CB5A6A46F18441B45DD7F7 /* ThumbnailLoaderTests.swift */,
+				08D593C98B21CD7C8FDA32B0 /* TimelineTests.swift */,
 				1D7170AD21A29EA37D33AE77 /* Fixtures */,
 			);
 			path = VimemoTests;
@@ -220,6 +237,7 @@
 			children = (
 				9527BD47AB760D3345DF4F33 /* DiagnosticShareTests.swift */,
 				A78144CB0D2A6734E514D19B /* StudioFlowTests.swift */,
+				A2632B790C557980E3B14BA7 /* TimelineInteractionTests.swift */,
 			);
 			path = VimemoUITests;
 			sourceTree = "<group>";
@@ -408,6 +426,7 @@
 				4957EA272B43D04FFEDA274A /* PickerMovieRequestTests.swift in Sources */,
 				FFDDD76A479820C327CFBEE0 /* PurchaseTests.swift in Sources */,
 				5D92F7C855426EEBEF936026 /* ThumbnailLoaderTests.swift in Sources */,
+				13D48DBE8D45D68093754048 /* TimelineTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -417,6 +436,7 @@
 			files = (
 				5E61D96B84ACA4D9E1C38EB0 /* DiagnosticShareTests.swift in Sources */,
 				9CAF0EDDABDE813ECCCEB0F1 /* StudioFlowTests.swift in Sources */,
+				049ABF1D23236C4341C274D5 /* TimelineInteractionTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -453,7 +473,11 @@
 				66869A973CAF56B3AA493D1F /* Theme.swift in Sources */,
 				EBC665434B7FB80602DAD3A1 /* ThumbnailImage.swift in Sources */,
 				D484F6EFC317F268E5D31B56 /* ThumbnailLoader.swift in Sources */,
+				134E88445BE3F13C0494EBF0 /* TimelinePinchGesture.swift in Sources */,
+				0F49D0F3C214DFD39A1C71E2 /* TimelineState.swift in Sources */,
+				98D3ECF39CFA42C3D24CF11E /* TimelineThumbnailManager.swift in Sources */,
 				2757C32D1517DEC963CA80D2 /* TimelineView.swift in Sources */,
+				07CBF2C03CD4C1D3F97E8877 /* TimelineViewModel.swift in Sources */,
 				FA37992923DE8151F84E24FE /* UnlimitedPurchaseView.swift in Sources */,
 				F53E4A804E86F9BCAE0FC326 /* VimemoApp.swift in Sources */,
 			);
@@ -525,7 +549,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 25;
+				CURRENT_PROJECT_VERSION = 27;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = U8U443D7ZL;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -546,7 +570,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
-				MARKETING_VERSION = 1.0.11;
+				MARKETING_VERSION = 1.0.12;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -592,7 +616,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 25;
+				CURRENT_PROJECT_VERSION = 27;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = U8U443D7ZL;
 				ENABLE_NS_ASSERTIONS = NO;
@@ -607,7 +631,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
-				MARKETING_VERSION = 1.0.11;
+				MARKETING_VERSION = 1.0.12;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";

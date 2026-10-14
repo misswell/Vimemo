@@ -369,7 +369,7 @@ final class StudioFlowTests: XCTestCase {
         XCTAssertNotEqual(end.value as? String, oldEnd)
         let right = end.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
         right.press(forDuration: 0.05, thenDragTo: origin.withOffset(CGVector(dx: start.frame.midX + 12, dy: end.frame.midY)))
-        XCTAssertLessThan(end.frame.midX - start.frame.midX, 44, "The clip must be narrower than the original 44-point trim targets")
+        XCTAssertGreaterThanOrEqual(end.frame.midX - start.frame.midX, 119, "Even a short clip must retain separate handles and a draggable body")
         let shortStart = start.value as? String
         let left = start.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
         left.press(forDuration: 0.05, thenDragTo: left.withOffset(CGVector(dx: -8, dy: 0)))
