@@ -25,16 +25,13 @@ struct TimelineView: View {
                         .padding(.horizontal, inset)
                         .overlay {
                             TimelinePinchGesture(
-                                hitTest: { point in target(at: point, selection: selection) },
-                                onBegin: { target in model.begin(target, clip: clip, width: width, frameRate: frameRate) },
-                                onMove: { translation in move(translation) },
+                                hitTest: { point in target(at: point, selection: selection, width: width) },
+                                onBegin: { target in model.begin(target, clip: clip, width: width) },
+                                onMove: { translation in move(translation, width: width) },
                                 onEnd: { finishDrag() },
-                                onPinchBegin: { x in
-                                    finishDrag()
-                                    model.beginPinch(x: x - inset, width: width)
-                                },
+                                onPinchBegin: { x in model.beginPinch(x: x - inset, width: width) },
                                 onPinch: { scale, x in model.pinch(scale: scale, x: x - inset, width: width) },
-                                onPinchEnd: { model.endPinch() },
+                                onPinchEnd: { model.endPinch(clip: clip) },
                                 onReset: { withAnimation(.easeOut(duration: 0.3)) { model.reset() } },
                                 onFine: { model.setFine($0) }
                             )
@@ -46,12 +43,17 @@ struct TimelineView: View {
                     }.font(.system(size: 10, design: .monospaced)).foregroundStyle(StudioTheme.secondary)
                         .padding(.horizontal, inset)
                 }
-                .onAppear { model.configure(duration: duration, clip: clip, width: width) }
+                .onAppear { model.configure(duration: duration, clip: clip, width: width, frameRate: frameRate) }
                 .onChange(of: clip) { _, current in
-                    model.configure(duration: duration, clip: current, width: width)
+                    model.configure(duration: duration, clip: current, width: width, frameRate: frameRate)
                     model.selectionChanged(current)
                 }
-                .onChange(of: duration) { _, _ in model.configure(duration: duration, clip: clip, width: width) }
+                .onChange(of: width) { _, _ in
+                    model.configure(duration: duration, clip: clip, width: width, frameRate: frameRate)
+                }
+                .onChange(of: duration) { _, _ in
+                    model.configure(duration: duration, clip: clip, width: width, frameRate: frameRate)
+                }
                 .task(id: ThumbnailRequest(source: sourceURL, plan: plan)) {
                     await thumbnails.load(source: sourceURL, plan: plan)
                 }
@@ -60,7 +62,7 @@ struct TimelineView: View {
                 Button { withAnimation(.easeOut(duration: 0.3)) { model.zoom(by: 0.5, clip: clip) } } label: {
                     Image(systemName: "minus.magnifyingglass").frame(width: 32, height: 32)
                 }.accessibilityLabel("缩小时间轴").accessibilityIdentifier("timelineZoomOut")
-                Text(String(format: "%.1f×", model.state.zoomScale))
+                Text(String(format: "%.0f×", model.state.zoomScale))
                     .font(.system(size: 11, design: .monospaced))
                     .accessibilityIdentifier("timelineZoomScale")
                 Button { withAnimation(.easeOut(duration: 0.3)) { model.zoom(by: 2, clip: clip) } } label: {
@@ -68,7 +70,7 @@ struct TimelineView: View {
                 }.accessibilityLabel("放大时间轴").accessibilityIdentifier("timelineZoomIn")
                 Spacer(minLength: 0)
                 Button("聚焦片段") {
-                    withAnimation(.easeOut(duration: 0.3)) { model.focus(clip, width: 300) }
+                    withAnimation(.easeOut(duration: 0.3)) { model.focus(clip) }
                 }.accessibilityIdentifier("timelineFocusSelection")
                 Button("全片") { withAnimation(.easeOut(duration: 0.3)) { model.reset() } }
                     .accessibilityIdentifier("timelineOverview")
@@ -83,7 +85,7 @@ struct TimelineView: View {
             Text(model.fineAdjustment ? "精细调整 · 松手锁定" : "双指缩放 · 双击全片 · 拖中间移动 · 长按精调")
                 .font(.system(size: 11)).foregroundStyle(StudioTheme.secondary)
         }.accessibilityElement(children: .contain).accessibilityLabel("片段裁剪时间轴")
-            .onDisappear { finishDrag(); model.endPinch() }
+            .onDisappear { finishDrag(); model.endPinch(clip: clip) }
     }
 
     private struct ThumbnailRequest: Equatable {
@@ -94,16 +96,16 @@ struct TimelineView: View {
     private func strip(width: CGFloat, selection: TimelineSelectionGeometry, plan: TimelineThumbnailPlan) -> some View {
         let visibleLeft = max(0, selection.left)
         let visibleRight = min(width, selection.right)
+        let cellWidth = plan.cellWidth(in: width)
         return ZStack(alignment: .topLeading) {
-            let cellWidth = CGFloat(plan.interval / model.state.visibleDuration) * width
-            LazyHStack(spacing: 0) {
+            HStack(spacing: 0) {
                 ForEach(plan.times, id: \.self) { time in
                     ZStack {
                         StudioTheme.raised
                         if let image = thumbnails.images[time] {
                             Image(uiImage: image).resizable().scaledToFill()
                         }
-                    }.frame(width: max(1, cellWidth), height: stripHeight).clipped()
+                    }.frame(width: cellWidth, height: stripHeight).clipped()
                 }
             }.offset(x: model.state.x(for: plan.times.first ?? 0, width: width))
                 .frame(width: width, height: stripHeight, alignment: .leading).clipped()
@@ -121,33 +123,33 @@ struct TimelineView: View {
                     .accessibilityElement(children: .ignore).accessibilityLabel("整体移动片段")
                     .accessibilityValue("\(clip.start.timeLabel)–\(clip.end.timeLabel)")
                     .accessibilityIdentifier("timelineSelectionBody")
-                    .accessibilityAdjustableAction { direction in adjust(.selection, direction: direction) }
-                if (0...width).contains(selection.coverX(for: clip)) { coverHandle(x: selection.coverX(for: clip)) }
-                if (0...width).contains(selection.left) { trimHandle(isStart: true).offset(x: selection.left - 22, y: 2) }
-                if (0...width).contains(selection.right) { trimHandle(isStart: false).offset(x: selection.right - 22, y: 2) }
+                    .accessibilityAdjustableAction { direction in adjust(.selection, direction: direction, width: width) }
+                if (0...width).contains(selection.coverX(for: clip)) { coverHandle(x: selection.coverX(for: clip), width: width) }
+                if (0...width).contains(selection.left) { trimHandle(isStart: true, width: width).offset(x: selection.left - 22, y: 2) }
+                if (0...width).contains(selection.right) { trimHandle(isStart: false, width: width).offset(x: selection.right - 22, y: 2) }
             }
             if let time = model.feedbackTime {
                 Text(time.timeLabel).font(.system(size: 12, weight: .semibold, design: .monospaced))
                     .padding(.horizontal, 10).padding(.vertical, 5)
                     .background(StudioTheme.background, in: Capsule())
-                    .frame(width: width, alignment: .center).offset(y: 80)
+                    .frame(width: width, alignment: .center).offset(y: 18)
                     .allowsHitTesting(false).accessibilityIdentifier("timelineDragTime")
             }
         }.frame(width: width, height: 114, alignment: .topLeading)
             .accessibilityElement(children: .contain).accessibilityIdentifier("timelineTrack")
     }
 
-    private func trimHandle(isStart: Bool) -> some View {
+    private func trimHandle(isStart: Bool, width: CGFloat) -> some View {
         RoundedRectangle(cornerRadius: 5).fill(StudioTheme.accent).frame(width: 20, height: 61)
             .overlay { Capsule().fill(StudioTheme.onAccent.opacity(0.8)).frame(width: 2, height: 19) }
             .frame(width: 44, height: 70)
             .accessibilityElement(children: .ignore).accessibilityLabel(isStart ? "裁剪入点" : "裁剪出点")
             .accessibilityValue((isStart ? clip.start : clip.end).timeLabel)
             .accessibilityIdentifier(isStart ? "trimStartHandle" : "trimEndHandle")
-            .accessibilityAdjustableAction { direction in adjust(isStart ? .start : .end, direction: direction) }
+            .accessibilityAdjustableAction { direction in adjust(isStart ? .start : .end, direction: direction, width: width) }
     }
 
-    private func coverHandle(x: CGFloat) -> some View {
+    private func coverHandle(x: CGFloat, width: CGFloat) -> some View {
         ZStack(alignment: .top) {
             Capsule().fill(StudioTheme.peach).frame(width: model.target == .cover ? 3 : 2, height: 70)
                 .offset(y: 11).allowsHitTesting(false).accessibilityHidden(true)
@@ -159,26 +161,28 @@ struct TimelineView: View {
                 .accessibilityValue("第 \(Int((clip.cover * max(1, frameRate)).rounded())) 帧")
                 .accessibilityHint("左右拖动，向下拉可降低选帧速度")
                 .accessibilityIdentifier("coverFrameHandle")
-                .accessibilityAdjustableAction { direction in adjust(.cover, direction: direction) }
+                .accessibilityAdjustableAction { direction in adjust(.cover, direction: direction, width: width) }
         }.frame(width: 44, height: 114, alignment: .top).offset(x: x - 22)
     }
 
-    private func target(at point: CGPoint, selection: TimelineSelectionGeometry) -> TimelineViewModel.Target {
+    /// Only handles that are actually drawn may be grabbed, so a touch never edits a target
+    /// the user cannot see.
+    private func target(at point: CGPoint, selection: TimelineSelectionGeometry, width: CGFloat) -> TimelineViewModel.Target {
         let x = point.x - inset
         guard selection.isVisible else { return .viewport }
-        if point.y >= 68, abs(x - selection.coverX(for: clip)) <= 22 { return .cover }
+        if point.y >= 68, (0...width).contains(selection.coverX(for: clip)),
+           abs(x - selection.coverX(for: clip)) <= 22 { return .cover }
         if point.y <= 72 {
-            if abs(x - selection.left) <= 22 { return .start }
-            if abs(x - selection.right) <= 22 { return .end }
+            if (0...width).contains(selection.left), abs(x - selection.left) <= 22 { return .start }
+            if (0...width).contains(selection.right), abs(x - selection.right) <= 22 { return .end }
             if x > selection.left, x < selection.right { return .selection }
         }
         return .viewport
     }
-    private func move(_ translation: CGSize) {
+    private func move(_ translation: CGSize, width: CGFloat) {
         let target = model.target
-        let value = model.move(translation: translation, clip: clip, speed: speed,
-                               maxOutputDuration: maxOutputDuration, frameRate: frameRate)
-        guard target != .viewport, target != nil else { return }
+        let value = model.move(translation: translation, clip: clip, width: width, speed: speed, maxOutputDuration: maxOutputDuration)
+        guard let target, target != .viewport else { return }
         clip = value
         let time = target == .start ? value.start : (target == .end ? max(value.start, value.end - 1 / max(1, frameRate)) : value.cover)
         onSeek(time, true)
@@ -188,12 +192,14 @@ struct TimelineView: View {
         model.end(clip: clip)
         if editing { onSeek(clip.cover, false) }
     }
-    private func adjust(_ target: TimelineViewModel.Target, direction: AccessibilityAdjustmentDirection) {
+    private func adjust(_ target: TimelineViewModel.Target, direction: AccessibilityAdjustmentDirection, width: CGFloat) {
         let sign: CGFloat
         switch direction { case .increment: sign = 1; case .decrement: sign = -1; @unknown default: return }
-        model.begin(target, clip: clip, width: 300, frameRate: frameRate)
-        let span = target == .cover ? clip.duration / Double(TimelineSelectionGeometry(state: model.state, clip: clip, width: 300).width) : model.state.visibleDuration / 300
-        move(CGSize(width: sign / CGFloat(max(1, frameRate) * span), height: 0))
+        model.begin(target, clip: clip, width: width)
+        // Ask the model for the same pixels-per-time it gave this drag, so a VoiceOver
+        // step is exactly one frame whether the target is measured in real or drawn space.
+        let points = CGFloat(1 / max(1, frameRate) / model.dragSecondsPerPoint)
+        move(CGSize(width: sign * points, height: 0), width: width)
         finishDrag()
     }
 }

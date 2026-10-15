@@ -7,29 +7,44 @@ import SwiftUI
     @Published private(set) var fineAdjustment = false
     @Published private(set) var feedbackTime: Double?
     private var clipID: UUID?
+    private var configuredWidth: CGFloat = 0
+    private var frameRate: Double = 30
     private var previousTranslation: CGFloat = 0
     private var secondsPerPoint: Double = 0
     private var scrub: FrameScrubSession?
     private var pinchState: TimelineState?
     private var pinchAnchor: Double = 0
-    private var timelineWidth: CGFloat = 300
 
-    func configure(duration: Double, clip: Clip, width: CGFloat) {
-        timelineWidth = max(1, width)
+    func configure(duration: Double, clip: Clip, width: CGFloat, frameRate: Double = 30) {
+        let strip = max(1, width)
+        self.frameRate = max(1, frameRate)
         if state.videoDuration != max(0.1, duration) {
-            state = TimelineState(duration: duration); clipID = nil
+            state = TimelineState(duration: duration, frameRate: self.frameRate); clipID = nil
         }
+        let resized = strip != configuredWidth
+        configuredWidth = strip
+        // An in-flight drag must never re-scale under the finger.
+        guard target == nil, pinchState == nil else { return }
         if clipID != clip.id {
             clipID = clip.id
             state.reset()
-            autoFocus(clip: clip, width: width)
+            ensureTrimmable(clip: clip, width: strip)
+        } else if resized {
+            // A re-layout hands the strip a different width than the one the current fit used.
+            state.fit(clip: clip, width: strip)
         }
     }
 
-    func autoFocus(clip: Clip, width: CGFloat) {
-        if CGFloat(clip.duration / state.visibleDuration) * width < 80 { state.focus(on: clip, width: width) }
+    /// The drawn selection must be the real trim window, so a selection too small to grab
+    /// at its true width makes the viewport fit instead of widening a fake box.
+    private func ensureTrimmable(clip: Clip, width: CGFloat) {
+        guard state.realWidth(of: clip, width: width) < min(120, width) else { return }
+        state.fit(clip: clip, width: width)
     }
-    func focus(_ clip: Clip, width: CGFloat) { state.focus(on: clip, width: width) }
+
+    /// Uses the width the last layout handed `configure`, so a button press fits the strip
+    /// the user is actually looking at.
+    func focus(_ clip: Clip) { state.fit(clip: clip, width: configuredWidth) }
     func reset() { state.reset() }
     func zoom(by factor: CGFloat, clip: Clip) {
         state.zoom(to: state.zoomScale * factor, anchorTime: (clip.start + clip.end) / 2, anchorFraction: 0.5)
@@ -42,47 +57,57 @@ import SwiftUI
     func beginPinch(x: CGFloat, width: CGFloat) {
         end()
         pinchState = state
-        pinchAnchor = state.time(at: x, width: width)
+        pinchAnchor = state.time(at: x, width: max(1, width))
     }
     func pinch(scale: CGFloat, x: CGFloat, width: CGFloat) {
         guard let initial = pinchState else { return }
         state.zoom(to: initial.zoomScale * scale, anchorTime: pinchAnchor, anchorFraction: x / max(1, width))
     }
-    func endPinch() { pinchState = nil }
+    /// Releasing a pinch keeps the zoom the fingers chose, but never leaves the selection
+    /// off-screen: a hidden endpoint cannot be trimmed, and its handle is deliberately not drawn.
+    func endPinch(clip: Clip) {
+        guard pinchState != nil else { return }
+        state.keepVisible(clip); pinchState = nil
+    }
 
-    func begin(_ target: Target, clip: Clip, width: CGFloat, frameRate: Double) {
+    func begin(_ target: Target, clip: Clip, width: CGFloat) {
+        let strip = max(1, width)
         self.target = target; previousTranslation = 0
-        // In overview, moving the body must retain the coarse scale so a long
-        // source can be traversed in one drag. Handles still enter precision mode.
-        if target == .start || target == .end { autoFocus(clip: clip, width: width) }
-        secondsPerPoint = state.visibleDuration / Double(max(1, width))
+        // Trimming needs the handles at their real width; panning the whole selection
+        // deliberately keeps the current scale so a long source can be traversed in one drag.
+        if target == .start || target == .end { ensureTrimmable(clip: clip, width: strip) }
+        let geometry = TimelineSelectionGeometry(state: state, clip: clip, width: strip)
+        switch target {
+        case .cover: secondsPerPoint = clip.duration / max(1, geometry.width)
+        case .start, .end where geometry.isDisplayClamped: secondsPerPoint = clip.duration / max(1, geometry.width)
+        default: secondsPerPoint = state.secondsPerPoint(width: strip)
+        }
         if target == .cover {
-            let selection = TimelineSelectionGeometry(state: state, clip: clip, width: width)
-            secondsPerPoint = clip.duration / Double(max(1, selection.width))
-            scrub = FrameScrubSession(time: clip.cover, range: clip.start...max(clip.start, clip.end - 1 / max(1, frameRate)), frameRate: frameRate)
+            scrub = FrameScrubSession(time: clip.cover, range: clip.start...max(clip.start, clip.end - 1 / frameRate), frameRate: frameRate)
         }
     }
     func setFine(_ enabled: Bool) { fineAdjustment = enabled }
+    var dragSecondsPerPoint: Double { max(0.000_001, secondsPerPoint) }
 
-    func move(translation: CGSize, clip: Clip, speed: Double, maxOutputDuration: Double?, frameRate: Double) -> Clip {
+    func move(translation: CGSize, clip: Clip, width: CGFloat, speed: Double, maxOutputDuration: Double?) -> Clip {
         guard let target else { return clip }
         var result = clip
         let incremental = Double(translation.width - previousTranslation) * secondsPerPoint
         previousTranslation = translation.width
-        let gain = fineAdjustment ? 0.1 : FrameScrubSession.gain(for: translation.height)
         if target == .viewport {
             state.center(on: state.viewportCenterTime - incremental)
             return clip
         }
         if target == .cover {
+            // The session itself applies the pull-down gain for slow frame selection.
             result.cover = scrub?.move(translation: translation, secondsPerPoint: secondsPerPoint) ?? clip.cover
             result.coverPhotoFilename = nil
             feedbackTime = result.cover
             return result
         }
-        // Keep continuous trim times, as in the existing Clip model. Only the
-        // cover snaps to frames; tiny handle movements must not be discarded.
-        let delta = incremental * gain
+        // Pull-down slow scrubbing belongs to the cover line; a trim handle only has the
+        // long-press precision mode.
+        let delta = incremental * (fineAdjustment ? 0.1 : 1)
         switch target {
         case .selection:
             let start = min(max(0, clip.start + delta), max(0, state.videoDuration - clip.duration))
@@ -104,11 +129,9 @@ import SwiftUI
         return result
     }
 
+    /// Releasing never jumps the viewport; it only guarantees the selection stays on screen.
     func end(clip: Clip? = nil) {
-        if let clip, let target, target != .viewport, target != .cover {
-            autoFocus(clip: clip, width: timelineWidth)
-            state.center(on: (clip.start + clip.end) / 2)
-        }
+        if let clip, let target, target != .viewport, target != .cover { state.keepVisible(clip) }
         target = nil; fineAdjustment = false; feedbackTime = nil; scrub = nil
     }
 }

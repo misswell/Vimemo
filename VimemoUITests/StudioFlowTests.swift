@@ -368,8 +368,11 @@ final class StudioFlowTests: XCTestCase {
         XCTAssertNotEqual(start.value as? String, oldStart, "Dragging the upper line must move the clip")
         XCTAssertNotEqual(end.value as? String, oldEnd)
         let right = end.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
-        right.press(forDuration: 0.05, thenDragTo: origin.withOffset(CGVector(dx: start.frame.midX + 12, dy: end.frame.midY)))
+        // Still below the 120pt display floor, but long enough that the cover arrow's own
+        // hit zone spans more than one frame on a wide iPad strip.
+        right.press(forDuration: 0.05, thenDragTo: origin.withOffset(CGVector(dx: start.frame.midX + 90, dy: end.frame.midY)))
         XCTAssertGreaterThanOrEqual(end.frame.midX - start.frame.midX, 119, "Even a short clip must retain separate handles and a draggable body")
+        XCTAssertTrue(app.descendants(matching: .any)["timelineSelectionBody"].isHittable, "The grips must keep a draggable body between them")
         let shortStart = start.value as? String
         let left = start.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
         left.press(forDuration: 0.05, thenDragTo: left.withOffset(CGVector(dx: -8, dy: 0)))

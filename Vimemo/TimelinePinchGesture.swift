@@ -34,8 +34,7 @@ struct TimelinePinchGesture: UIViewRepresentable {
     }
     func updateUIView(_ uiView: UIView, context: Context) { context.coordinator.owner = self }
     static func dismantleUIView(_ uiView: UIView, coordinator: Coordinator) {
-        coordinator.owner.onEnd()
-        coordinator.owner.onPinchEnd()
+        coordinator.endActiveInteractions()
     }
 
     final class Coordinator: NSObject, UIGestureRecognizerDelegate {
@@ -45,6 +44,13 @@ struct TimelinePinchGesture: UIViewRepresentable {
         private var fine = false
         private let feedback = UIImpactFeedbackGenerator(style: .light)
         init(_ owner: TimelinePinchGesture) { self.owner = owner }
+
+        /// Leaving the editor must settle an in-flight drag, but a finished one must not
+        /// fire a second exact-frame seek.
+        func endActiveInteractions() {
+            if panning { owner.onEnd(); panning = false }
+            if pinching { owner.onPinchEnd(); pinching = false }
+        }
 
         func gestureRecognizerShouldBegin(_ recognizer: UIGestureRecognizer) -> Bool {
             if let pan = recognizer as? TimelinePanRecognizer {
