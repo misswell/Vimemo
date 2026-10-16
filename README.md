@@ -191,7 +191,7 @@ swiftc -target arm64-apple-macos14.0 -parse-as-library \
 
 ## GitHub 发布
 
-源码仓库：[misswell/Vimemo](https://github.com/misswell/Vimemo)。当前源码发布版本为 1.0.24，GitHub tag 为 `v1.0.24`；随附 IPA 的 App 版本为 1.0.11（24），使用 Xcode 27（27A266a）及 iOS 27 SDK 构建。合并后相关回归覆盖 iOS 26.3.1 模拟器的 42 项单元测试与 5 项界面测试。41 项单元测试首轮通过，一项旧测试的非 UUID 输出目录修正为生产使用的 UUID 目录后复跑通过；生产文件清理规则和原有断言保留。iOS 27.0.1 真机隔离安装验证了实况配对、非默认轨道编号视频的封面/MOV 导出、预览与输出的几何颜色一致性；播放推进测试首轮超时，单项复跑通过。真机界面测试因测试运行器断连未执行，模拟器结果不代替这项验证。用户报错的原视频仍需通过复现日志确认。
+源码仓库：[misswell/Vimemo](https://github.com/misswell/Vimemo)。当前源码发布版本为 1.0.27，GitHub tag 为 `v1.0.27`；随附 IPA 的 App 版本为 1.0.11（28）。该版本重做了可缩放裁剪时间轴：选区始终按视频真实时长绘制，抓到入点/出点或「聚焦片段」时视口自动展开到选区占半条时间轴、两侧各留四分之一，拖柄与选区位移和手指像素 1:1，松手与缩放松手只保持选区可见而不改变倍率，缩放上限由源视频时长推导。78 项单元测试通过（排除 1 项本机 StoreKit 交易测试挂起），iPhone 3 项时间轴与 4 项封面/裁剪界面测试、iPad Air 13 3 项时间轴界面测试通过；运行时验证使用 iOS 26.3.1 模拟器。
 
 2026-10-11 GitHub patch 1.0.23 保留工作台与作品页的多选删除能力；草稿删除不清除导出作品，本机作品删除不影响图库副本。11 项草稿存储测试、iPhone 4 项和 iPad 3 项界面回归在 iOS 27.0 通过，覆盖删除确认、取消、筛选、保存失败回滚、文件保护及既有编辑入口。该版本没有更新 TestFlight，也未替换送审构建。
 Release 附带 Apple Distribution 签名的 App Store IPA，仅供 App Store Connect 上传；日常安装请使用下方 TestFlight 邀请。
@@ -202,7 +202,8 @@ Release 附带 Apple Distribution 签名的 App Store IPA，仅供 App Store Con
 1.0.0（1）正式签名包已生成并验证：`build/TestFlight/Export/Vimemo.ipa`。
 归档：`build/TestFlight/Vimemo-1.0.0-1.xcarchive`。中文测试说明：`build/TestFlight/WhatToTest.zh-Hans.txt`。
 2026-10-06 已上传并处理通过，内部测试状态为 `IN_BETA_TESTING`。测试邀请已发送到 `misswell@foxmail.com`，可通过邀请邮件在 iPhone / iPad 的 TestFlight 安装。
-最新内部测试版本为 1.0.11（22），构建 ID `96269496-76e1-4fbd-bec6-bdb455a6a687`，状态 `VALID` / `IN_BETA_TESTING`，已加入现有内部测试组并开启自动通知，中文测试说明已回读核验。选择封面位于预览左下角，仅显示无背景图标；四角位置固定，轻点选择封面、长按播放且不误开选择页。保留双指缩放与双击回正、整个预览区按住播放、16:9 满宽预览，以及缩放与颜色在封面、动态预览及输出中的一致性；包含制作与导出页真实片段预览及长按放大、统一作品声音及短片段裁剪触控修复。通过现有邀请在 TestFlight 中覆盖安装，不必先删除应用。TestFlight 内购使用 Apple 沙盒，不实际扣款；商品价格加载失败时可在固定按钮处查看错误并重试。
+1.0.11（构建 25）已于 2026-10-14 通过 App Store 审核并发布，状态 `READY_FOR_SALE`；该版本的 pre-release train 已关闭，后续 TestFlight 与 App Store 构建必须递增应用版本号。
+最新内部测试版本为 1.0.12（29），构建 ID `9549061a-e94a-4ec8-a148-e33a135df91d`，状态 `VALID` / `IN_BETA_TESTING`，已加入现有内部测试组并开启自动通知，中文测试说明已回读核验。这一版包含重做后的可缩放裁剪时间轴：选区按真实时长绘制、抓柄与选区跟手指 1:1、缩放上限由素材时长推导、松手只保持选区可见不改变倍率、只有实际绘制的拖柄可抓取、缩略图复用成片解码管线。通过现有邀请在 TestFlight 中覆盖安装，不必先删除应用。TestFlight 内购使用 Apple 沙盒，不实际扣款；商品价格加载失败时可在固定按钮处查看错误并重试。
 App Store Connect：[Vimemo 实刻 TestFlight](https://appstoreconnect.apple.com/apps/6819492441/testflight/ios)。
 应用 ID：`6819492441`；构建 ID：`54e012e6-b4cc-4c50-a763-8058c9640432`；内部测试组：`58d7d5de-0316-4bf2-a7a5-5acf1387b9d5`。
 
