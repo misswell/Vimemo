@@ -14,7 +14,7 @@
 - 封面支持视频逐帧选择与 PhotosPicker 相册照片；照片拷贝至草稿目录，封面预览和输出共享裁剪、旋转、翻转与调色管线。旧草稿缺少新增可选字段时继续使用默认 3 秒与视频封面。
 - 超过 3 秒的实际动态导出（实况/MOV/GIF）需要 StoreKit 2 非消耗型内购；静态照片、3 秒内动态导出与全部编辑功能免费。统一在 ExportCoordinator 检查整批任务，并在长导出开始前重新验证权益；不通过 UserDefaults、启动参数或明文缓存解锁。旧长草稿不得因权益缺失而自动截短。
 - 购买页只展示一次性永久解锁，不加入订阅、试用或把免费编辑能力列为收费权益。价格始终取 StoreKit 的 displayPrice；加载、成功、失败状态均保留底部固定操作，失败需显示明确反馈和重试；测试商品加载注入仅在 DEBUG 的独立 UI 测试中使用，不影响交易验证。
-- 内购商品 `com.vimemo.live.unlimited`，App Store Connect ID `6819497962`，准备提交版本 `bc805805-7c62-455e-8de4-28bd6a07314d`。美国基准价 0.99 美元，中国大陆手动价 6 元；客户端显示 StoreKit 实际本地价格。首次内购随应用版本审核，未批准上架前不宣称正式收费已上线。
+- 内购商品 `com.vimemo.live.unlimited`，App Store Connect ID `6819497962`，准备提交版本 `bc805805-7c62-455e-8de4-28bd6a07314d`。美国基准价 0.99 美元，中国大陆手动价 6 元；客户端显示 StoreKit 实际本地价格。首次内购随应用版本审核，未批准上架前不宣称正式收费已上线。2026-10-16 核验该商品状态已为 `APPROVED`（`NON_CONSUMABLE`，基础价 0.99 美元，`availableInNewTerritories=true`），随 1.0.11 发布，正式收费已上线；沙盒的成功购买、重装恢复与退款三项验证尚未执行，仍是待办。
 - `VimemoTests/Fixtures/Unlimited.storekit` 仅属于测试 target；测试购买不得使用真实账户支付，不得将测试商品或 StoreKitTest 框架打包进正式应用。
 - UI 测试用 DEBUG 下的 `--test-library <UUID>` 创建独立库，不能清空用户草稿。`--demo-editor` 可进入原创示例编辑器。
 - 正式资源不包含用户提供的参考录屏或测试音频；`VimemoTests/Fixtures/AudioFixture.mov` 只属于测试 target。
