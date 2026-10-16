@@ -4,14 +4,19 @@ import SwiftUI
 /// Drawing and accessibility remain in SwiftUI; all coordinates use this fixed view.
 struct TimelinePinchGesture: UIViewRepresentable {
     var hitTest: (CGPoint) -> TimelineViewModel.Target
-    var onBegin: (TimelineViewModel.Target) -> Void
+    var onBegin: (TimelineViewModel.Target, CGFloat) -> Void
     var onMove: (CGSize) -> Void
     var onEnd: () -> Void
+    /// A second finger takes the gesture away from a one-finger edit; the edit keeps its result
+    /// but must not fire the final exact-frame seek.
+    var onCancel: () -> Void
     var onPinchBegin: (CGFloat) -> Void
     var onPinch: (CGFloat, CGFloat) -> Void
     var onPinchEnd: () -> Void
     var onReset: () -> Void
     var onFine: (Bool) -> Void
+    var scrollRate: () -> Double
+    var onAutoScroll: (Double) -> Void
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
     func makeUIView(context: Context) -> UIView {
@@ -42,14 +47,18 @@ struct TimelinePinchGesture: UIViewRepresentable {
         private var panning = false
         private var pinching = false
         private var fine = false
+        private var scrollLink: CADisplayLink?
+        private var lastFrameTime = 0.0
         private let feedback = UIImpactFeedbackGenerator(style: .light)
         init(_ owner: TimelinePinchGesture) { self.owner = owner }
+        deinit { scrollLink?.invalidate() }
 
         /// Leaving the editor must settle an in-flight drag, but a finished one must not
         /// fire a second exact-frame seek.
         func endActiveInteractions() {
             if panning { owner.onEnd(); panning = false }
             if pinching { owner.onPinchEnd(); pinching = false }
+            stopScroll()
         }
 
         func gestureRecognizerShouldBegin(_ recognizer: UIGestureRecognizer) -> Bool {
@@ -76,7 +85,7 @@ struct TimelinePinchGesture: UIViewRepresentable {
                 guard !pinching else { return }
                 panning = true
                 let translation = recognizer.translation
-                owner.onBegin(owner.hitTest(recognizer.origin))
+                owner.onBegin(owner.hitTest(recognizer.origin), recognizer.origin.x)
                 owner.onFine(fine)
                 feedback.impactOccurred(); feedback.prepare()
                 owner.onMove(CGSize(width: translation.x, height: translation.y))
@@ -89,17 +98,20 @@ struct TimelinePinchGesture: UIViewRepresentable {
                     if recognizer.state == .ended, !pinching {
                         owner.onMove(CGSize(width: recognizer.translation.x, height: recognizer.translation.y))
                     }
+                    stopScroll()
                     owner.onEnd(); feedback.impactOccurred(intensity: 0.5)
                 }
                 panning = false; fine = false
             default: break
             }
+            syncScroll()
         }
         @objc func pinch(_ recognizer: UIPinchGestureRecognizer) {
             let x = recognizer.location(in: recognizer.view).x
             switch recognizer.state {
             case .began:
-                if panning { owner.onEnd(); panning = false }
+                stopScroll()
+                if panning { owner.onCancel(); panning = false; fine = false }
                 fine = false; owner.onFine(false); pinching = true
                 owner.onPinchBegin(x)
             case .changed: owner.onPinch(recognizer.scale, x)
@@ -119,6 +131,28 @@ struct TimelinePinchGesture: UIViewRepresentable {
                 fine = false; owner.onFine(false)
             default: break
             }
+        }
+
+        /// Edge auto-scroll runs on the display link, not on touch events: a finger that stops
+        /// moving inside an edge zone must keep scrolling the timeline under itself.
+        private func syncScroll() {
+            if abs(owner.scrollRate()) < 0.0001 { stopScroll(); return }
+            guard scrollLink == nil else { return }
+            let link = CADisplayLink(target: self, selector: #selector(scrollTick(_:)))
+            link.preferredFrameRateRange = CAFrameRateRange(minimum: 60, maximum: 120, preferred: 60)
+            link.add(to: .main, forMode: .common)
+            scrollLink = link
+            lastFrameTime = 0
+        }
+        private func stopScroll() {
+            scrollLink?.invalidate(); scrollLink = nil; lastFrameTime = 0
+        }
+        @objc private func scrollTick(_ link: CADisplayLink) {
+            // The first frame has no predecessor; a stalled tick must not teleport the viewport.
+            defer { lastFrameTime = link.timestamp }
+            guard lastFrameTime > 0 else { return }
+            owner.onAutoScroll(min(1.0 / 30, max(0, link.timestamp - lastFrameTime)))
+            if abs(owner.scrollRate()) < 0.0001 { stopScroll() }
         }
     }
 }

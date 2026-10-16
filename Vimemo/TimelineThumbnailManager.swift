@@ -2,7 +2,9 @@ import AVFoundation
 import SwiftUI
 
 @MainActor final class TimelineThumbnailManager: ObservableObject {
-    @Published private(set) var images: [Double: UIImage] = [:]
+    /// Keyed by the source frame, so every viewport that asks for the same frame reuses the
+    /// decode instead of asking for it again at a new pixel position.
+    @Published private(set) var images: [Int: UIImage] = [:]
     private let cache = NSCache<NSNumber, UIImage>()
     private let maximumSize = CGSize(width: 160, height: 160)
     private var source: URL?
@@ -23,13 +25,14 @@ import SwiftUI
             asset = AVURLAsset(url: source); transform = nil
             cache.removeAllObjects(); images = [:]
         }
-        var loaded: [Double: UIImage] = [:]
-        for time in plan.times {
-            if let image = cache.object(forKey: NSNumber(value: time)) { loaded[time] = image }
+        let keep = Set(plan.times.map { plan.key(for: $0) })
+        var loaded = images
+        for key in keep {
+            if let image = cache.object(forKey: NSNumber(value: key)) { loaded[key] = image }
         }
-        // Cells that are still on screen keep their frame while the new ones decode.
-        for (time, image) in images where plan.times.contains(time) && loaded[time] == nil { loaded[time] = image }
-        images = loaded
+        // A pinch rewrites the request every frame. Cells the new viewport no longer asks for
+        // stay until the strip is full again, so the row never blinks mid-gesture.
+        images = loaded.count > 60 ? loaded.filter { keep.contains($0.key) } : loaded
         do {
             // Debounce moving viewports, then decode only the visible screen plus one cell.
             try await Task.sleep(for: .milliseconds(100))
@@ -46,7 +49,9 @@ import SwiftUI
             generator.requestedTimeToleranceAfter = tolerance
             let upright = transform ?? .identity
             try await withTaskCancellationHandler {
-                for time in plan.times where loaded[time] == nil {
+                for time in plan.times {
+                    let key = plan.key(for: time)
+                    if loaded[key] != nil { continue }
                     try Task.checkCancellation()
                     guard generation == request else { return }
                     let requested = CMTime(seconds: time, preferredTimescale: 600)
@@ -62,8 +67,8 @@ import SwiftUI
                     try Task.checkCancellation()
                     guard generation == request else { return }
                     let image = UIImage(cgImage: frame)
-                    cache.setObject(image, forKey: NSNumber(value: time), cost: frame.bytesPerRow * frame.height)
-                    loaded[time] = image
+                    cache.setObject(image, forKey: NSNumber(value: key), cost: frame.bytesPerRow * frame.height)
+                    loaded[key] = image
                     images = loaded
                 }
             } onCancel: { generator.cancelAllCGImageGeneration() }

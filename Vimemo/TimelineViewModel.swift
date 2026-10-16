@@ -2,16 +2,41 @@ import SwiftUI
 
 @MainActor final class TimelineViewModel: ObservableObject {
     enum Target { case start, end, selection, viewport, cover }
+
     @Published private(set) var state = TimelineState(duration: 0.1)
     @Published private(set) var target: Target?
     @Published private(set) var fineAdjustment = false
     @Published private(set) var feedbackTime: Double?
+    /// Viewport widths per second the strip wants to scroll while a finger parks in an edge zone.
+    @Published private(set) var autoScrollRate: Double = 0
+    private(set) var isFittedToSelection = false
+
+    private struct Drag {
+        var target: Target
+        var originX: CGFloat
+        var width: CGFloat
+        var secondsPerPoint: Double
+        /// The difference between the grabbed control's time and the time under the finger. It
+        /// absorbs whatever the precision fit could not do at the head or tail of the source, so
+        /// the control then tracks the finger exactly.
+        var timeOffset: Double
+        var baselineCenter: Double
+        var duration: Double
+        var coverOffset: Double
+        var speed: Double = 1
+        var maxOutputDuration: Double?
+        var translation: CGSize = .zero
+    }
+
+    private var drag: Drag?
+    private var scrub: FrameScrubSession?
+    /// The clip value the last drag or auto-scroll produced. SwiftUI reports a binding write from
+    /// `onChange` after the gesture has already ended, so the model has to remember which edits
+    /// came from the timeline itself: a release must never be followed by a camera nudge.
+    private var produced: Clip?
+    private var frameRate: Double = 30
     private var clipID: UUID?
     private var configuredWidth: CGFloat = 0
-    private var frameRate: Double = 30
-    private var previousTranslation: CGFloat = 0
-    private var secondsPerPoint: Double = 0
-    private var scrub: FrameScrubSession?
     private var pinchState: TimelineState?
     private var pinchAnchor: Double = 0
 
@@ -19,39 +44,52 @@ import SwiftUI
         let strip = max(1, width)
         self.frameRate = max(1, frameRate)
         if state.videoDuration != max(0.1, duration) {
-            state = TimelineState(duration: duration, frameRate: self.frameRate); clipID = nil
+            state = TimelineState(duration: duration, frameRate: self.frameRate)
+            clipID = nil
+            isFittedToSelection = false
         }
         let resized = strip != configuredWidth
         configuredWidth = strip
-        // An in-flight drag must never re-scale under the finger.
+        // An in-flight drag or pinch must never re-scale under the finger.
         guard target == nil, pinchState == nil else { return }
         if clipID != clip.id {
             clipID = clip.id
+            // A clip opens in Overview: the whole source, with the selection drawn at its true
+            // ratio. Zooming in is the user's decision, made by grabbing a handle or 聚焦片段.
             state.reset()
-            ensureTrimmable(clip: clip, width: strip)
-        } else if resized {
-            // A re-layout hands the strip a different width than the one the current fit used.
+            isFittedToSelection = false
+        } else if resized, isFittedToSelection {
+            // A re-layout hands the strip a different width than the one the fit used.
             state.fit(clip: clip, width: strip)
         }
     }
 
-    /// The drawn selection must be the real trim window, so a selection too small to grab
-    /// at its true width makes the viewport fit instead of widening a fake box.
-    private func ensureTrimmable(clip: Clip, width: CGFloat) {
-        guard state.realWidth(of: clip, width: width) < min(120, width) else { return }
-        state.fit(clip: clip, width: width)
+    func focus(_ clip: Clip) {
+        state.fit(clip: clip, width: configuredWidth)
+        isFittedToSelection = true
     }
 
-    /// Uses the width the last layout handed `configure`, so a button press fits the strip
-    /// the user is actually looking at.
-    func focus(_ clip: Clip) { state.fit(clip: clip, width: configuredWidth) }
-    func reset() { state.reset() }
-    func zoom(by factor: CGFloat, clip: Clip) {
-        state.zoom(to: state.zoomScale * factor, anchorTime: (clip.start + clip.end) / 2, anchorFraction: 0.5)
+    func reset() {
+        state.reset()
+        isFittedToSelection = false
     }
+
+    /// The buttons work on the viewport the user is looking at, not on the selection.
+    func zoom(by factor: CGFloat) {
+        state.zoom(to: state.zoomScale * factor, anchorTime: state.viewportCenterTime, anchorFraction: 0.5)
+    }
+
+    /// Follows a clip the user changed somewhere else, e.g. the 精确裁剪 steppers, so the camera
+    /// shows the result. A value the timeline just produced is its own edit: the fingers already
+    /// decided where the camera is, so this returns without moving it.
     func selectionChanged(_ clip: Clip) {
         guard target == nil, pinchState == nil else { return }
+        if produced == clip { produced = nil; return }
         state.keepVisible(clip)
+    }
+
+    func selectionIsOffScreen(_ clip: Clip) -> Bool {
+        !TimelineSelectionGeometry(state: state, clip: clip, width: configuredWidth).isVisible
     }
 
     func beginPinch(x: CGFloat, width: CGFloat) {
@@ -59,79 +97,146 @@ import SwiftUI
         pinchState = state
         pinchAnchor = state.time(at: x, width: max(1, width))
     }
+
     func pinch(scale: CGFloat, x: CGFloat, width: CGFloat) {
         guard let initial = pinchState else { return }
         state.zoom(to: initial.zoomScale * scale, anchorTime: pinchAnchor, anchorFraction: x / max(1, width))
     }
-    /// Releasing a pinch keeps the zoom the fingers chose, but never leaves the selection
-    /// off-screen: a hidden endpoint cannot be trimmed, and its handle is deliberately not drawn.
-    func endPinch(clip: Clip) {
-        guard pinchState != nil else { return }
-        state.keepVisible(clip); pinchState = nil
+
+    /// Releasing a pinch must not undo what the fingers did. The viewport keeps exactly the zoom
+    /// and anchor they chose; a selection that ends up outside it is a legal state, and the strip
+    /// says so instead of dragging the camera back.
+    func endPinch() { pinchState = nil }
+
+    func begin(_ target: Target, clip: Clip, width: CGFloat, at fingerX: CGFloat) {
+        let strip = max(1, width)
+        let x = fingerX
+        self.target = target
+        produced = nil
+        autoScrollRate = 0
+        if target != .viewport && target != .selection {
+            enterPrecision(clip: clip, edgeTime: grabbedTime(for: target, clip: clip), fingerX: x, width: strip)
+        }
+        let perPoint = target == .cover
+            ? clip.duration / max(1, state.realWidth(of: clip, width: strip))
+            : state.secondsPerPoint(width: strip)
+        drag = Drag(
+            target: target, originX: x, width: strip, secondsPerPoint: perPoint,
+            timeOffset: grabbedTime(for: target, clip: clip) - state.time(at: x, width: strip),
+            baselineCenter: state.viewportCenterTime, duration: clip.duration,
+            coverOffset: clip.cover - clip.start
+        )
+        if target == .cover {
+            scrub = FrameScrubSession(time: clip.cover, range: clip.start...max(clip.start, clip.end - 1 / max(1, frameRate)), frameRate: frameRate)
+        }
     }
 
-    func begin(_ target: Target, clip: Clip, width: CGFloat) {
-        let strip = max(1, width)
-        self.target = target; previousTranslation = 0
-        // Trimming needs the handles at their real width; panning the whole selection
-        // deliberately keeps the current scale so a long source can be traversed in one drag.
-        if target == .start || target == .end { ensureTrimmable(clip: clip, width: strip) }
-        let geometry = TimelineSelectionGeometry(state: state, clip: clip, width: strip)
+    /// Trimming needs the endpoints far enough apart to be real targets, so grabbing one that is
+    /// drawn narrower than half the strip opens the precision viewport with that edge under the
+    /// finger. Moving the whole selection deliberately keeps the current scale, so a long source
+    /// stays traversable in one drag.
+    private func enterPrecision(clip: Clip, edgeTime: Double, fingerX: CGFloat, width: CGFloat) {
+        guard state.realWidth(of: clip, width: width) < width * TimelineState.precisionSelectionFraction else { return }
+        state.fit(clip: clip, width: width, edgeTime: edgeTime, fingerX: fingerX)
+        isFittedToSelection = true
+    }
+
+    private func grabbedTime(for target: Target, clip: Clip) -> Double {
         switch target {
-        case .cover: secondsPerPoint = clip.duration / max(1, geometry.width)
-        case .start, .end where geometry.isDisplayClamped: secondsPerPoint = clip.duration / max(1, geometry.width)
-        default: secondsPerPoint = state.secondsPerPoint(width: strip)
-        }
-        if target == .cover {
-            scrub = FrameScrubSession(time: clip.cover, range: clip.start...max(clip.start, clip.end - 1 / frameRate), frameRate: frameRate)
+        case .start: return clip.start
+        case .end: return clip.end
+        case .cover: return clip.cover
+        case .selection, .viewport: return clip.start
         }
     }
+
     func setFine(_ enabled: Bool) { fineAdjustment = enabled }
-    var dragSecondsPerPoint: Double { max(0.000_001, secondsPerPoint) }
+    var dragSecondsPerPoint: Double { max(0.000_001, drag?.secondsPerPoint ?? state.secondsPerPoint(width: configuredWidth)) }
 
     func move(translation: CGSize, clip: Clip, width: CGFloat, speed: Double, maxOutputDuration: Double?) -> Clip {
-        guard let target else { return clip }
-        var result = clip
-        let incremental = Double(translation.width - previousTranslation) * secondsPerPoint
-        previousTranslation = translation.width
-        if target == .viewport {
-            state.center(on: state.viewportCenterTime - incremental)
-            return clip
-        }
-        if target == .cover {
-            // The session itself applies the pull-down gain for slow frame selection.
-            result.cover = scrub?.move(translation: translation, secondsPerPoint: secondsPerPoint) ?? clip.cover
-            result.coverPhotoFilename = nil
-            feedbackTime = result.cover
-            return result
-        }
-        // Pull-down slow scrubbing belongs to the cover line; a trim handle only has the
-        // long-press precision mode.
-        let delta = incremental * (fineAdjustment ? 0.1 : 1)
-        switch target {
-        case .selection:
-            let start = min(max(0, clip.start + delta), max(0, state.videoDuration - clip.duration))
-            let shift = start - clip.start
-            result.start = start; result.end += shift; result.cover += shift
-            feedbackTime = result.start
-        case .start:
-            result.start = min(clip.end - min(0.1, state.videoDuration), max(0, clip.start + delta))
-            if let maximum = maxOutputDuration { result.start = max(result.start, clip.end - maximum * speed) }
-            result.normalize(sourceDuration: state.videoDuration, speed: speed, maxOutputDuration: maxOutputDuration)
-            feedbackTime = result.start
-        case .end:
-            result.end = min(state.videoDuration, max(clip.start + min(0.1, state.videoDuration), clip.end + delta))
-            result.normalize(sourceDuration: state.videoDuration, speed: speed, maxOutputDuration: maxOutputDuration)
-            feedbackTime = result.end
-        case .viewport, .cover: break
-        }
-        state.keepVisible(result)
-        return result
+        guard var current = drag else { return clip }
+        current.width = max(1, width)
+        current.translation = translation
+        current.speed = speed
+        current.maxOutputDuration = maxOutputDuration
+        // Gesture math always uses the strip being drawn and the viewport as it now stands.
+        if current.target != .cover { current.secondsPerPoint = state.secondsPerPoint(width: current.width) }
+        drag = current
+        return derive(clip)
     }
 
-    /// Releasing never jumps the viewport; it only guarantees the selection stays on screen.
-    func end(clip: Clip? = nil) {
-        if let clip, let target, target != .viewport, target != .cover { state.keepVisible(clip) }
-        target = nil; fineAdjustment = false; feedbackTime = nil; scrub = nil
+    /// A finger parked in an edge zone scrolls the viewport beneath it, so one continuous drag can
+    /// take a trim from 00:00 to the end of the source without releasing.
+    func autoScroll(deltaTime: Double, clip: Clip) -> Clip? {
+        guard drag != nil, abs(autoScrollRate) > 0.0001 else { return nil }
+        guard state.pan(seconds: autoScrollRate * deltaTime * state.visibleDuration) != 0 else { return nil }
+        return derive(clip)
+    }
+
+    private func derive(_ clip: Clip) -> Clip {
+        guard let drag else { return clip }
+        var result = clip
+        switch drag.target {
+        case .viewport:
+            state.center(on: drag.baselineCenter - Double(drag.translation.width) * drag.secondsPerPoint)
+            autoScrollRate = 0
+            return clip
+        case .cover:
+            autoScrollRate = 0
+            result.cover = scrub?.move(translation: drag.translation, secondsPerPoint: drag.secondsPerPoint) ?? clip.cover
+            result.coverPhotoFilename = nil
+            feedbackTime = result.cover
+            produced = result
+            return result
+        case .start, .end, .selection:
+            // Pull-down slow scrubbing belongs to the cover line; a trim target only has the
+            // long-press precision mode.
+            let gain = fineAdjustment ? 0.1 : 1
+            let virtualX = drag.originX + drag.translation.width * gain
+            let time = state.time(at: virtualX, width: drag.width) + drag.timeOffset
+            switch drag.target {
+            case .start:
+                result.start = min(clip.end - min(0.1, state.videoDuration), max(0, time))
+                if let maximum = drag.maxOutputDuration { result.start = max(result.start, clip.end - maximum * drag.speed) }
+                result.normalize(sourceDuration: state.videoDuration, speed: drag.speed, maxOutputDuration: drag.maxOutputDuration)
+                feedbackTime = result.start
+            case .end:
+                result.end = min(state.videoDuration, max(clip.start + min(0.1, state.videoDuration), time))
+                result.normalize(sourceDuration: state.videoDuration, speed: drag.speed, maxOutputDuration: drag.maxOutputDuration)
+                feedbackTime = result.end
+            case .selection:
+                let start = min(max(0, time), max(0, state.videoDuration - drag.duration))
+                let shift = start - clip.start
+                result.start = start
+                result.end = start + drag.duration
+                result.cover = clip.cover + shift
+                feedbackTime = result.start
+            case .viewport, .cover: break
+            }
+            autoScrollRate = scrollRate(fingerX: drag.originX + drag.translation.width, width: drag.width)
+            produced = result
+            return result
+        }
+    }
+
+    /// Zero when the viewport is the whole source or the requested direction has no room left.
+    private func scrollRate(fingerX: CGFloat, width: CGFloat) -> Double {
+        guard let drag, state.canScroll, drag.target == .start || drag.target == .end || drag.target == .selection else { return 0 }
+        let zone = min(56, max(24, width * 0.18))
+        let x = min(max(fingerX, 0), width)
+        if x < zone, state.visibleStart > 0 { return -pow(Double((zone - x) / zone), 2) }
+        if x > width - zone, state.visibleEnd < state.videoDuration { return pow(Double((x - (width - zone)) / zone), 2) }
+        return 0
+    }
+
+    /// Releasing never jumps the viewport and never re-scales: the fingers or the buttons that
+    /// moved it are the only things allowed to.
+    func end() {
+        drag = nil
+        target = nil
+        fineAdjustment = false
+        feedbackTime = nil
+        scrub = nil
+        autoScrollRate = 0
     }
 }
