@@ -207,7 +207,7 @@ Release 附带 Apple Distribution 签名的 App Store IPA，仅供 App Store Con
 归档：`build/TestFlight/Vimemo-1.0.0-1.xcarchive`。中文测试说明：`build/TestFlight/WhatToTest.zh-Hans.txt`。
 2026-10-06 已上传并处理通过，内部测试状态为 `IN_BETA_TESTING`。测试邀请已发送到 `misswell@foxmail.com`，可通过邀请邮件在 iPhone / iPad 的 TestFlight 安装。
 1.0.11（构建 25）已于 2026-10-14 通过 App Store 审核并发布，状态 `READY_FOR_SALE`；该版本的 pre-release train 已关闭，后续 TestFlight 与 App Store 构建必须递增应用版本号。
-最新内部测试版本为 1.0.12（29），构建 ID `9549061a-e94a-4ec8-a148-e33a135df91d`，状态 `VALID` / `IN_BETA_TESTING`，已加入现有内部测试组并开启自动通知，中文测试说明已回读核验。这一版包含重做后的可缩放裁剪时间轴：选区按真实时长绘制、抓柄与选区跟手指 1:1、缩放上限由素材时长推导、松手只保持选区可见不改变倍率、只有实际绘制的拖柄可抓取、缩略图复用成片解码管线。通过现有邀请在 TestFlight 中覆盖安装，不必先删除应用。TestFlight 内购使用 Apple 沙盒，不实际扣款；商品价格加载失败时可在固定按钮处查看错误并重试。GitHub 1.0.28（App 1.0.12 构建 30）只做源码与 IPA 发布，未上传 TestFlight，内部测试仍为构建 29。
+最新内部测试版本为 1.0.12（30），构建 ID `aa2a9e32-389c-4087-b146-331f4dab57f4`，处理状态 `VALID`，已加入现有内部测试组（不重复邀请测试者），中文 zh-Hans 测试说明经 API 写入并回读逐字节一致（2356 字节）。这一版把裁剪时间轴重做在同一套视口坐标上：打开片段先给全片概览、抓柄或「聚焦片段」才进入精度视图且被抓的边落在手指下、拖柄与选区跟手指像素 1:1、边缘 24–56 点内自动滚动、缩放松手允许选区在视野外并显示「定位」、窄选区的三条 44 点触控带成簇滑入条带、缩略图按帧号缓存不再重复解码。通过现有邀请在 TestFlight 中覆盖安装，不必先删除应用。TestFlight 内购使用 Apple 沙盒，不实际扣款；商品价格加载失败时可在固定按钮处查看错误并重试。上一个内部测试构建为 1.0.12（29），构建 ID `9549061a-e94a-4ec8-a148-e33a135df91d`。
 App Store Connect：[Vimemo 实刻 TestFlight](https://appstoreconnect.apple.com/apps/6819492441/testflight/ios)。
 应用 ID：`6819492441`；构建 ID：`54e012e6-b4cc-4c50-a763-8058c9640432`；内部测试组：`58d7d5de-0316-4bf2-a7a5-5acf1387b9d5`。
 
