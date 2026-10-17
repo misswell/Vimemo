@@ -215,4 +215,4 @@ App Store Connect：[Vimemo 实刻 TestFlight](https://appstoreconnect.apple.com
 
 2026-10-09 按用户要求将构建 22 上传并分发到现有 TestFlight 内部组，未替换 App Store 已送审构建。
 
-本次 GitHub 构建 23 不自动上传 TestFlight，也不替换送审版本。
+2026-10-17 已提交 App Store 1.0.12（构建 30）审核，提交 ID `e5b26807-b6c4-40fd-979f-0c5e20a9889f`，提交时版本与提交均为 `WAITING_FOR_REVIEW`，发布方式 `AFTER_APPROVAL`（审核通过后自动上架）。这一版只提交应用版本：不限制时长内购已随 1.0.11 变为 `APPROVED`，无需重复提交。zh-Hans「本次更新内容」已补写并回读核验。同日 TestFlight 内部测试更新到同一构建 30，未提交外部 Beta 审核，已发布的 1.0.11 未受影响。
