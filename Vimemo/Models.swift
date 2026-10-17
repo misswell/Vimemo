@@ -9,10 +9,10 @@ enum OutputFormat: String, Codable, CaseIterable, Identifiable {
 }
 
 enum FrameRatio: String, Codable, CaseIterable, Identifiable {
-    case original, portrait, square, classic, landscape
+    case original, portrait, threeFour, square, classic, landscape
     var id: String { rawValue }
-    var title: String { switch self { case .original: "原始"; case .portrait: "9:16"; case .square: "1:1"; case .classic: "4:3"; case .landscape: "16:9" } }
-    var value: Double? { switch self { case .original: nil; case .portrait: 9 / 16; case .square: 1; case .classic: 4 / 3; case .landscape: 16 / 9 } }
+    var title: String { switch self { case .original: "原始"; case .portrait: "9:16"; case .threeFour: "3:4"; case .square: "1:1"; case .classic: "4:3"; case .landscape: "16:9" } }
+    var value: Double? { switch self { case .original: nil; case .portrait: 9 / 16; case .threeFour: 3 / 4; case .square: 1; case .classic: 4 / 3; case .landscape: 16 / 9 } }
 }
 
 enum ColorLook: String, Codable, CaseIterable, Identifiable {

@@ -336,8 +336,17 @@ final class StudioFlowTests: XCTestCase {
         XCTAssertGreaterThan(cover.frame.midY, live.frame.midY)
         XCTAssertEqual(cover.frame.midY, sound.frame.midY, accuracy: 1)
         let originalCorners = [live.frame, duration.frame, sound.frame, cover.frame]
-        for ratio in ["9:16", "1:1", "16:9"] {
-            app.buttons[ratio].tap()
+        let ratioRow = app.scrollViews["ratioOptionsScroll"]
+        XCTAssertTrue(ratioRow.waitForExistence(timeout: 5))
+        for ratio in ["9:16", "3:4", "1:1", "16:9"] {
+            let pill = app.buttons[ratio]
+            pill.tap()
+            for _ in 0..<10 {
+                if pill.frame.minX >= ratioRow.frame.minX - 1 && pill.frame.maxX <= ratioRow.frame.maxX + 1 { break }
+                Thread.sleep(forTimeInterval: 0.2)
+            }
+            XCTAssertGreaterThan(pill.frame.width, 40)
+            XCTAssertLessThanOrEqual(pill.frame.maxX, ratioRow.frame.maxX + 1, "Selecting \(ratio) must scroll the pill fully into view: \(pill.frame) in \(ratioRow.frame)")
             // A containing AX element reports the union of its visible children,
             // including the video. Measure the corner badges themselves.
             for (element, frame) in zip([live, duration, sound, cover], originalCorners) {

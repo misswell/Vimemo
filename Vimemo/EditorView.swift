@@ -449,9 +449,20 @@ struct EditorView: View {
         StudioCard {
             VStack(alignment: .leading, spacing: 18) {
                 SectionLabel(title: "构图", detail: "同时应用到照片与视频")
-                ScrollView(.horizontal) {
-                    HStack(spacing: 8) { ForEach(FrameRatio.allCases) { ratio in PillButton(title: ratio.title, selected: project.settings.ratio == ratio) { project.settings.ratio = ratio } } }
-                }.scrollIndicators(.hidden)
+                // Six ratios no longer fit a narrow strip, so the chosen one is always scrolled into view.
+                ScrollViewReader { proxy in
+                    ScrollView(.horizontal) {
+                        HStack(spacing: 8) { ForEach(FrameRatio.allCases) { ratio in
+                            PillButton(title: ratio.title, selected: project.settings.ratio == ratio) { project.settings.ratio = ratio }.id(ratio.id)
+                        } }
+                    }
+                    .accessibilityIdentifier("ratioOptionsScroll")
+                    .scrollIndicators(.hidden)
+                    .onAppear { proxy.scrollTo(project.settings.ratio.id, anchor: .center) }
+                    .onChange(of: project.settings.ratio) { _, selected in
+                        withAnimation { proxy.scrollTo(selected.id, anchor: .center) }
+                    }
+                }
                 HStack(spacing: 10) {
                     PillButton(title: "旋转 90°") { project.settings.rotation = (project.settings.rotation + 1) % 4 }
                     PillButton(title: "水平翻转", selected: project.settings.mirrored) { project.settings.mirrored.toggle() }

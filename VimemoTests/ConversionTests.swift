@@ -34,6 +34,29 @@ final class ConversionTests: XCTestCase {
         XCTAssertNil(LivePhotoExporter.parseLocation("+99.0+181.0/"))
     }
 
+    @MainActor func testThreeFourRatioCropsWidthAndReachesCoverPreviewAndOutput() async throws {
+        var settings = EditSettings()
+        settings.ratio = .threeFour; settings.rotation = 1; settings.format = .video
+        let project = project(settings: settings)
+        // The 960×1280 source becomes 1280 wide once rotated, so 3:4 has to trim 560 columns.
+        XCTAssertEqual(MediaProcessor.dimensions(CGSize(width: 960, height: 1280), settings: settings), CGSize(width: 720, height: 960))
+        let crop = MediaProcessor.cropRect(CGRect(x: 0, y: 0, width: 1280, height: 960), settings: settings, topOrigin: true)
+        XCTAssertEqual(crop.width / crop.height, 3 / 4, accuracy: 0.0001)
+        XCTAssertTrue(crop.minX >= 0 && crop.maxX <= 1280 && crop.minY >= 0 && crop.maxY <= 960)
+        let cover = try await MediaProcessor.frame(url: source, time: 2.25, settings: settings, maxSize: CGSize(width: 4096, height: 4096))
+        XCTAssertEqual(Double(cover.width) / Double(cover.height), 3 / 4, accuracy: 0.01)
+        let preview = try await MediaProcessor.previewItem(source: source, clip: project.clips[0], settings: settings)
+        XCTAssertEqual(preview.size.width / preview.size.height, 3 / 4, accuracy: 0.01)
+        let output = try await LivePhotoExporter().export(source: source, project: project, clip: project.clips[0], directory: folder.appendingPathComponent("ThreeFour")) { _ in }
+        let movie = AVURLAsset(url: output.urls[0])
+        let movieTracks = try await movie.loadTracks(withMediaType: .video)
+        let track = try XCTUnwrap(movieTracks.first)
+        let natural = try await track.load(.naturalSize)
+        XCTAssertEqual(natural.width / natural.height, 3 / 4, accuracy: 0.01)
+        let frame = try await MediaProcessor.frame(url: output.urls[0], time: 0.5)
+        XCTAssertEqual(Double(frame.width) / Double(frame.height), 3 / 4, accuracy: 0.01)
+    }
+
     func testUnreadableSourceReportsCoverStageAndRemovesPartialExport() async throws {
         let outputFolder = folder.appendingPathComponent("FailedExport")
         do {
