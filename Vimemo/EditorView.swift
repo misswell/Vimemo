@@ -308,6 +308,11 @@ struct EditorView: View {
             Button {
                 project.settings.muted.toggle()
                 player.isMuted = project.settings.muted
+                if !project.settings.muted {
+                    let session = AVAudioSession.sharedInstance()
+                    let port = session.currentRoute.outputs.first?.portType.rawValue ?? "none"
+                    DiagnosticLog.shared.record("audio.unmuted", "port=\(port.prefix(32)) volume=\(Int(session.outputVolume * 100)) other=\(session.isOtherAudioPlaying)")
+                }
             } label: {
                 Image(systemName: project.settings.muted || !project.hasAudio ? "speaker.slash.fill" : "speaker.wave.2.fill")
                     .font(.system(size: 17)).foregroundStyle(badgeColor)

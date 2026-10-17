@@ -322,6 +322,53 @@ final class ConversionTests: XCTestCase {
         }
     }
 
+    func testExportedMovieAudioCarriesAudibleSamples() async throws {
+        let combinedURL = try XCTUnwrap(Bundle(for: ConversionTests.self).url(forResource: "AudioFixture", withExtension: "mov"))
+        var settings = EditSettings(); settings.format = .video
+        let unmutated = project(settings: settings)
+        let output = try await LivePhotoExporter().export(source: combinedURL, project: unmutated, clip: unmutated.clips[0], directory: folder.appendingPathComponent("Audible")) { _ in }
+        let exportPeak = try await Self.peakAudioLevel(of: AVURLAsset(url: output.urls[0]))
+        let sourcePeak = try await Self.peakAudioLevel(of: AVURLAsset(url: combinedURL))
+        XCTAssertGreaterThan(exportPeak, 0.01, "An unmutated export must carry real signal, not digital silence")
+        XCTAssertGreaterThanOrEqual(exportPeak, sourcePeak * 0.5, "The audio mix must not attenuate the source track")
+    }
+
+    func testAppPlaysThroughTheMediaRouteInsteadOfTheRinger() throws {
+        // A host process that never declares a category stays solo-ambient, which the
+        // Ring/Silent switch silences completely no matter what the project speaker does.
+        XCTAssertEqual(AVAudioSession.sharedInstance().category, .playback)
+        XCTAssertTrue(AVAudioSession.sharedInstance().categoryOptions.contains(.mixWithOthers))
+    }
+
+    private static func peakAudioLevel(of asset: AVAsset) async throws -> Double {
+        guard let track = try await asset.loadTracks(withMediaType: .audio).first else { throw StudioError.message("导出文件没有音频轨道。") }
+        let reader = try AVAssetReader(asset: asset)
+        let output = AVAssetReaderTrackOutput(track: track, outputSettings: [
+            AVFormatIDKey: kAudioFormatLinearPCM, AVLinearPCMBitDepthKey: 16,
+            AVLinearPCMIsFloatKey: false, AVLinearPCMIsNonInterleaved: false, AVLinearPCMIsBigEndianKey: false])
+        guard reader.canAdd(output) else { throw StudioError.message("无法读取导出音频。") }
+        reader.add(output)
+        guard reader.startReading() else { throw reader.error ?? StudioError.message("导出音频读取失败。") }
+        defer { if reader.status == .reading { reader.cancelReading() } }
+        var peak = 0.0
+        var samples = 0
+        while let buffer = output.copyNextSampleBuffer() {
+            guard let block = CMSampleBufferGetDataBuffer(buffer) else { continue }
+            var offsetLength = 0, totalLength = 0, pointer: UnsafeMutablePointer<Int8>?
+            guard CMBlockBufferGetDataPointer(block, atOffset: 0, lengthAtOffsetOut: &offsetLength, totalLengthOut: &totalLength, dataPointerOut: &pointer) == kCMBlockBufferNoErr,
+                  let pointer else { continue }
+            let count = totalLength / MemoryLayout<Int16>.size
+            pointer.withMemoryRebound(to: Int16.self, capacity: count) { values in
+                for index in 0..<count {
+                    samples += 1
+                    peak = max(peak, Double(abs(Int32(values[index]))) / Double(Int16.max))
+                }
+            }
+        }
+        guard samples > 0 else { throw StudioError.message("导出音频没有样本。") }
+        return peak
+    }
+
     @MainActor func testBatchExportCompletesAllClips() async throws {
         let store = ProjectStore(root: folder.appendingPathComponent("BatchLibrary"))
         var imported = try await store.importVideo(source, title: "Batch test")

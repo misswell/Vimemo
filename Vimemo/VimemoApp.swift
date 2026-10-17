@@ -1,6 +1,14 @@
+import AVFoundation
 import SwiftUI
 
 @main struct VimemoApp: App {
+    init() {
+        // Without a declared category the session stays solo-ambient, which the
+        // Ring/Silent switch mutes completely; previews then sound dead whatever
+        // the project speaker does. mixWithOthers keeps the user's own audio alive.
+        do { try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default, options: [.mixWithOthers]) }
+        catch { DiagnosticLog.shared.record("audio.session-failed", "mode=default mix=true", error: error) }
+    }
     @StateObject private var store = ProjectStore()
     @StateObject private var exporter = ExportCoordinator()
     @StateObject private var purchases = makePurchaseStore()
