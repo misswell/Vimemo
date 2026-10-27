@@ -237,7 +237,7 @@ struct HomeView: View {
                 Text(project.title).font(.subheadline.weight(.medium)).lineLimit(1)
                 Text("\(project.clips.count) 个片段 · \(project.sizeLabel)").font(.caption).foregroundStyle(StudioTheme.secondary)
             }
-        }.frame(maxWidth: .infinity, alignment: .leading).foregroundStyle(StudioTheme.ink)
+        }.frame(maxWidth: .infinity, alignment: .leading).contentShape(Rectangle()).foregroundStyle(StudioTheme.ink)
             .overlay(alignment: .topTrailing) {
                 if batchMode {
                     Image(systemName: batchIDs.contains(project.id) ? "checkmark.circle.fill" : "circle").font(.title2)

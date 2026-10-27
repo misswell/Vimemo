@@ -163,6 +163,25 @@ final class StudioFlowTests: XCTestCase {
         XCTAssertTrue(confirm.waitForNonExistence(timeout: 5))
     }
 
+    @MainActor func testAdjacentDraftCardsHaveIndependentHitRegions() throws {
+        let app = batchFixture()
+        enterDraftSelection(app)
+        let first = draft(app, number: 3)
+        let second = draft(app, number: 2)
+        XCTAssertTrue(first.waitForExistence(timeout: 5))
+        XCTAssertTrue(second.waitForExistence(timeout: 5))
+        for x in [0.1, 0.5, 0.9] {
+            first.coordinate(withNormalizedOffset: CGVector(dx: x, dy: 0.35)).tap()
+            XCTAssertEqual(first.value as? String, "已选择")
+            XCTAssertEqual(second.value as? String, "未选择")
+            first.coordinate(withNormalizedOffset: CGVector(dx: x, dy: 0.35)).tap()
+            XCTAssertEqual(first.value as? String, "未选择")
+        }
+        second.coordinate(withNormalizedOffset: CGVector(dx: 0.1, dy: 0.35)).tap()
+        XCTAssertEqual(first.value as? String, "未选择")
+        XCTAssertEqual(second.value as? String, "已选择")
+    }
+
     @MainActor func testBulkDraftDeletionRequiresConfirmationAndPersists() throws {
         let app = batchFixture()
         enterDraftSelection(app)
