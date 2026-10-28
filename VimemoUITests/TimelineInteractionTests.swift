@@ -206,24 +206,17 @@ final class TimelineInteractionTests: XCTestCase {
                        "Overview drags measure against the whole source, not against a refitted box")
         XCTAssertEqual(moved.end - moved.start, beforeMove.end - beforeMove.start, accuracy: 0.02)
 
-        // Every new handle grab doubles the zoom until the selected window reaches half
-        // the strip. Drag outward; the existing output-duration limit keeps this clip at 3s.
+        // One continuous drag smoothly increases zoom; the handle remains under the
+        // moving finger, and stationary pauses do not cause additional zoom steps.
         var end = handle(app, "trimEndHandle")
-        var previousScale = scale(app)
-        var zoomSteps = 0
-        while scale(app) < 1200, zoomSteps < 12 {
-            grip = end.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
-            grip.press(forDuration: 0.05, thenDragTo: grip.withOffset(CGVector(dx: 8, dy: 0)))
-            let currentScale = scale(app)
-            XCTAssertGreaterThan(currentScale, previousScale, "Each handle grab advances the zoom")
-            XCTAssertLessThanOrEqual(currentScale, previousScale * 2.01,
-                                     "Zoom advances by at most one doubling per grab")
-            previousScale = currentScale
-            zoomSteps += 1
-            end = handle(app, "trimEndHandle")
-        }
-        XCTAssertEqual(scale(app), 1200, accuracy: 1, "The small steps reach the precision fit")
-        XCTAssertLessThanOrEqual(zoomSteps, 12)
+        let beforeEndGripX = end.frame.midX
+        grip = end.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        grip.press(forDuration: 0.05, thenDragTo: grip.withOffset(CGVector(dx: 150, dy: 0)))
+        XCTAssertEqual(scale(app), 1200, accuracy: 1, "A continuous drag reaches the precision fit smoothly")
+        end = handle(app, "trimEndHandle")
+        XCTAssertEqual(end.frame.midX, beforeEndGripX + 150, accuracy: 4,
+                       "The round grip tracks the finger through continuous zoom")
+        assertBoxIsTheRealWindow(app, "After one continuous zooming drag")
 
         end = handle(app, "trimEndHandle")
         let beforeX = end.frame.midX, beforeEnd = seconds(end)

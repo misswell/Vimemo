@@ -21,6 +21,12 @@ import SwiftUI
         /// absorbs whatever the precision fit could not do at the head or tail of the source, so
         /// the control then tracks the finger exactly.
         var timeOffset: Double
+        var gripOffset: CGFloat = 0
+        var zoomStartScale: CGFloat = 1
+        var zoomTargetScale: CGFloat = 1
+        var zoomTravel: CGFloat = 0
+        var lastFingerX: CGFloat = 0
+        var lastRawTranslationX: CGFloat = 0
         var baselineCenter: Double
         var duration: Double
         var coverOffset: Double
@@ -118,16 +124,37 @@ import SwiftUI
         self.target = target
         produced = nil
         autoScrollRate = 0
-        if target != .viewport && target != .selection {
-            enterPrecision(target: target, clip: clip, edgeTime: grabbedTime(for: target, clip: clip),
-                           fingerX: x, width: strip)
+        let gripOffset: CGFloat
+        if target == .start || target == .end {
+            let geometry = TimelineSelectionGeometry(state: state, clip: clip, width: strip)
+            let isStart = target == .start
+            if let zone = geometry.handleZone(isStart: isStart, width: strip), zone.contains(x),
+               let gripX = geometry.handleGripX(isStart: isStart, width: strip) {
+                gripOffset = x - gripX
+            } else {
+                gripOffset = 0
+            }
+        } else {
+            gripOffset = 0
         }
+        let zoomStartScale = state.zoomScale
+        let zoomTargetScale: CGFloat
+        if (target == .start || target == .end),
+           state.realWidth(of: clip, width: strip) < strip * TimelineState.precisionSelectionFraction {
+            zoomTargetScale = max(zoomStartScale, state.precisionZoomScale(for: clip))
+        } else {
+            zoomTargetScale = zoomStartScale
+        }
+        let zoomTravel = Self.zoomTravelDistance(from: zoomStartScale, to: zoomTargetScale, width: strip)
         let perPoint = target == .cover
             ? clip.duration / max(1, state.realWidth(of: clip, width: strip))
             : state.secondsPerPoint(width: strip)
         drag = Drag(
             target: target, originX: x, width: strip, secondsPerPoint: perPoint,
             timeOffset: grabbedTime(for: target, clip: clip) - state.time(at: x, width: strip),
+            gripOffset: gripOffset, zoomStartScale: zoomStartScale,
+            zoomTargetScale: zoomTargetScale, zoomTravel: zoomTravel, lastFingerX: x,
+            lastRawTranslationX: 0,
             baselineCenter: state.viewportCenterTime, duration: clip.duration,
             coverOffset: clip.cover - clip.start
         )
@@ -136,44 +163,26 @@ import SwiftUI
         }
     }
 
-    /// Trimming needs the endpoints far enough apart to be real targets, so grabbing one that is
-    /// drawn narrower than half the strip opens the precision viewport with that edge under the
-    /// finger. Moving the whole selection deliberately keeps the current scale, so a long source
-    /// stays traversable in one drag.
-    private func enterPrecision(target: Target, clip: Clip, edgeTime: Double, fingerX: CGFloat, width: CGFloat) {
-        guard state.realWidth(of: clip, width: width) < width * TimelineState.precisionSelectionFraction else { return }
-        let nextScaleLimit = min(state.maximumZoomScale, max(state.zoomScale, state.zoomScale * 2))
-        var anchorX = fingerX
-        if target == .start || target == .end {
-            let geometry = TimelineSelectionGeometry(state: state, clip: clip, width: width)
-            let isStart = target == .start
-            if let zone = geometry.handleZone(isStart: isStart, width: width),
-               let gripX = geometry.handleGripX(isStart: isStart, width: width), zone.contains(fingerX) {
-                let grabOffset = fingerX - gripX
-                let desiredGripX = fingerX - grabOffset
-                let projectedWidth = width * clip.duration * nextScaleLimit / CGFloat(state.videoDuration)
-                if projectedWidth < TimelineSelectionGeometry.controlBand {
-                    // In the overview the start and end grips live in a separated three-control
-                    // cluster. Keep the cluster grip under the finger during each zoom step.
-                    let unit = min(TimelineSelectionGeometry.controlBand, width / 3)
-                    anchorX = desiredGripX + (isStart ? unit : -unit) - projectedWidth / 2
-                } else {
-                    // Once the selection is wide enough, the ball sits against its real edge.
-                    anchorX = desiredGripX + (isStart ? Self.joystickRadius : -Self.joystickRadius)
-                }
-            }
-        }
-        // Enter precision progressively. A long source can need a very large fit scale, but
-        // jumping there on the first touch makes the timeline appear to teleport. Each new
-        // handle grab advances by at most one doubling until the clip is easy to work with.
-        withAnimation(.easeInOut(duration: 0.22)) {
-            state.fit(clip: clip, width: width, edgeTime: edgeTime, fingerX: anchorX,
-                      maximumScale: nextScaleLimit)
-        }
-        isFittedToSelection = true
+    /// The precision zoom uses the drag distance itself. A doubling takes about 24 points;
+    /// long sources cap the travel at half the strip so one uninterrupted drag can reach fit.
+    private static func zoomTravelDistance(from start: CGFloat, to target: CGFloat, width: CGFloat) -> CGFloat {
+        guard target > start else { return 0 }
+        let doublings = log2(Double(target / start))
+        let idealDistance = CGFloat(doublings) * 24
+        return min(idealDistance, max(24, width * 0.5))
     }
 
-    private static let joystickRadius = TimelineSelectionGeometry.joystickBallDiameter / 2
+    private func edgeAnchorX(target: Target, fingerX: CGFloat, gripOffset: CGFloat,
+                             projectedWidth: CGFloat, stripWidth: CGFloat) -> CGFloat {
+        let desiredGripX = fingerX - gripOffset
+        let isStart = target == .start
+        if projectedWidth < TimelineSelectionGeometry.controlBand {
+            let unit = min(TimelineSelectionGeometry.controlBand, stripWidth / 3)
+            return desiredGripX + (isStart ? unit - projectedWidth / 2 : projectedWidth / 2 - unit)
+        }
+        let radius = TimelineSelectionGeometry.joystickBallDiameter / 2
+        return desiredGripX + (isStart ? radius : -radius)
+    }
 
     private func grabbedTime(for target: Target, clip: Clip) -> Double {
         switch target {
@@ -190,13 +199,67 @@ import SwiftUI
     func move(translation: CGSize, clip: Clip, width: CGFloat, speed: Double, maxOutputDuration: Double?) -> Clip {
         guard var current = drag else { return clip }
         current.width = max(1, width)
-        current.translation = translation
         current.speed = speed
         current.maxOutputDuration = maxOutputDuration
-        // Gesture math always uses the strip being drawn and the viewport as it now stands.
+        let gain = fineAdjustment ? 0.1 : 1
+        if (current.target == .start || current.target == .end), current.zoomTravel > 0 {
+            let firstFingerX = current.lastFingerX
+            let distance = (translation.width - current.lastRawTranslationX) * gain
+            // UIKit normally supplies several coalesced pan updates. Sub-stepping a coarse
+            // update keeps zoom and trim independent of event sampling on long drags.
+            let steps = max(1, Int(ceil(abs(distance))))
+            var result = clip
+            for step in 1...steps {
+                let fingerX = firstFingerX + distance * CGFloat(step) / CGFloat(steps)
+                current.translation = CGSize(width: (fingerX - current.originX) / gain,
+                                             height: translation.height * CGFloat(step) / CGFloat(steps))
+                result = advanceZoomingHandle(&current, fingerX: fingerX, clip: result)
+            }
+            current.translation = translation
+            current.lastRawTranslationX = translation.width
+            drag = current
+            return result
+        }
+        current.translation = translation
         if current.target != .cover { current.secondsPerPoint = state.secondsPerPoint(width: current.width) }
         drag = current
         return derive(clip)
+    }
+
+    /// Apply one small segment of a handle drag. Zoom is a continuous function of total travel,
+    /// while each time delta uses the currently visible time scale and remains anchored to the
+    /// real clip endpoint. The endpoint can move and the viewport can zoom in the same sample.
+    private func advanceZoomingHandle(_ drag: inout Drag, fingerX: CGFloat, clip: Clip) -> Clip {
+        let deltaX = fingerX - drag.lastFingerX
+        let edgeTime = grabbedTime(for: drag.target, clip: clip)
+        let nextEdgeTime = edgeTime + deltaX * state.secondsPerPoint(width: drag.width)
+        let travelled = abs(fingerX - drag.originX)
+        let progress = min(1, travelled / drag.zoomTravel)
+        let requestedZoom = drag.zoomStartScale * pow(drag.zoomTargetScale / drag.zoomStartScale, progress)
+        let projectedWidth = drag.width * clip.duration * requestedZoom / CGFloat(state.videoDuration)
+        let anchorX = edgeAnchorX(target: drag.target, fingerX: fingerX, gripOffset: drag.gripOffset,
+                                  projectedWidth: projectedWidth, stripWidth: drag.width)
+        if abs(requestedZoom - state.zoomScale) > 0.000_001 {
+            state.zoom(to: requestedZoom, anchorTime: nextEdgeTime, anchorFraction: anchorX / drag.width)
+            isFittedToSelection = state.zoomScale > 1
+        }
+        drag.secondsPerPoint = state.secondsPerPoint(width: drag.width)
+        drag.timeOffset = nextEdgeTime - state.time(at: fingerX, width: drag.width)
+        drag.lastFingerX = fingerX
+        self.drag = drag
+
+        let result = derive(clip)
+        let actualEdgeTime = grabbedTime(for: drag.target, clip: result)
+        // Reanchor to the actual normalized result. Duration limits can change the other edge
+        // during this same sample, which moves a narrow selection's separated grip cluster.
+        let actualWidth = drag.width * result.duration * state.zoomScale / CGFloat(state.videoDuration)
+        let actualAnchorX = edgeAnchorX(target: drag.target, fingerX: fingerX,
+                                        gripOffset: drag.gripOffset, projectedWidth: actualWidth,
+                                        stripWidth: drag.width)
+        state.setViewportStart(actualEdgeTime - Double(actualAnchorX) * state.visibleDuration / Double(drag.width))
+        drag.timeOffset = actualEdgeTime - state.time(at: fingerX, width: drag.width)
+        self.drag = drag
+        return result
     }
 
     /// A finger parked in an edge zone scrolls the viewport beneath it, so one continuous drag can
@@ -253,7 +316,7 @@ import SwiftUI
                 feedbackTime = result.start
             case .viewport, .cover: break
             }
-            autoScrollRate = scrollRate(fingerX: drag.originX + drag.translation.width, width: drag.width)
+            autoScrollRate = scrollRate(fingerX: drag.lastFingerX, width: drag.width, clip: result)
             produced = result
             return result
         }
@@ -271,12 +334,18 @@ import SwiftUI
     }
 
     /// Zero when the viewport is the whole source or the requested direction has no room left.
-    private func scrollRate(fingerX: CGFloat, width: CGFloat) -> Double {
+    private func scrollRate(fingerX: CGFloat, width: CGFloat, clip: Clip) -> Double {
         guard let drag, state.canScroll, drag.target == .start || drag.target == .end || drag.target == .selection else { return 0 }
         let zone = min(56, max(24, width * 0.18))
         let x = min(max(fingerX, 0), width)
-        if x < zone, state.visibleStart > 0 { return -pow(Double((zone - x) / zone), 2) }
-        if x > width - zone, state.visibleEnd < state.videoDuration { return pow(Double((x - (width - zone)) / zone), 2) }
+        if x < zone, state.visibleStart > 0,
+           !(drag.target == .start && clip.start <= 0) {
+            return -pow(Double((zone - x) / zone), 2)
+        }
+        if x > width - zone, state.visibleEnd < state.videoDuration,
+           !(drag.target == .end && clip.end >= state.videoDuration) {
+            return pow(Double((x - (width - zone)) / zone), 2)
+        }
         return 0
     }
 

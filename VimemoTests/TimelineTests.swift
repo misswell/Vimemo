@@ -238,45 +238,68 @@ final class TimelineTests: XCTestCase {
 
     // MARK: - Precision entry keeps the grip under the finger
 
-    @MainActor func testHandleGrabsIncreasePrecisionByAtMostTwoTimesUntilTheSelectionFits() throws {
+    @MainActor func testOneHandleDragContinuouslyZoomsStopsAndReverses() throws {
         let model = TimelineViewModel()
         let clip = Clip(start: 89, end: 92, cover: 90.5)
         model.configure(duration: 180, clip: clip, width: strip, frameRate: 30)
         let overview = TimelineSelectionGeometry(state: model.state, clip: clip, width: strip)
-        let zone = try XCTUnwrap(overview.handleZone(isStart: true, width: strip))
-        var fingerX = (zone.lowerBound + zone.upperBound) / 2
-        var previousScale = model.state.zoomScale
-        var grabs = 0
-        while model.state.zoomScale < 30 {
-            model.begin(.start, clip: clip, width: strip, at: fingerX)
-            XCTAssertLessThanOrEqual(model.state.zoomScale, previousScale * 2 + 0.0001,
-                                     "A handle grab must never jump more than one doubling")
-            XCTAssertEqual(try XCTUnwrap(TimelineSelectionGeometry(state: model.state, clip: clip, width: strip)
-                                            .handleGripX(isStart: true, width: strip)), fingerX, accuracy: 0.01,
-                           "The round grip must stay under the finger as the viewport zooms")
-            previousScale = model.state.zoomScale
-            grabs += 1
-            model.end()
-            let geometry = TimelineSelectionGeometry(state: model.state, clip: clip, width: strip)
-            fingerX = try XCTUnwrap(geometry.handleGripX(isStart: true, width: strip))
+        let fingerX = try XCTUnwrap(overview.handleGripX(isStart: false, width: strip))
+        model.begin(.end, clip: clip, width: strip, at: fingerX)
+        XCTAssertEqual(model.state.zoomScale, 1, accuracy: 0.0001, "Touch down alone must not zoom")
+
+        let first = model.move(translation: CGSize(width: 6, height: 0), clip: clip, width: strip,
+                               speed: 1, maxOutputDuration: nil)
+        let firstScale = model.state.zoomScale
+        XCTAssertGreaterThan(firstScale, 1)
+        XCTAssertLessThan(firstScale, 2, "A partial drag produces a partial scale, not a jump")
+        XCTAssertGreaterThan(first.end, clip.end, "The handle still edits while the viewport zooms")
+        XCTAssertEqual(try XCTUnwrap(TimelineSelectionGeometry(state: model.state, clip: first, width: strip)
+                                        .handleGripX(isStart: false, width: strip)), fingerX + 6, accuracy: 0.1,
+                       "The end grip remains under the finger while both zoom and trim change")
+
+        let stopped = model.move(translation: CGSize(width: 6, height: 0), clip: first, width: strip,
+                                 speed: 1, maxOutputDuration: nil)
+        XCTAssertEqual(model.state.zoomScale, firstScale, accuracy: 0.0001,
+                       "Holding the finger still must stop zoom growth")
+        XCTAssertEqual(stopped.end, first.end, accuracy: 0.0001,
+                       "Holding still must not continue trimming")
+
+        let farther = model.move(translation: CGSize(width: 12, height: 0), clip: stopped, width: strip,
+                                 speed: 1, maxOutputDuration: nil)
+        XCTAssertGreaterThan(model.state.zoomScale, firstScale, "More travel smoothly increases zoom")
+        XCTAssertGreaterThan(farther.end, stopped.end, "More travel still changes the trim")
+        XCTAssertEqual(try XCTUnwrap(TimelineSelectionGeometry(state: model.state, clip: farther, width: strip)
+                                        .handleGripX(isStart: false, width: strip)), fingerX + 12, accuracy: 0.1)
+        let reversed = model.move(translation: CGSize(width: 6, height: 0), clip: farther, width: strip,
+                                  speed: 1, maxOutputDuration: nil)
+        XCTAssertEqual(model.state.zoomScale, firstScale, accuracy: 0.001,
+                       "Reversing to the same drag distance restores the same zoom")
+        XCTAssertLessThan(reversed.end, farther.end, "Reverse travel reverses the trim")
+
+        var current = reversed
+        for point in 7...120 {
+            current = model.move(translation: CGSize(width: point, height: 0), clip: current, width: strip,
+                                 speed: 1, maxOutputDuration: nil)
         }
         XCTAssertEqual(model.state.zoomScale, 30, accuracy: 0.001,
-                       "Repeated grabs reach the six-second precision window for this source")
-        XCTAssertEqual(grabs, 5, "The 1× overview should progress through 2×, 4×, 8×, 16× and 30×")
+                       "A long uninterrupted drag reaches the clip's precision fit")
+        XCTAssertGreaterThan(current.end, clip.end)
+        model.end()
     }
 
     @MainActor func testHandleDragTracksTheFingerPixelForPixelAfterTheRefit() {
         let model = TimelineViewModel()
         let clip = Clip(start: 3599, end: 3602, cover: 3601)
         model.configure(duration: 7200, clip: clip, width: strip, frameRate: 30)
+        model.focus(clip)
         model.begin(.start, clip: clip, width: strip, at: 106)
         let before = TimelineSelectionGeometry(state: model.state, clip: clip, width: strip)
-        let moved = model.move(translation: CGSize(width: 0.02, height: 0), clip: clip, width: strip, speed: 1, maxOutputDuration: 3)
+        let moved = model.move(translation: CGSize(width: 20, height: 0), clip: clip, width: strip, speed: 1, maxOutputDuration: 3)
         let after = TimelineSelectionGeometry(state: model.state, clip: moved, width: strip)
-        XCTAssertEqual(after.left - before.left, 0.02, accuracy: 0.001, "The grip must stay exactly under the finger")
+        XCTAssertEqual(after.left - before.left, 20, accuracy: 0.001, "The grip must stay exactly under the finger")
         XCTAssertEqual(after.right - before.right, 0, accuracy: 0.001, "Trimming the start must not slide the whole box")
-        XCTAssertEqual(moved.start, 3599.24, accuracy: 0.001,
-                       "At 2×, a small finger movement uses the matching current viewport scale")
+        XCTAssertEqual(moved.start, 3599.4, accuracy: 0.0001,
+                       "At precision scale, twenty pixels use the visible seconds-per-point")
     }
 
     @MainActor func testPrecisionFitClampsAtTheHeadInsteadOfTeleportingTheIntent() {
@@ -286,12 +309,13 @@ final class TimelineTests: XCTestCase {
         model.begin(.start, clip: clip, width: strip, at: 100)
         XCTAssertEqual(model.state.visibleStart, 0, "The viewport cannot start before the source")
         let before = TimelineSelectionGeometry(state: model.state, clip: clip, width: strip)
-        XCTAssertEqual(before.left, 0.05 / 3600 * strip, accuracy: 0.001,
-                       "At the first 2× step, the edge stays at its true near-source time")
+        XCTAssertEqual(before.left, 0.05 / 7200 * strip, accuracy: 0.001,
+                       "Touch down keeps the overview scale until the finger moves")
         let moved = model.move(translation: CGSize(width: 0.001, height: 0), clip: clip, width: strip, speed: 1, maxOutputDuration: 3)
         let after = TimelineSelectionGeometry(state: model.state, clip: moved, width: strip)
-        XCTAssertEqual(after.left - before.left, 0.001, accuracy: 0.001, "From there the grip still tracks the finger exactly")
-        XCTAssertEqual(moved.start - clip.start, 0.012, accuracy: 0.001)
+        XCTAssertEqual(moved.start - clip.start, 0.024, accuracy: 0.001,
+                       "The initial delta uses the overview's current time scale")
+        XCTAssertGreaterThan(model.state.zoomScale, 1, "The same finger delta also starts magnifying the viewport")
     }
 
     @MainActor func testReleasingNeverJumpsScaleOrViewport() {
