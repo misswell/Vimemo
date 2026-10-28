@@ -131,11 +131,9 @@ struct TimelineView: View {
                     selectionBody(body, width: width)
                 }
                 if let start = selection.handleZone(isStart: true, width: width) {
-                    trimLeader(isStart: true, selection: selection, width: width)
                     trimHandle(isStart: true, zone: start, selection: selection, width: width)
                 }
                 if let end = selection.handleZone(isStart: false, width: width) {
-                    trimLeader(isStart: false, selection: selection, width: width)
                     trimHandle(isStart: false, zone: end, selection: selection, width: width)
                 }
             }
@@ -171,22 +169,7 @@ struct TimelineView: View {
             .accessibilityAdjustableAction { direction in adjust(.selection, direction: direction, width: width) }
     }
 
-    private func trimLeader(isStart: Bool, selection: TimelineSelectionGeometry, width: CGFloat) -> some View {
-        let endpoint = isStart ? selection.left : selection.right
-        let grip = selection.handleGripX(isStart: isStart, width: width) ?? endpoint
-        guard abs(endpoint - grip) > 2 else { return AnyView(EmptyView()) }
-        let color = isStart ? StudioTheme.accent : StudioTheme.peach
-        return AnyView(
-            Path { path in
-                path.move(to: CGPoint(x: endpoint, y: 37))
-                path.addLine(to: CGPoint(x: grip, y: 37))
-            }
-            .stroke(color, style: StrokeStyle(lineWidth: 4, lineCap: .round))
-            .allowsHitTesting(false)
-        )
-    }
-
-    /// Each round joystick sits outside its endpoint; its horizontal shaft reaches the true edge.
+    /// Each round joystick sits outside and touches its true endpoint, without a connecting shaft.
     private func trimHandle(isStart: Bool, zone: ClosedRange<CGFloat>, selection: TimelineSelectionGeometry, width: CGFloat) -> some View {
         let color = isStart ? StudioTheme.accent : StudioTheme.peach
         let gripX = selection.handleGripX(isStart: isStart, width: width) ?? (zone.lowerBound + zone.upperBound) / 2

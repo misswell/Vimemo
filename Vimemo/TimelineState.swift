@@ -102,9 +102,9 @@ struct TimelineSelectionGeometry {
     /// cluster is slid along the strip, so a sub-pixel selection in Overview can still be grabbed,
     /// moved and trimmed even when it sits at the very head or tail of the source.
     static let controlBand: CGFloat = 44
-    /// Keep the 24 pt ball one half diameter away from its true endpoint.
+    /// The ball touches its true endpoint: its center is one radius outside the edge.
     static let joystickBallDiameter: CGFloat = 24
-    static let joystickCenterOffset: CGFloat = joystickBallDiameter
+    static let joystickCenterOffset: CGFloat = joystickBallDiameter / 2
     static let minimumZone: CGFloat = 4
 
     let left: CGFloat

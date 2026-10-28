@@ -97,12 +97,14 @@ final class TimelineTests: XCTestCase {
         let endGrip = try XCTUnwrap(geometry.handleGripX(isStart: false, width: strip))
         XCTAssertLessThan(startGrip, geometry.left)
         XCTAssertGreaterThan(endGrip, geometry.right)
-        let expectedCenterOffset = TimelineSelectionGeometry.joystickBallDiameter
+        let radius = TimelineSelectionGeometry.joystickBallDiameter / 2
+        let expectedCenterOffset = radius
         XCTAssertEqual(geometry.left - startGrip, expectedCenterOffset, accuracy: 0.001)
         XCTAssertEqual(endGrip - geometry.right, expectedCenterOffset, accuracy: 0.001)
-        XCTAssertEqual(geometry.left - (startGrip + TimelineSelectionGeometry.joystickBallDiameter / 2),
-                       TimelineSelectionGeometry.joystickBallDiameter / 2, accuracy: 0.001,
-                       "Leave only half a ball between the true endpoint and the joystick")
+        XCTAssertEqual(geometry.left, startGrip + radius, accuracy: 0.001,
+                       "The start joystick ball edge must touch the true selection edge")
+        XCTAssertEqual(geometry.right, endGrip - radius, accuracy: 0.001,
+                       "The end joystick ball edge must touch the true selection edge")
     }
 
     func testJoystickTouchBandsStayInsideTheStripAtSourceBoundaries() throws {
