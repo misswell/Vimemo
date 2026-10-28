@@ -131,9 +131,11 @@ struct TimelineView: View {
                     selectionBody(body, width: width)
                 }
                 if let start = selection.handleZone(isStart: true, width: width) {
+                    trimLeader(isStart: true, selection: selection, width: width)
                     trimHandle(isStart: true, zone: start, selection: selection, width: width)
                 }
                 if let end = selection.handleZone(isStart: false, width: width) {
+                    trimLeader(isStart: false, selection: selection, width: width)
                     trimHandle(isStart: false, zone: end, selection: selection, width: width)
                 }
             }
@@ -145,6 +147,16 @@ struct TimelineView: View {
                     .background(StudioTheme.background, in: Capsule())
                     .frame(width: width, alignment: .center).offset(y: 18)
                     .allowsHitTesting(false).accessibilityIdentifier("timelineDragTime")
+            }
+            if model.minimumDurationReached {
+                Text("已经是最小了 0.1 秒")
+                    .font(.system(size: 12, weight: .semibold))
+                    .padding(.horizontal, 11).padding(.vertical, 6)
+                    .background(StudioTheme.background, in: Capsule())
+                    .overlay(Capsule().stroke(StudioTheme.accent.opacity(0.8), lineWidth: 1))
+                    .frame(width: width, alignment: .center).offset(y: 18)
+                    .allowsHitTesting(false)
+                    .accessibilityIdentifier("timelineMinimumDurationNotice")
             }
         }.frame(width: width, height: 114, alignment: .topLeading)
             .accessibilityElement(children: .contain).accessibilityIdentifier("timelineTrack")
@@ -159,23 +171,46 @@ struct TimelineView: View {
             .accessibilityAdjustableAction { direction in adjust(.selection, direction: direction, width: width) }
     }
 
-    /// The 44 pt touch band remains available in overview. The visible selection outline is the
-    /// endpoint cue there, because drawing a full-size bar at a displaced touch band lies about time.
+    private func trimLeader(isStart: Bool, selection: TimelineSelectionGeometry, width: CGFloat) -> some View {
+        let endpoint = isStart ? selection.left : selection.right
+        let grip = selection.handleGripX(isStart: isStart, width: width) ?? endpoint
+        guard selection.isNarrow, abs(endpoint - grip) > 8 else { return AnyView(EmptyView()) }
+        let color = isStart ? StudioTheme.accent : StudioTheme.peach
+        return AnyView(
+            Path { path in
+                path.move(to: CGPoint(x: endpoint, y: isStart ? 58 : 63))
+                path.addLine(to: CGPoint(x: grip, y: isStart ? 58 : 63))
+            }
+            .stroke(color.opacity(0.9), style: StrokeStyle(lineWidth: 2, lineCap: .round, dash: [3, 3]))
+            .allowsHitTesting(false)
+        )
+    }
+
+    /// Each endpoint gets a separate arcade joystick. A dotted leader ties a displaced
+    /// Overview grip to the true edge when the selected interval is narrower than the grips.
     private func trimHandle(isStart: Bool, zone: ClosedRange<CGFloat>, selection: TimelineSelectionGeometry, width: CGFloat) -> some View {
-        let bar = RoundedRectangle(cornerRadius: 5).fill(StudioTheme.accent).frame(width: 20, height: 61)
-            .overlay { Capsule().fill(StudioTheme.onAccent.opacity(0.8)).frame(width: 2, height: 19) }
+        let color = isStart ? StudioTheme.accent : StudioTheme.peach
         return Color.clear
             .frame(width: max(1, zone.upperBound - zone.lowerBound), height: 70)
-            // In overview the selection can be narrower than a pixel. Its red outline shows
-            // the true endpoints; don't draw large handles elsewhere and imply false times.
-            .overlay {
-                if !selection.isNarrow { bar }
-            }
+            .overlay { trimJoystick(isStart: isStart, color: color) }
             .offset(x: zone.lowerBound, y: 2)
             .accessibilityElement(children: .ignore).accessibilityLabel(isStart ? "裁剪入点" : "裁剪出点")
             .accessibilityValue((isStart ? clip.start : clip.end).timeLabel)
             .accessibilityIdentifier(isStart ? "trimStartHandle" : "trimEndHandle")
             .accessibilityAdjustableAction { direction in adjust(isStart ? .start : .end, direction: direction, width: width) }
+    }
+
+    private func trimJoystick(isStart: Bool, color: Color) -> some View {
+        let ball = Circle().fill(StudioTheme.background)
+            .frame(width: 22, height: 22)
+            .overlay(Circle().stroke(color, lineWidth: 3))
+        let direction = Image(systemName: isStart ? "chevron.left" : "chevron.right")
+            .font(.system(size: 8, weight: .black))
+            .foregroundStyle(color)
+        return ZStack {
+            Capsule().fill(color).frame(width: 5, height: 19).offset(y: 2)
+            ball.overlay(direction).offset(y: -9)
+        }
     }
 
     /// A pinch can legally walk the viewport away from the selection. The strip then says so

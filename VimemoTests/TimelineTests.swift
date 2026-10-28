@@ -84,6 +84,33 @@ final class TimelineTests: XCTestCase {
         XCTAssertLessThanOrEqual(start.upperBound, body.lowerBound + 0.0001, "Bands must never fight over one touch")
         XCTAssertLessThanOrEqual(body.upperBound, end.lowerBound + 0.0001)
         XCTAssertEqual(geometry.midpoint, (start.upperBound + end.lowerBound) / 2, accuracy: 0.0001)
+        XCTAssertLessThan(try XCTUnwrap(geometry.handleGripX(isStart: true, width: strip)),
+                          try XCTUnwrap(geometry.handleGripX(isStart: false, width: strip)),
+                          "The separated joystick grips must remain independently addressable")
+    }
+
+    @MainActor func testTryingToTrimPastOneTenthSecondShowsTheMinimumNoticeAndKeepsTheClipValid() {
+        let width: CGFloat = 300
+        let endModel = TimelineViewModel()
+        let original = Clip(start: 20, end: 20.2, cover: 20.1)
+        endModel.configure(duration: 60, clip: original, width: width, frameRate: 30)
+        let endGeometry = TimelineSelectionGeometry(state: endModel.state, clip: original, width: width)
+        endModel.begin(.end, clip: original, width: width, at: endGeometry.handleGripX(isStart: false, width: width)!)
+        let shortenedAtEnd = endModel.move(translation: CGSize(width: -width, height: 0), clip: original,
+                                           width: width, speed: 1, maxOutputDuration: nil)
+        XCTAssertTrue(endModel.minimumDurationReached)
+        XCTAssertEqual(shortenedAtEnd.duration, 0.1, accuracy: 0.000_001)
+        endModel.end()
+
+        let startModel = TimelineViewModel()
+        startModel.configure(duration: 60, clip: original, width: width, frameRate: 30)
+        let startGeometry = TimelineSelectionGeometry(state: startModel.state, clip: original, width: width)
+        startModel.begin(.start, clip: original, width: width, at: startGeometry.handleGripX(isStart: true, width: width)!)
+        let shortenedAtStart = startModel.move(translation: CGSize(width: width, height: 0), clip: original,
+                                               width: width, speed: 1, maxOutputDuration: nil)
+        XCTAssertTrue(startModel.minimumDurationReached)
+        XCTAssertEqual(shortenedAtStart.duration, 0.1, accuracy: 0.000_001)
+        startModel.end()
     }
 
     func testASliverAtTheHeadOrTailOfTheStripStillLosesNoControl() throws {

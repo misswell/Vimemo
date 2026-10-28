@@ -7,6 +7,7 @@ import SwiftUI
     @Published private(set) var target: Target?
     @Published private(set) var fineAdjustment = false
     @Published private(set) var feedbackTime: Double?
+    @Published private(set) var minimumDurationReached = false
     /// Viewport widths per second the strip wants to scroll while a finger parks in an edge zone.
     @Published private(set) var autoScrollRate: Double = 0
     private(set) var isFittedToSelection = false
@@ -39,6 +40,7 @@ import SwiftUI
     private var configuredWidth: CGFloat = 0
     private var pinchState: TimelineState?
     private var pinchAnchor: Double = 0
+    private var minimumNoticeTask: Task<Void, Never>?
 
     func configure(duration: Double, clip: Clip, width: CGFloat, frameRate: Double = 30) {
         let strip = max(1, width)
@@ -109,6 +111,8 @@ import SwiftUI
     func endPinch() { pinchState = nil }
 
     func begin(_ target: Target, clip: Clip, width: CGFloat, at fingerX: CGFloat) {
+        minimumNoticeTask?.cancel()
+        minimumDurationReached = false
         let strip = max(1, width)
         let x = fingerX
         self.target = target
@@ -196,12 +200,18 @@ import SwiftUI
             let time = state.time(at: virtualX, width: drag.width) + drag.timeOffset
             switch drag.target {
             case .start:
-                result.start = min(clip.end - min(0.1, state.videoDuration), max(0, time))
+                let minimumDuration = min(0.1, state.videoDuration)
+                let latestStart = clip.end - minimumDuration
+                if time > latestStart + 0.000_001 { showMinimumDurationNotice() }
+                result.start = min(latestStart, max(0, time))
                 if let maximum = drag.maxOutputDuration { result.start = max(result.start, clip.end - maximum * drag.speed) }
                 result.normalize(sourceDuration: state.videoDuration, speed: drag.speed, maxOutputDuration: drag.maxOutputDuration)
                 feedbackTime = result.start
             case .end:
-                result.end = min(state.videoDuration, max(clip.start + min(0.1, state.videoDuration), time))
+                let minimumDuration = min(0.1, state.videoDuration)
+                let earliestEnd = clip.start + minimumDuration
+                if time < earliestEnd - 0.000_001 { showMinimumDurationNotice() }
+                result.end = min(state.videoDuration, max(earliestEnd, time))
                 result.normalize(sourceDuration: state.videoDuration, speed: drag.speed, maxOutputDuration: drag.maxOutputDuration)
                 feedbackTime = result.end
             case .selection:
@@ -216,6 +226,17 @@ import SwiftUI
             autoScrollRate = scrollRate(fingerX: drag.originX + drag.translation.width, width: drag.width)
             produced = result
             return result
+        }
+    }
+
+    private func showMinimumDurationNotice() {
+        guard !minimumDurationReached else { return }
+        minimumDurationReached = true
+        minimumNoticeTask?.cancel()
+        minimumNoticeTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(1.6))
+            guard !Task.isCancelled else { return }
+            self?.minimumDurationReached = false
         }
     }
 

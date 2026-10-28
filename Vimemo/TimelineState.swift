@@ -138,6 +138,13 @@ struct TimelineSelectionGeometry {
         return clamped(edge - Self.controlBand / 2 ... edge + Self.controlBand / 2, width: width)
     }
 
+    /// The joystick stays centered in its own hit band. In Overview the connecting leader
+    /// makes its relationship to the true (possibly sub-pixel) endpoint explicit.
+    func handleGripX(isStart: Bool, width: CGFloat) -> CGFloat? {
+        guard let zone = handleZone(isStart: isStart, width: width) else { return nil }
+        return (zone.lowerBound + zone.upperBound) / 2
+    }
+
     func bodyZone(width: CGFloat) -> ClosedRange<CGFloat>? {
         guard isVisible else { return nil }
         if let cluster = cluster(in: width) {
