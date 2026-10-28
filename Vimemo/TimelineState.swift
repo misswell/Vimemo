@@ -102,6 +102,9 @@ struct TimelineSelectionGeometry {
     /// cluster is slid along the strip, so a sub-pixel selection in Overview can still be grabbed,
     /// moved and trimmed even when it sits at the very head or tail of the source.
     static let controlBand: CGFloat = 44
+    /// Keep the 24 pt ball one half diameter away from its true endpoint.
+    static let joystickBallDiameter: CGFloat = 24
+    static let joystickCenterOffset: CGFloat = joystickBallDiameter
     static let minimumZone: CGFloat = 4
 
     let left: CGFloat
@@ -135,20 +138,33 @@ struct TimelineSelectionGeometry {
             let unit = cluster.unit, origin = cluster.origin
             return isStart ? origin ... origin + unit : origin + 2 * unit ... origin + 3 * unit
         }
-        // Put each joystick outside its true edge. The horizontal shaft then reaches inward
-        // from the ball to the exact trim boundary, leaving the two controls easy to distinguish.
-        let reach = Self.controlBand
-        let zone = isStart
-            ? (edge - 1.5 * reach ... edge - 0.5 * reach)
-            : (edge + 0.5 * reach ... edge + 1.5 * reach)
-        return clamped(zone, width: width)
+        let center = gripCenter(isStart: isStart, width: width)
+        let lower = max(0, center - Self.controlBand / 2)
+        let upper = min(width, center + Self.controlBand / 2)
+        if isStart {
+            // Do not let a clipped endpoint's touch band steal the selection body.
+            let bodyUpper = bodyZone(width: width)?.lowerBound ?? width
+            return lower ... min(upper, bodyUpper)
+        } else {
+            let bodyLower = bodyZone(width: width)?.upperBound ?? 0
+            return max(lower, bodyLower) ... upper
+        }
     }
 
-    /// The joystick stays centered in its own hit band. In Overview the connecting leader
-    /// makes its relationship to the true (possibly sub-pixel) endpoint explicit.
+    /// The visible ball sits in the hit band; at source boundaries the band narrows so it
+    /// cannot overlap the selection body. In Overview a leader marks the true endpoint.
     func handleGripX(isStart: Bool, width: CGFloat) -> CGFloat? {
         guard let zone = handleZone(isStart: isStart, width: width) else { return nil }
-        return (zone.lowerBound + zone.upperBound) / 2
+        if isNarrow { return (zone.lowerBound + zone.upperBound) / 2 }
+        return gripCenter(isStart: isStart, width: width)
+    }
+
+    private func gripCenter(isStart: Bool, width: CGFloat) -> CGFloat {
+        let edge = isStart ? left : right
+        let direction: CGFloat = isStart ? -1 : 1
+        let desired = edge + direction * Self.joystickCenterOffset
+        let radius = Self.joystickBallDiameter / 2
+        return min(max(radius, desired), width - radius)
     }
 
     func bodyZone(width: CGFloat) -> ClosedRange<CGFloat>? {

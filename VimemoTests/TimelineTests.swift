@@ -97,8 +97,23 @@ final class TimelineTests: XCTestCase {
         let endGrip = try XCTUnwrap(geometry.handleGripX(isStart: false, width: strip))
         XCTAssertLessThan(startGrip, geometry.left)
         XCTAssertGreaterThan(endGrip, geometry.right)
-        XCTAssertEqual(geometry.left - startGrip, TimelineSelectionGeometry.controlBand, accuracy: 0.001)
-        XCTAssertEqual(endGrip - geometry.right, TimelineSelectionGeometry.controlBand, accuracy: 0.001)
+        let expectedCenterOffset = TimelineSelectionGeometry.joystickBallDiameter
+        XCTAssertEqual(geometry.left - startGrip, expectedCenterOffset, accuracy: 0.001)
+        XCTAssertEqual(endGrip - geometry.right, expectedCenterOffset, accuracy: 0.001)
+        XCTAssertEqual(geometry.left - (startGrip + TimelineSelectionGeometry.joystickBallDiameter / 2),
+                       TimelineSelectionGeometry.joystickBallDiameter / 2, accuracy: 0.001,
+                       "Leave only half a ball between the true endpoint and the joystick")
+    }
+
+    func testJoystickTouchBandsStayInsideTheStripAtSourceBoundaries() throws {
+        let state = TimelineState(duration: 30, frameRate: 30)
+        let clip = Clip(start: 0, end: 10, cover: 5)
+        let geometry = TimelineSelectionGeometry(state: state, clip: clip, width: strip)
+        let start = try XCTUnwrap(geometry.handleZone(isStart: true, width: strip))
+        let grip = try XCTUnwrap(geometry.handleGripX(isStart: true, width: strip))
+        XCTAssertEqual(start.lowerBound, 0, accuracy: 0.001)
+        XCTAssertGreaterThanOrEqual(grip, TimelineSelectionGeometry.joystickBallDiameter / 2)
+        XCTAssertLessThanOrEqual(start.upperBound, strip)
     }
 
     @MainActor func testTryingToTrimPastOneTenthSecondShowsTheMinimumNoticeAndKeepsTheClipValid() {

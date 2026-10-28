@@ -189,9 +189,13 @@ struct TimelineView: View {
     /// Each round joystick sits outside its endpoint; its horizontal shaft reaches the true edge.
     private func trimHandle(isStart: Bool, zone: ClosedRange<CGFloat>, selection: TimelineSelectionGeometry, width: CGFloat) -> some View {
         let color = isStart ? StudioTheme.accent : StudioTheme.peach
+        let gripX = selection.handleGripX(isStart: isStart, width: width) ?? (zone.lowerBound + zone.upperBound) / 2
         return Color.clear
             .frame(width: max(1, zone.upperBound - zone.lowerBound), height: 70)
-            .overlay { trimJoystick(isStart: isStart, color: color) }
+            .overlay {
+                trimJoystick(isStart: isStart, color: color)
+                    .position(x: gripX - zone.lowerBound, y: 35)
+            }
             .offset(x: zone.lowerBound, y: 2)
             .accessibilityElement(children: .ignore).accessibilityLabel(isStart ? "裁剪入点" : "裁剪出点")
             .accessibilityValue((isStart ? clip.start : clip.end).timeLabel)
@@ -201,7 +205,8 @@ struct TimelineView: View {
 
     private func trimJoystick(isStart: Bool, color: Color) -> some View {
         let ball = Circle().fill(StudioTheme.background)
-            .frame(width: 24, height: 24)
+            .frame(width: TimelineSelectionGeometry.joystickBallDiameter,
+                   height: TimelineSelectionGeometry.joystickBallDiameter)
             .overlay(Circle().stroke(color, lineWidth: 3))
         let direction = Image(systemName: isStart ? "chevron.left" : "chevron.right")
             .font(.system(size: 8, weight: .black))
