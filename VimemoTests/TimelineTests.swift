@@ -238,19 +238,31 @@ final class TimelineTests: XCTestCase {
 
     // MARK: - Precision entry keeps the grip under the finger
 
-    @MainActor func testGrabbingTheStartHandleOpensPrecisionWithTheBallUnderTheFinger() throws {
+    @MainActor func testHandleGrabsIncreasePrecisionByAtMostTwoTimesUntilTheSelectionFits() throws {
         let model = TimelineViewModel()
-        let clip = Clip(start: 3599, end: 3602, cover: 3601)
-        model.configure(duration: 7200, clip: clip, width: strip, frameRate: 30)
+        let clip = Clip(start: 89, end: 92, cover: 90.5)
+        model.configure(duration: 180, clip: clip, width: strip, frameRate: 30)
         let overview = TimelineSelectionGeometry(state: model.state, clip: clip, width: strip)
         let zone = try XCTUnwrap(overview.handleZone(isStart: true, width: strip))
-        let fingerX = (zone.lowerBound + zone.upperBound) / 2
-        model.begin(.start, clip: clip, width: strip, at: fingerX)
-        XCTAssertEqual(model.state.zoomScale, 1200, accuracy: 1, "A three-second window must open at six seconds wide")
-        let fitted = TimelineSelectionGeometry(state: model.state, clip: clip, width: strip)
-        XCTAssertEqual(fitted.width, strip / 2, accuracy: 0.01)
-        XCTAssertEqual(try XCTUnwrap(fitted.handleGripX(isStart: true, width: strip)), fingerX, accuracy: 0.01,
-                       "The round grip the user aimed at must not run away during the zoom")
+        var fingerX = (zone.lowerBound + zone.upperBound) / 2
+        var previousScale = model.state.zoomScale
+        var grabs = 0
+        while model.state.zoomScale < 30 {
+            model.begin(.start, clip: clip, width: strip, at: fingerX)
+            XCTAssertLessThanOrEqual(model.state.zoomScale, previousScale * 2 + 0.0001,
+                                     "A handle grab must never jump more than one doubling")
+            XCTAssertEqual(try XCTUnwrap(TimelineSelectionGeometry(state: model.state, clip: clip, width: strip)
+                                            .handleGripX(isStart: true, width: strip)), fingerX, accuracy: 0.01,
+                           "The round grip must stay under the finger as the viewport zooms")
+            previousScale = model.state.zoomScale
+            grabs += 1
+            model.end()
+            let geometry = TimelineSelectionGeometry(state: model.state, clip: clip, width: strip)
+            fingerX = try XCTUnwrap(geometry.handleGripX(isStart: true, width: strip))
+        }
+        XCTAssertEqual(model.state.zoomScale, 30, accuracy: 0.001,
+                       "Repeated grabs reach the six-second precision window for this source")
+        XCTAssertEqual(grabs, 5, "The 1× overview should progress through 2×, 4×, 8×, 16× and 30×")
     }
 
     @MainActor func testHandleDragTracksTheFingerPixelForPixelAfterTheRefit() {
@@ -259,11 +271,12 @@ final class TimelineTests: XCTestCase {
         model.configure(duration: 7200, clip: clip, width: strip, frameRate: 30)
         model.begin(.start, clip: clip, width: strip, at: 106)
         let before = TimelineSelectionGeometry(state: model.state, clip: clip, width: strip)
-        let moved = model.move(translation: CGSize(width: 20, height: 0), clip: clip, width: strip, speed: 1, maxOutputDuration: 3)
+        let moved = model.move(translation: CGSize(width: 0.02, height: 0), clip: clip, width: strip, speed: 1, maxOutputDuration: 3)
         let after = TimelineSelectionGeometry(state: model.state, clip: moved, width: strip)
-        XCTAssertEqual(after.left - before.left, 20, accuracy: 0.001, "The grip must stay exactly under the finger")
+        XCTAssertEqual(after.left - before.left, 0.02, accuracy: 0.001, "The grip must stay exactly under the finger")
         XCTAssertEqual(after.right - before.right, 0, accuracy: 0.001, "Trimming the start must not slide the whole box")
-        XCTAssertEqual(moved.start, 3599.4, accuracy: 0.0001, "Twenty pixels at two frames per point is 0.4 s")
+        XCTAssertEqual(moved.start, 3599.24, accuracy: 0.001,
+                       "At 2×, a small finger movement uses the matching current viewport scale")
     }
 
     @MainActor func testPrecisionFitClampsAtTheHeadInsteadOfTeleportingTheIntent() {
@@ -273,11 +286,12 @@ final class TimelineTests: XCTestCase {
         model.begin(.start, clip: clip, width: strip, at: 100)
         XCTAssertEqual(model.state.visibleStart, 0, "The viewport cannot start before the source")
         let before = TimelineSelectionGeometry(state: model.state, clip: clip, width: strip)
-        XCTAssertEqual(before.left, 2.5, accuracy: 0.01, "The grip lands where the clamp leaves it")
-        let moved = model.move(translation: CGSize(width: 8, height: 0), clip: clip, width: strip, speed: 1, maxOutputDuration: 3)
+        XCTAssertEqual(before.left, 0.05 / 3600 * strip, accuracy: 0.001,
+                       "At the first 2× step, the edge stays at its true near-source time")
+        let moved = model.move(translation: CGSize(width: 0.001, height: 0), clip: clip, width: strip, speed: 1, maxOutputDuration: 3)
         let after = TimelineSelectionGeometry(state: model.state, clip: moved, width: strip)
-        XCTAssertEqual(after.left - before.left, 8, accuracy: 0.001, "From there the grip still tracks the finger exactly")
-        XCTAssertEqual(moved.start - clip.start, 0.16, accuracy: 0.0001)
+        XCTAssertEqual(after.left - before.left, 0.001, accuracy: 0.001, "From there the grip still tracks the finger exactly")
+        XCTAssertEqual(moved.start - clip.start, 0.012, accuracy: 0.001)
     }
 
     @MainActor func testReleasingNeverJumpsScaleOrViewport() {
@@ -505,7 +519,7 @@ final class TimelineTests: XCTestCase {
                        speed: 1, maxOutputDuration: 3)
         model.end()
         let panned = model.state
-        model.selectionChanged(Clip(start: 6000, end: 6003, cover: 6001))
+        model.selectionChanged(Clip(start: 100, end: 103, cover: 101))
         XCTAssertNotEqual(model.state.visibleStart, panned.visibleStart, accuracy: 0.000_001,
                           "A clip changed elsewhere still gets the camera")
     }

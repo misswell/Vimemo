@@ -66,20 +66,21 @@ struct TimelineState: Equatable {
     }
 
     mutating func fit(clip: Clip, width: CGFloat) {
-        applyPrecisionZoom(for: clip)
+        zoomScale = precisionZoomScale(for: clip)
         center(on: (clip.start + clip.end) / 2)
     }
 
     /// Precision fit that leaves the grabbed edge under the finger. The head and tail of the
     /// source clamp naturally, so an edge already at the boundary simply stops there.
-    mutating func fit(clip: Clip, width: CGFloat, edgeTime: Double, fingerX: CGFloat) {
-        applyPrecisionZoom(for: clip)
+    mutating func fit(clip: Clip, width: CGFloat, edgeTime: Double, fingerX: CGFloat,
+                      maximumScale: CGFloat? = nil) {
+        zoomScale = min(precisionZoomScale(for: clip), maximumScale ?? maximumZoomScale)
         setViewportStart(edgeTime - Double(fingerX) * secondsPerPoint(width: width))
     }
 
-    private mutating func applyPrecisionZoom(for clip: Clip) {
+    func precisionZoomScale(for clip: Clip) -> CGFloat {
         let window = min(videoDuration, max(clip.duration / Self.precisionSelectionFraction, minimumVisibleDuration))
-        zoomScale = min(maximumZoomScale, max(Self.minZoomScale, CGFloat(videoDuration / window)))
+        return min(maximumZoomScale, max(Self.minZoomScale, CGFloat(videoDuration / window)))
     }
 
     mutating func keepVisible(_ clip: Clip) {

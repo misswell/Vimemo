@@ -206,13 +206,31 @@ final class TimelineInteractionTests: XCTestCase {
                        "Overview drags measure against the whole source, not against a refitted box")
         XCTAssertEqual(moved.end - moved.start, beforeMove.end - beforeMove.start, accuracy: 0.02)
 
-        // Grabbing the end grip opens precision with that grip under the finger.
+        // Every new handle grab doubles the zoom until the selected window reaches half
+        // the strip. Drag outward; the existing output-duration limit keeps this clip at 3s.
         var end = handle(app, "trimEndHandle")
+        var previousScale = scale(app)
+        var zoomSteps = 0
+        while scale(app) < 1200, zoomSteps < 12 {
+            grip = end.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+            grip.press(forDuration: 0.05, thenDragTo: grip.withOffset(CGVector(dx: 8, dy: 0)))
+            let currentScale = scale(app)
+            XCTAssertGreaterThan(currentScale, previousScale, "Each handle grab advances the zoom")
+            XCTAssertLessThanOrEqual(currentScale, previousScale * 2.01,
+                                     "Zoom advances by at most one doubling per grab")
+            previousScale = currentScale
+            zoomSteps += 1
+            end = handle(app, "trimEndHandle")
+        }
+        XCTAssertEqual(scale(app), 1200, accuracy: 1, "The small steps reach the precision fit")
+        XCTAssertLessThanOrEqual(zoomSteps, 12)
+
+        end = handle(app, "trimEndHandle")
         let beforeX = end.frame.midX, beforeEnd = seconds(end)
         grip = end.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
         grip.press(forDuration: 0.05, thenDragTo: grip.withOffset(CGVector(dx: -8, dy: 0)))
         end = handle(app, "trimEndHandle")
-        XCTAssertGreaterThan(scale(app), 200, "Grabbing a handle must widen the viewport to the real window")
+        XCTAssertEqual(scale(app), 1200, accuracy: 1, "A precision drag keeps the reached fit scale")
         XCTAssertEqual(end.frame.midX, beforeX - 8, accuracy: 3, "The grip must stay under the finger through the refit")
         XCTAssertEqual(beforeEnd - seconds(end), 8 * secondsPerPoint(app), accuracy: 0.05,
                        "Eight points of precision trim is eight points, not minutes")

@@ -142,21 +142,34 @@ import SwiftUI
     /// stays traversable in one drag.
     private func enterPrecision(target: Target, clip: Clip, edgeTime: Double, fingerX: CGFloat, width: CGFloat) {
         guard state.realWidth(of: clip, width: width) < width * TimelineState.precisionSelectionFraction else { return }
+        let nextScaleLimit = min(state.maximumZoomScale, max(state.zoomScale, state.zoomScale * 2))
         var anchorX = fingerX
         if target == .start || target == .end {
             let geometry = TimelineSelectionGeometry(state: state, clip: clip, width: width)
             let isStart = target == .start
             if let zone = geometry.handleZone(isStart: isStart, width: width),
                let gripX = geometry.handleGripX(isStart: isStart, width: width), zone.contains(fingerX) {
-                // Preserve where the user grabbed the round grip. The edge itself sits one
-                // radius inward from the ball center, so anchoring the edge under the finger
-                // would make the control jump by half a ball when zooming.
                 let grabOffset = fingerX - gripX
                 let desiredGripX = fingerX - grabOffset
-                anchorX = desiredGripX + (isStart ? Self.joystickRadius : -Self.joystickRadius)
+                let projectedWidth = width * clip.duration * nextScaleLimit / CGFloat(state.videoDuration)
+                if projectedWidth < TimelineSelectionGeometry.controlBand {
+                    // In the overview the start and end grips live in a separated three-control
+                    // cluster. Keep the cluster grip under the finger during each zoom step.
+                    let unit = min(TimelineSelectionGeometry.controlBand, width / 3)
+                    anchorX = desiredGripX + (isStart ? unit : -unit) - projectedWidth / 2
+                } else {
+                    // Once the selection is wide enough, the ball sits against its real edge.
+                    anchorX = desiredGripX + (isStart ? Self.joystickRadius : -Self.joystickRadius)
+                }
             }
         }
-        state.fit(clip: clip, width: width, edgeTime: edgeTime, fingerX: anchorX)
+        // Enter precision progressively. A long source can need a very large fit scale, but
+        // jumping there on the first touch makes the timeline appear to teleport. Each new
+        // handle grab advances by at most one doubling until the clip is easy to work with.
+        withAnimation(.easeInOut(duration: 0.22)) {
+            state.fit(clip: clip, width: width, edgeTime: edgeTime, fingerX: anchorX,
+                      maximumScale: nextScaleLimit)
+        }
         isFittedToSelection = true
     }
 
