@@ -135,7 +135,13 @@ struct TimelineSelectionGeometry {
             let unit = cluster.unit, origin = cluster.origin
             return isStart ? origin ... origin + unit : origin + 2 * unit ... origin + 3 * unit
         }
-        return clamped(edge - Self.controlBand / 2 ... edge + Self.controlBand / 2, width: width)
+        // Put each joystick outside its true edge. The horizontal shaft then reaches inward
+        // from the ball to the exact trim boundary, leaving the two controls easy to distinguish.
+        let reach = Self.controlBand
+        let zone = isStart
+            ? (edge - 1.5 * reach ... edge - 0.5 * reach)
+            : (edge + 0.5 * reach ... edge + 1.5 * reach)
+        return clamped(zone, width: width)
     }
 
     /// The joystick stays centered in its own hit band. In Overview the connecting leader

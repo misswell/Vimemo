@@ -89,6 +89,18 @@ final class TimelineTests: XCTestCase {
                           "The separated joystick grips must remain independently addressable")
     }
 
+    func testWideSelectionPlacesRoundJoystickGripsOutsideTheirTrueEdges() throws {
+        let state = TimelineState(duration: 30, frameRate: 30)
+        let clip = Clip(start: 10, end: 20, cover: 15)
+        let geometry = TimelineSelectionGeometry(state: state, clip: clip, width: strip)
+        let startGrip = try XCTUnwrap(geometry.handleGripX(isStart: true, width: strip))
+        let endGrip = try XCTUnwrap(geometry.handleGripX(isStart: false, width: strip))
+        XCTAssertLessThan(startGrip, geometry.left)
+        XCTAssertGreaterThan(endGrip, geometry.right)
+        XCTAssertEqual(geometry.left - startGrip, TimelineSelectionGeometry.controlBand, accuracy: 0.001)
+        XCTAssertEqual(endGrip - geometry.right, TimelineSelectionGeometry.controlBand, accuracy: 0.001)
+    }
+
     @MainActor func testTryingToTrimPastOneTenthSecondShowsTheMinimumNoticeAndKeepsTheClipValid() {
         let width: CGFloat = 300
         let endModel = TimelineViewModel()

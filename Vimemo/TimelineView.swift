@@ -174,20 +174,19 @@ struct TimelineView: View {
     private func trimLeader(isStart: Bool, selection: TimelineSelectionGeometry, width: CGFloat) -> some View {
         let endpoint = isStart ? selection.left : selection.right
         let grip = selection.handleGripX(isStart: isStart, width: width) ?? endpoint
-        guard selection.isNarrow, abs(endpoint - grip) > 8 else { return AnyView(EmptyView()) }
+        guard abs(endpoint - grip) > 2 else { return AnyView(EmptyView()) }
         let color = isStart ? StudioTheme.accent : StudioTheme.peach
         return AnyView(
             Path { path in
-                path.move(to: CGPoint(x: endpoint, y: isStart ? 58 : 63))
-                path.addLine(to: CGPoint(x: grip, y: isStart ? 58 : 63))
+                path.move(to: CGPoint(x: endpoint, y: 37))
+                path.addLine(to: CGPoint(x: grip, y: 37))
             }
-            .stroke(color.opacity(0.9), style: StrokeStyle(lineWidth: 2, lineCap: .round, dash: [3, 3]))
+            .stroke(color, style: StrokeStyle(lineWidth: 4, lineCap: .round))
             .allowsHitTesting(false)
         )
     }
 
-    /// Each endpoint gets a separate arcade joystick. A dotted leader ties a displaced
-    /// Overview grip to the true edge when the selected interval is narrower than the grips.
+    /// Each round joystick sits outside its endpoint; its horizontal shaft reaches the true edge.
     private func trimHandle(isStart: Bool, zone: ClosedRange<CGFloat>, selection: TimelineSelectionGeometry, width: CGFloat) -> some View {
         let color = isStart ? StudioTheme.accent : StudioTheme.peach
         return Color.clear
@@ -202,15 +201,12 @@ struct TimelineView: View {
 
     private func trimJoystick(isStart: Bool, color: Color) -> some View {
         let ball = Circle().fill(StudioTheme.background)
-            .frame(width: 22, height: 22)
+            .frame(width: 24, height: 24)
             .overlay(Circle().stroke(color, lineWidth: 3))
         let direction = Image(systemName: isStart ? "chevron.left" : "chevron.right")
             .font(.system(size: 8, weight: .black))
             .foregroundStyle(color)
-        return ZStack {
-            Capsule().fill(color).frame(width: 5, height: 19).offset(y: 2)
-            ball.overlay(direction).offset(y: -9)
-        }
+        return ball.overlay(direction)
     }
 
     /// A pinch can legally walk the viewport away from the selection. The strip then says so
