@@ -10,7 +10,10 @@ struct TimelineView: View {
     var onSeek: (Double, Bool) -> Void
     @StateObject private var model = TimelineViewModel()
     @StateObject private var thumbnails = TimelineThumbnailManager()
-    private let inset: CGFloat = 22
+    private let inset: CGFloat = 24
+    /// The visible track sits between two touch/drawing gutters. Controls may overhang
+    /// into these gutters so neither the round grips nor the cover scrubber gets detached.
+    private let controlOverhang: CGFloat = 24
     private let stripHeight: CGFloat = 58
 
     var body: some View {
@@ -22,7 +25,7 @@ struct TimelineView: View {
                 let plan = TimelineThumbnailPlan(state: state, frameRate: frameRate)
                 VStack(spacing: 0) {
                     strip(width: width, selection: selection, plan: plan)
-                        .padding(.horizontal, inset)
+                        .padding(.horizontal, inset - controlOverhang)
                         .overlay {
                             TimelinePinchGesture(
                                 hitTest: { point in target(at: point, selection: selection, width: width) },
@@ -157,6 +160,7 @@ struct TimelineView: View {
                     .accessibilityIdentifier("timelineMinimumDurationNotice")
             }
         }.frame(width: width, height: 114, alignment: .topLeading)
+            .padding(.horizontal, controlOverhang)
             .accessibilityElement(children: .contain).accessibilityIdentifier("timelineTrack")
     }
 

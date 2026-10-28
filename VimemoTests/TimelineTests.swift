@@ -107,14 +107,17 @@ final class TimelineTests: XCTestCase {
                        "The end joystick ball edge must touch the true selection edge")
     }
 
-    func testJoystickTouchBandsStayInsideTheStripAtSourceBoundaries() throws {
+    func testJoystickTouchBandsExtendIntoTheSideGutterAtSourceBoundaries() throws {
         let state = TimelineState(duration: 30, frameRate: 30)
         let clip = Clip(start: 0, end: 10, cover: 5)
         let geometry = TimelineSelectionGeometry(state: state, clip: clip, width: strip)
         let start = try XCTUnwrap(geometry.handleZone(isStart: true, width: strip))
         let grip = try XCTUnwrap(geometry.handleGripX(isStart: true, width: strip))
-        XCTAssertEqual(start.lowerBound, 0, accuracy: 0.001)
-        XCTAssertGreaterThanOrEqual(grip, TimelineSelectionGeometry.joystickBallDiameter / 2)
+        XCTAssertEqual(start.lowerBound, -TimelineSelectionGeometry.controlOverhang, accuracy: 0.001)
+        XCTAssertEqual(start.upperBound - start.lowerBound, TimelineSelectionGeometry.controlBand, accuracy: 0.001)
+        XCTAssertEqual(geometry.left, grip + TimelineSelectionGeometry.joystickBallDiameter / 2, accuracy: 0.001,
+                       "The ball keeps touching the true endpoint while it overhangs the strip")
+        XCTAssertLessThan(start.lowerBound, 0)
         XCTAssertLessThanOrEqual(start.upperBound, strip)
     }
 
@@ -156,7 +159,9 @@ final class TimelineTests: XCTestCase {
             XCTAssertEqual(end.upperBound - end.lowerBound, 44, accuracy: 0.001)
             XCTAssertLessThanOrEqual(start.upperBound, body.lowerBound + 0.0001)
             XCTAssertLessThanOrEqual(body.upperBound, end.lowerBound + 0.0001)
-            XCTAssertTrue((0...strip).contains(start.lowerBound) && (0...strip).contains(end.upperBound))
+            let gutter = TimelineSelectionGeometry.controlOverhang
+            XCTAssertTrue((-gutter...strip + gutter).contains(start.lowerBound)
+                          && (-gutter...strip + gutter).contains(end.upperBound))
         }
     }
 
@@ -171,7 +176,8 @@ final class TimelineTests: XCTestCase {
                     guard geometry.isVisible else { continue }
                     if let zone = geometry.handleZone(isStart: true, width: strip) {
                         XCTAssertTrue((0...strip).contains(geometry.left), "A hidden endpoint may not be grabbed")
-                        XCTAssertTrue(zone.lowerBound >= 0 && zone.upperBound <= strip)
+                        XCTAssertTrue(zone.lowerBound >= -TimelineSelectionGeometry.controlOverhang
+                                      && zone.upperBound <= strip + TimelineSelectionGeometry.controlOverhang)
                         XCTAssertGreaterThanOrEqual(zone.upperBound - zone.lowerBound, TimelineSelectionGeometry.minimumZone)
                         if let body = geometry.bodyZone(width: strip) {
                             XCTAssertLessThanOrEqual(zone.upperBound, body.lowerBound + 0.0001)
@@ -196,22 +202,43 @@ final class TimelineTests: XCTestCase {
                             .coverX(for: biased), geometry.right - geometry.width / 10, accuracy: 0.0001)
     }
 
-    func testCoverGripStaysInsideAtSourceEdgesWhileTheLineKeepsItsTrueTime() {
+    func testCoverGripStaysAlignedWithItsLineInTheSideGutter() {
         let state = TimelineState(duration: 7200, frameRate: 30)
         for clip in [Clip(start: 0, end: 3, cover: 0), Clip(start: 7197, end: 7200, cover: 7200)] {
             let geometry = TimelineSelectionGeometry(state: state, clip: clip, width: strip)
             let lineX = geometry.coverX(for: clip)
             let gripX = geometry.coverGripX(for: clip, stripWidth: strip)
             XCTAssertEqual(lineX, clip.start == 0 ? 0 : strip, accuracy: 0.001)
-            XCTAssertEqual(gripX, clip.start == 0 ? 22 : strip - 22, accuracy: 0.001)
-            XCTAssertGreaterThanOrEqual(gripX - 22, 0)
-            XCTAssertLessThanOrEqual(gripX + 22, strip)
+            XCTAssertEqual(gripX, lineX, accuracy: 0.001)
+            XCTAssertGreaterThanOrEqual(gripX - 22, -TimelineSelectionGeometry.controlOverhang)
+            XCTAssertLessThanOrEqual(gripX + 22, strip + TimelineSelectionGeometry.controlOverhang)
+        }
+    }
+
+    func testTrimAndCoverControlsShareTheExpandedCanvasAtViewportEdges() throws {
+        let state = TimelineState(duration: 180, frameRate: 30)
+        let width: CGFloat = 240
+        for clip in [Clip(start: 0, end: 60, cover: 0.1), Clip(start: 120, end: 180, cover: 179.9)] {
+            let geometry = TimelineSelectionGeometry(state: state, clip: clip, width: width)
+            let isAtHead = clip.start == 0
+            let endpoint = isAtHead ? geometry.left : geometry.right
+            let grip = try XCTUnwrap(geometry.handleGripX(isStart: isAtHead, width: width))
+            let zone = try XCTUnwrap(geometry.handleZone(isStart: isAtHead, width: width))
+            let cover = geometry.coverGripX(for: clip, stripWidth: width)
+            let overhang = TimelineSelectionGeometry.controlOverhang
+
+            XCTAssertEqual(abs(endpoint - grip), TimelineSelectionGeometry.joystickCenterOffset, accuracy: 0.001)
+            XCTAssertGreaterThanOrEqual(zone.lowerBound, -overhang)
+            XCTAssertLessThanOrEqual(zone.upperBound, width + overhang)
+            XCTAssertEqual(cover, geometry.coverX(for: clip), accuracy: 0.001)
+            XCTAssertGreaterThanOrEqual(cover - 22, -overhang)
+            XCTAssertLessThanOrEqual(cover + 22, width + overhang)
         }
     }
 
     // MARK: - Precision entry keeps the grip under the finger
 
-    @MainActor func testGrabbingTheStartHandleOpensPrecisionWithThatEdgeUnderTheFinger() throws {
+    @MainActor func testGrabbingTheStartHandleOpensPrecisionWithTheBallUnderTheFinger() throws {
         let model = TimelineViewModel()
         let clip = Clip(start: 3599, end: 3602, cover: 3601)
         model.configure(duration: 7200, clip: clip, width: strip, frameRate: 30)
@@ -222,7 +249,8 @@ final class TimelineTests: XCTestCase {
         XCTAssertEqual(model.state.zoomScale, 1200, accuracy: 1, "A three-second window must open at six seconds wide")
         let fitted = TimelineSelectionGeometry(state: model.state, clip: clip, width: strip)
         XCTAssertEqual(fitted.width, strip / 2, accuracy: 0.01)
-        XCTAssertEqual(fitted.left, fingerX, accuracy: 0.01, "The grip the user aimed at must not run away")
+        XCTAssertEqual(try XCTUnwrap(fitted.handleGripX(isStart: true, width: strip)), fingerX, accuracy: 0.01,
+                       "The round grip the user aimed at must not run away during the zoom")
     }
 
     @MainActor func testHandleDragTracksTheFingerPixelForPixelAfterTheRefit() {

@@ -119,7 +119,8 @@ import SwiftUI
         produced = nil
         autoScrollRate = 0
         if target != .viewport && target != .selection {
-            enterPrecision(clip: clip, edgeTime: grabbedTime(for: target, clip: clip), fingerX: x, width: strip)
+            enterPrecision(target: target, clip: clip, edgeTime: grabbedTime(for: target, clip: clip),
+                           fingerX: x, width: strip)
         }
         let perPoint = target == .cover
             ? clip.duration / max(1, state.realWidth(of: clip, width: strip))
@@ -139,11 +140,27 @@ import SwiftUI
     /// drawn narrower than half the strip opens the precision viewport with that edge under the
     /// finger. Moving the whole selection deliberately keeps the current scale, so a long source
     /// stays traversable in one drag.
-    private func enterPrecision(clip: Clip, edgeTime: Double, fingerX: CGFloat, width: CGFloat) {
+    private func enterPrecision(target: Target, clip: Clip, edgeTime: Double, fingerX: CGFloat, width: CGFloat) {
         guard state.realWidth(of: clip, width: width) < width * TimelineState.precisionSelectionFraction else { return }
-        state.fit(clip: clip, width: width, edgeTime: edgeTime, fingerX: fingerX)
+        var anchorX = fingerX
+        if target == .start || target == .end {
+            let geometry = TimelineSelectionGeometry(state: state, clip: clip, width: width)
+            let isStart = target == .start
+            if let zone = geometry.handleZone(isStart: isStart, width: width),
+               let gripX = geometry.handleGripX(isStart: isStart, width: width), zone.contains(fingerX) {
+                // Preserve where the user grabbed the round grip. The edge itself sits one
+                // radius inward from the ball center, so anchoring the edge under the finger
+                // would make the control jump by half a ball when zooming.
+                let grabOffset = fingerX - gripX
+                let desiredGripX = fingerX - grabOffset
+                anchorX = desiredGripX + (isStart ? Self.joystickRadius : -Self.joystickRadius)
+            }
+        }
+        state.fit(clip: clip, width: width, edgeTime: edgeTime, fingerX: anchorX)
         isFittedToSelection = true
     }
+
+    private static let joystickRadius = TimelineSelectionGeometry.joystickBallDiameter / 2
 
     private func grabbedTime(for target: Target, clip: Clip) -> Double {
         switch target {

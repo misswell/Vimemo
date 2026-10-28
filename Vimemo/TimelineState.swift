@@ -105,6 +105,9 @@ struct TimelineSelectionGeometry {
     /// The ball touches its true endpoint: its center is one radius outside the edge.
     static let joystickBallDiameter: CGFloat = 24
     static let joystickCenterOffset: CGFloat = joystickBallDiameter / 2
+    /// The strip's drawing canvas extends by this much on both sides. This is also the
+    /// gutter available to a full touch band when an endpoint reaches the viewport edge.
+    static let controlOverhang: CGFloat = 24
     static let minimumZone: CGFloat = 4
 
     let left: CGFloat
@@ -125,11 +128,11 @@ struct TimelineSelectionGeometry {
     }
 
     /// The cover line stays on its real time. Only the arrow grip is clamped so its full
-    /// 44 pt touch target remains inside the strip at the source boundaries.
+    /// 44 pt touch target remains within the expanded drawing canvas at the source boundaries.
     func coverGripX(for clip: Clip, stripWidth: CGFloat) -> CGFloat {
-        let x = coverX(for: clip)
-        let inset = min(22, stripWidth / 2)
-        return min(max(inset, x), stripWidth - inset)
+        // The arrow may sit over the gutter; clamping it to the thumbnail edge would break
+        // its relationship with the cover line when the selected frame is at either edge.
+        coverX(for: clip)
     }
 
     func handleZone(isStart: Bool, width: CGFloat) -> ClosedRange<CGFloat>? {
@@ -139,8 +142,12 @@ struct TimelineSelectionGeometry {
             return isStart ? origin ... origin + unit : origin + 2 * unit ... origin + 3 * unit
         }
         let center = gripCenter(isStart: isStart, width: width)
-        let lower = max(0, center - Self.controlBand / 2)
-        let upper = min(width, center + Self.controlBand / 2)
+        let gutter = Self.controlOverhang
+        let minimum = -gutter
+        let maximum = width + gutter
+        let band = Self.controlBand
+        let lower = min(max(minimum, center - band / 2), maximum - band)
+        let upper = lower + band
         if isStart {
             // Do not let a clipped endpoint's touch band steal the selection body.
             let bodyUpper = bodyZone(width: width)?.lowerBound ?? width
@@ -162,9 +169,9 @@ struct TimelineSelectionGeometry {
     private func gripCenter(isStart: Bool, width: CGFloat) -> CGFloat {
         let edge = isStart ? left : right
         let direction: CGFloat = isStart ? -1 : 1
-        let desired = edge + direction * Self.joystickCenterOffset
-        let radius = Self.joystickBallDiameter / 2
-        return min(max(radius, desired), width - radius)
+        // Do not clamp each joystick to the thumbnail edge. The padded canvas carries it
+        // into the gutter, keeping the ball tangent to the true selection endpoint.
+        return edge + direction * Self.joystickCenterOffset
     }
 
     func bodyZone(width: CGFloat) -> ClosedRange<CGFloat>? {
@@ -189,7 +196,8 @@ struct TimelineSelectionGeometry {
         guard isNarrow else { return nil }
         let unit = min(Self.controlBand, width / 3)
         guard unit * 3 <= width else { return nil }
-        return (min(max(0, midpoint - 1.5 * unit), max(0, width - unit * 3)), unit)
+        let gutter = Self.controlOverhang
+        return (min(max(-gutter, midpoint - 1.5 * unit), max(-gutter, width - unit * 3 + gutter)), unit)
     }
 
     private func clamped(_ zone: ClosedRange<CGFloat>, width: CGFloat) -> ClosedRange<CGFloat>? {
