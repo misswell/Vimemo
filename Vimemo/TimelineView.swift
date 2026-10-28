@@ -120,7 +120,7 @@ struct TimelineView: View {
                     .allowsHitTesting(false)
                 Rectangle().fill(.black.opacity(0.55)).frame(width: max(0, width - visibleRight), height: stripHeight)
                     .offset(x: visibleRight, y: 8).allowsHitTesting(false)
-                let drawnWidth = max(3, visibleRight - visibleLeft)
+                let drawnWidth = max(0.5, visibleRight - visibleLeft)
                 RoundedRectangle(cornerRadius: 8).stroke(StudioTheme.accent, lineWidth: 3)
                     .frame(width: drawnWidth, height: 61)
                     .offset(x: visibleLeft, y: 6.5).allowsHitTesting(false)
@@ -159,14 +159,18 @@ struct TimelineView: View {
             .accessibilityAdjustableAction { direction in adjust(.selection, direction: direction, width: width) }
     }
 
-    /// The 44 pt grab band is the element, so what a test or a thumb lands on is what the hit
-    /// test admits. A narrow selection draws its bars against the middle instead.
+    /// The 44 pt touch band remains available in overview. The visible selection outline is the
+    /// endpoint cue there, because drawing a full-size bar at a displaced touch band lies about time.
     private func trimHandle(isStart: Bool, zone: ClosedRange<CGFloat>, selection: TimelineSelectionGeometry, width: CGFloat) -> some View {
         let bar = RoundedRectangle(cornerRadius: 5).fill(StudioTheme.accent).frame(width: 20, height: 61)
             .overlay { Capsule().fill(StudioTheme.onAccent.opacity(0.8)).frame(width: 2, height: 19) }
         return Color.clear
             .frame(width: max(1, zone.upperBound - zone.lowerBound), height: 70)
-            .overlay(alignment: selection.isNarrow ? (isStart ? .trailing : .leading) : .center) { bar }
+            // In overview the selection can be narrower than a pixel. Its red outline shows
+            // the true endpoints; don't draw large handles elsewhere and imply false times.
+            .overlay {
+                if !selection.isNarrow { bar }
+            }
             .offset(x: zone.lowerBound, y: 2)
             .accessibilityElement(children: .ignore).accessibilityLabel(isStart ? "裁剪入点" : "裁剪出点")
             .accessibilityValue((isStart ? clip.start : clip.end).timeLabel)
@@ -187,19 +191,22 @@ struct TimelineView: View {
     }
 
     private func coverHandle(x: CGFloat, width: CGFloat) -> some View {
-        ZStack(alignment: .top) {
+        let selection = TimelineSelectionGeometry(state: model.state, clip: clip, width: width)
+        let gripX = selection.coverGripX(for: clip, stripWidth: width)
+        return ZStack {
             Capsule().fill(StudioTheme.peach).frame(width: model.target == .cover ? 3 : 2, height: 70)
-                .offset(y: 11).allowsHitTesting(false).accessibilityHidden(true)
+                .position(x: x, y: 46).allowsHitTesting(false).accessibilityHidden(true)
             Image(systemName: "arrow.left.and.right").font(.system(size: 10, weight: .bold))
                 .foregroundStyle(StudioTheme.onAccent).frame(width: 30, height: 22)
                 .background(StudioTheme.peach, in: Capsule())
-                .frame(width: 44, height: 44).offset(y: 68)
+                .frame(width: 44, height: 44)
                 .accessibilityElement(children: .ignore).accessibilityLabel("拖动选择封面帧")
                 .accessibilityValue("第 \(Int((clip.cover * max(1, frameRate)).rounded())) 帧")
                 .accessibilityHint("左右拖动，向下拉可降低选帧速度")
                 .accessibilityIdentifier("coverFrameHandle")
                 .accessibilityAdjustableAction { direction in adjust(.cover, direction: direction, width: width) }
-        }.frame(width: 44, height: 114, alignment: .top).offset(x: x - 22)
+                .position(x: gripX, y: 90)
+        }.frame(width: width, height: 114)
     }
 
     /// Only controls that are actually drawn may be grabbed, so a touch never edits a target
@@ -207,8 +214,10 @@ struct TimelineView: View {
     private func target(at point: CGPoint, selection: TimelineSelectionGeometry, width: CGFloat) -> TimelineViewModel.Target {
         let x = point.x - inset
         guard selection.isVisible else { return .viewport }
-        if point.y >= 68, (0...width).contains(selection.coverX(for: clip)),
-           abs(x - selection.coverX(for: clip)) <= 22 { return .cover }
+        let coverX = selection.coverX(for: clip)
+        let coverGripX = selection.coverGripX(for: clip, stripWidth: width)
+        if point.y >= 68, (0...width).contains(coverX),
+           abs(x - coverGripX) <= 22 { return .cover }
         guard point.y <= 72 else { return .viewport }
         if let start = selection.handleZone(isStart: true, width: width), start.contains(x) { return .start }
         if let end = selection.handleZone(isStart: false, width: width), end.contains(x) { return .end }

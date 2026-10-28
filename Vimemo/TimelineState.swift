@@ -121,6 +121,14 @@ struct TimelineSelectionGeometry {
         left + CGFloat(min(1, max(0, (clip.cover - clip.start) / max(0.1, clip.duration)))) * width
     }
 
+    /// The cover line stays on its real time. Only the arrow grip is clamped so its full
+    /// 44 pt touch target remains inside the strip at the source boundaries.
+    func coverGripX(for clip: Clip, stripWidth: CGFloat) -> CGFloat {
+        let x = coverX(for: clip)
+        let inset = min(22, stripWidth / 2)
+        return min(max(inset, x), stripWidth - inset)
+    }
+
     func handleZone(isStart: Bool, width: CGFloat) -> ClosedRange<CGFloat>? {
         guard isVisible, let edge = grabbableEdge(isStart, width: width) else { return nil }
         if let cluster = cluster(in: width) {

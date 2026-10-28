@@ -140,6 +140,19 @@ final class TimelineTests: XCTestCase {
                             .coverX(for: biased), geometry.right - geometry.width / 10, accuracy: 0.0001)
     }
 
+    func testCoverGripStaysInsideAtSourceEdgesWhileTheLineKeepsItsTrueTime() {
+        let state = TimelineState(duration: 7200, frameRate: 30)
+        for clip in [Clip(start: 0, end: 3, cover: 0), Clip(start: 7197, end: 7200, cover: 7200)] {
+            let geometry = TimelineSelectionGeometry(state: state, clip: clip, width: strip)
+            let lineX = geometry.coverX(for: clip)
+            let gripX = geometry.coverGripX(for: clip, stripWidth: strip)
+            XCTAssertEqual(lineX, clip.start == 0 ? 0 : strip, accuracy: 0.001)
+            XCTAssertEqual(gripX, clip.start == 0 ? 22 : strip - 22, accuracy: 0.001)
+            XCTAssertGreaterThanOrEqual(gripX - 22, 0)
+            XCTAssertLessThanOrEqual(gripX + 22, strip)
+        }
+    }
+
     // MARK: - Precision entry keeps the grip under the finger
 
     @MainActor func testGrabbingTheStartHandleOpensPrecisionWithThatEdgeUnderTheFinger() throws {
