@@ -217,7 +217,7 @@ struct TimelineView: View {
         let selection = TimelineSelectionGeometry(state: model.state, clip: clip, width: width)
         let gripX = selection.coverGripX(for: clip, stripWidth: width)
         return ZStack {
-            Capsule().fill(StudioTheme.peach).frame(width: model.target == .cover ? 3 : 2, height: 70)
+            Capsule().fill(StudioTheme.peach).frame(width: model.target == .cover ? 3 : 2, height: 76)
                 .position(x: x, y: 46).allowsHitTesting(false).accessibilityHidden(true)
             Image(systemName: "arrow.left.and.right").font(.system(size: 10, weight: .bold))
                 .foregroundStyle(StudioTheme.onAccent).frame(width: 30, height: 22)
