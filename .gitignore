@@ -11,3 +11,12 @@ Reference/
 *.p12
 xcuserdata/
 *.xcuserstate
+
+# Local promotional renders, review captures, and generated audio
+Promo/exports/
+Promo/Remake/exports/
+Promo/Remake/review/
+Promo/Remake/audio/
+
+# Source videos kept locally for promotional edits
+vibe_videos/
